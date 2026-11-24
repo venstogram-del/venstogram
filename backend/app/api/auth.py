@@ -271,6 +271,10 @@ async def update_profile(
         current_user.wallet_pin = req.wallet_pin
     if req.biometric_enabled is not None:
         current_user.biometric_enabled = req.biometric_enabled
+    if req.is_incognito is not None:
+        current_user.is_incognito = req.is_incognito
+    if req.is_private is not None:
+        current_user.is_private = req.is_private
 
     await db.commit()
     await db.refresh(current_user)
@@ -299,6 +303,8 @@ async def update_profile(
 # ============================================================================
 
 @router.post("/register-email")
+@router.post("/send-code")
+@router.post("/email-code")
 async def register_email(req: EmailRegisterRequest, db: AsyncSession = Depends(get_db)):
     """
     Step 1 of Email Registration:
@@ -393,6 +399,7 @@ async def register_email(req: EmailRegisterRequest, db: AsyncSession = Depends(g
 
 
 @router.post("/verify-email-code", response_model=AuthResponse)
+@router.post("/verify-code", response_model=AuthResponse)
 async def verify_email_code(req: EmailVerifyCodeRequest, db: AsyncSession = Depends(get_db)):
     """
     Step 2 of Email Registration:

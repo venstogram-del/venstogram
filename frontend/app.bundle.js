@@ -717,7 +717,7 @@ function ShareModal({
   }, []);
   const loadRecentDialogs = async () => {
     try {
-      const res = await Api.get("/chat/dialogs");
+      const res = await Api.get("/chats/dialogs");
       if (Array.isArray(res)) {
         // Res may contain partner objects
         const users = res.map(d => d.partner || d.user || d).filter(Boolean);
@@ -758,7 +758,7 @@ function ShareModal({
     try {
       for (const recipientId of selectedUserIds) {
         try {
-          await Api.post("/chat/send", {
+          await Api.post("/chats/send", {
             recipient_id: recipientId,
             content: shareText,
             media_url: mediaUrl,
@@ -855,7 +855,7 @@ function ShareModal({
     }, /*#__PURE__*/React.createElement("div", {
       className: "flex items-center space-x-2.5"
     }, /*#__PURE__*/React.createElement("img", {
-      src: u.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+      src: u.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
       alt: u.username,
       className: "w-8 h-8 rounded-full object-cover border border-slate-700"
     }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
@@ -904,6 +904,8 @@ function PostModal({
   const [reportReason, setReportReason] = useState("Запрещенный контент / Порнография (Ст. 130 УК РУз)");
   const [isSaved, setIsSaved] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [replyToComment, setReplyToComment] = useState(null); // { id, username }
+
   const commentInputRef = useRef(null);
   useEffect(() => {
     if (post && post.id) {
@@ -953,9 +955,11 @@ function PostModal({
     setNewComment("");
     try {
       const added = await Api.post(`/posts/${currentPost.id}/comments`, {
-        text
+        text,
+        parent_id: replyToComment?.id || null
       });
       setComments(prev => [...prev, added]);
+      setReplyToComment(null);
       const updated = {
         ...currentPost,
         comments_count: (currentPost.comments_count || 0) + 1
@@ -964,10 +968,14 @@ function PostModal({
       if (onPostUpdated) onPostUpdated(updated);
     } catch (e) {}
   };
-  const handleReplyToComment = authorUsername => {
+  const handleReplyToComment = c => {
     triggerHaptic("light");
-    if (!authorUsername) return;
-    setNewComment(`@${authorUsername}, `);
+    if (!c || !c.author?.username) return;
+    setReplyToComment({
+      id: c.id,
+      username: c.author.username
+    });
+    setNewComment(`@${c.author.username} `);
     setTimeout(() => {
       commentInputRef.current?.focus();
     }, 50);
@@ -1036,7 +1044,7 @@ function PostModal({
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-2.5"
   }, /*#__PURE__*/React.createElement("img", {
-    src: currentPost.author?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    src: currentPost.author?.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
     className: "w-9 h-9 rounded-full object-cover ring-1 ring-pink-500"
   }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-1"
@@ -1122,32 +1130,50 @@ function PostModal({
     className: "text-[10px] text-slate-500 uppercase font-black tracking-wider block"
   }, "\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438 (", comments.length, "):"), comments.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "text-center py-4 text-slate-500 text-xs"
-  }, "\u0411\u0443\u0434\u044C\u0442\u0435 \u043F\u0435\u0440\u0432\u044B\u043C, \u043A\u0442\u043E \u043E\u0441\u0442\u0430\u0432\u0438\u0442 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439! \u2728") : comments.map(c => /*#__PURE__*/React.createElement("div", {
-    key: c.id,
-    className: "flex items-start space-x-2 text-xs"
-  }, /*#__PURE__*/React.createElement("img", {
-    src: c.author?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
-    className: "w-6 h-6 rounded-full object-cover shrink-0 mt-0.5"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "bg-slate-900 p-2 rounded-xl border border-slate-800/80 flex-1"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-0.5"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "font-black text-pink-400"
-  }, "@", c.author?.username), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2"
-  }, /*#__PURE__*/React.createElement("button", {
+  }, "\u0411\u0443\u0434\u044C\u0442\u0435 \u043F\u0435\u0440\u0432\u044B\u043C, \u043A\u0442\u043E \u043E\u0441\u0442\u0430\u0432\u0438\u0442 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439! \u2728") : comments.map(c => {
+    const isNested = Boolean(c.parent_id);
+    return /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      className: `flex items-start space-x-2 text-xs transition-all ${isNested ? "ml-5 pl-2 border-l-2 border-pink-500/50 bg-pink-950/10 rounded-r-xl" : ""}`
+    }, /*#__PURE__*/React.createElement("img", {
+      src: c.author?.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
+      className: "w-6 h-6 rounded-full object-cover shrink-0 mt-0.5"
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "bg-slate-900 p-2 rounded-xl border border-slate-800/80 flex-1"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-between mb-0.5"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center space-x-1.5"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "font-black text-pink-400"
+    }, "@", c.author?.username), isNested && /*#__PURE__*/React.createElement("span", {
+      className: "text-[9px] text-pink-400/80 bg-pink-950/60 px-1 py-0.2 rounded font-semibold"
+    }, "\u21B3 \u043E\u0442\u0432\u0435\u0442")), /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center space-x-2"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => handleReplyToComment(c),
+      className: "text-[10px] text-sky-400 hover:underline font-bold"
+    }, "\u041E\u0442\u0432\u0435\u0442\u0438\u0442\u044C"), (c.author?.id === currentUser?.id || c.user_id === currentUser?.id || currentPost.author?.id === currentUser?.id || currentUser?.role === "director") && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => handleDeleteComment(c.id),
+      className: "text-[10px] text-rose-500 hover:text-rose-400",
+      title: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439"
+    }, "\uD83D\uDDD1\uFE0F"))), /*#__PURE__*/React.createElement("span", {
+      className: "text-slate-200"
+    }, c.text)));
+  })), replyToComment && /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-800/90 px-3 py-1.5 flex items-center justify-between text-[11px] text-pink-300 border-t border-slate-700/60"
+  }, /*#__PURE__*/React.createElement("span", null, "\u21B3 \u041E\u0442\u0432\u0435\u0442 \u0434\u043B\u044F ", /*#__PURE__*/React.createElement("strong", {
+    className: "text-white"
+  }, "@", replyToComment.username)), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => handleReplyToComment(c.author?.username),
-    className: "text-[10px] text-sky-400 hover:underline font-bold"
-  }, "\u041E\u0442\u0432\u0435\u0442\u0438\u0442\u044C"), (c.author?.id === currentUser?.id || c.user_id === currentUser?.id || currentPost.author?.id === currentUser?.id || currentUser?.role === "director") && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => handleDeleteComment(c.id),
-    className: "text-[10px] text-rose-500 hover:text-rose-400",
-    title: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439"
-  }, "\uD83D\uDDD1\uFE0F"))), /*#__PURE__*/React.createElement("span", {
-    className: "text-slate-200"
-  }, c.text))))), /*#__PURE__*/React.createElement("form", {
+    onClick: () => {
+      setReplyToComment(null);
+      setNewComment("");
+    },
+    className: "text-slate-400 hover:text-white font-bold ml-2 text-xs"
+  }, "\u2715")), /*#__PURE__*/React.createElement("form", {
     onSubmit: handleAddComment,
     className: "p-2.5 bg-slate-900 border-t border-slate-800 flex items-center space-x-2"
   }, /*#__PURE__*/React.createElement("input", {
@@ -1178,7 +1204,7 @@ function PostModal({
     key: u.id,
     className: "flex items-center space-x-2 text-xs"
   }, /*#__PURE__*/React.createElement("img", {
-    src: u.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+    src: u.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
     className: "w-7 h-7 rounded-full object-cover"
   }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "font-bold text-white block"
@@ -1217,6 +1243,299 @@ function PostModal({
     type: "submit",
     className: "flex-1 bg-rose-600 hover:bg-rose-500 text-white py-2 rounded-xl text-xs font-bold shadow-md"
   }, "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0436\u0430\u043B\u043E\u0431\u0443")))));
+}
+
+// --- File: components/UserProfileModal.jsx ---
+
+const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E";
+function UserProfileModal({
+  userId,
+  currentUser,
+  onClose,
+  onOpenChat,
+  onSelectPost,
+  t
+}) {
+  const [profile, setProfile] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [reels, setReels] = useState([]);
+  const [activeTab, setActiveTab] = useState("posts"); // posts | reels
+  const [loading, setLoading] = useState(true);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [copySuccess, setCopySuccess] = useState(false);
+  useEffect(() => {
+    if (userId) {
+      loadProfileData();
+    }
+  }, [userId]);
+  const loadProfileData = async () => {
+    setLoading(true);
+    try {
+      const [profRes, postsRes, reelsRes] = await Promise.all([Api.get(`/users/${userId}/profile`).catch(() => null), Api.get(`/users/${userId}/posts`).catch(() => []), Api.get(`/users/${userId}/reels`).catch(() => [])]);
+      if (profRes) {
+        setProfile(profRes);
+        setIsFollowing(Boolean(profRes.is_following));
+        setFollowersCount(profRes.followers_count || 0);
+      }
+      setPosts(postsRes || []);
+      setReels(reelsRes || []);
+    } catch (err) {
+      console.warn("Failed to load user profile:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleFollowToggle = async () => {
+    triggerHaptic("medium");
+    const nextState = !isFollowing;
+    setIsFollowing(nextState);
+    setFollowersCount(prev => nextState ? prev + 1 : Math.max(0, prev - 1));
+    try {
+      await Api.post(`/users/${userId}/follow`, {});
+    } catch (e) {
+      // Revert if error
+      setIsFollowing(!nextState);
+      setFollowersCount(prev => !nextState ? prev + 1 : Math.max(0, prev - 1));
+    }
+  };
+  const handleCopyLink = () => {
+    triggerHaptic("light");
+    const username = profile?.username || `id${userId}`;
+    const url = `https://t.me/venstogrambot?startapp=u_${username}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+    }
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
+  const handleOpenChannel = channel => {
+    triggerHaptic("light");
+    let url = channel;
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      const cleaned = url.replace("@", "");
+      url = `https://t.me/${cleaned}`;
+    }
+    if (window.Telegram?.WebApp?.openTelegramLink) {
+      window.Telegram.WebApp.openTelegramLink(url);
+    } else {
+      window.open(url, "_blank");
+    }
+  };
+  const isMe = currentUser?.id === userId;
+
+  // Compute total likes across posts and reels
+  const totalLikes = posts.reduce((acc, p) => acc + (p.likes_count || 0), 0) + reels.reduce((acc, r) => acc + (r.likes_count || 0), 0);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 bg-slate-950 flex flex-col overflow-y-auto animate-fadeIn"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sticky top-0 z-20 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      triggerHaptic("light");
+      onClose();
+    },
+    className: "flex items-center space-x-1.5 text-slate-300 hover:text-white p-1 rounded-lg"
+  }, /*#__PURE__*/React.createElement("svg", {
+    className: "w-5 h-5",
+    fill: "none",
+    stroke: "currentColor",
+    viewBox: "0 0 24 24"
+  }, /*#__PURE__*/React.createElement("path", {
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    strokeWidth: "2.5",
+    d: "M15 19l-7-7 7-7"
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold"
+  }, "\u041D\u0430\u0437\u0430\u0434")), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm font-black text-white"
+  }, "@", profile?.username || `user_${userId}`), profile?.is_verified && /*#__PURE__*/React.createElement("span", {
+    className: `text-xs ${profile?.badge_type === "gold_founder" ? "text-amber-400" : "text-sky-400"}`,
+    title: profile?.badge_type === "gold_founder" ? "Основатель" : "Верифицирован"
+  }, "\u2713")), /*#__PURE__*/React.createElement("button", {
+    onClick: handleCopyLink,
+    className: "p-1.5 bg-slate-800 text-slate-300 hover:text-white rounded-lg text-xs font-semibold flex items-center space-x-1",
+    title: "\u041F\u043E\u0434\u0435\u043B\u0438\u0442\u044C\u0441\u044F \u043F\u0440\u043E\u0444\u0438\u043B\u0435\u043C"
+  }, /*#__PURE__*/React.createElement("svg", {
+    className: "w-4 h-4",
+    fill: "none",
+    stroke: "currentColor",
+    viewBox: "0 0 24 24"
+  }, /*#__PURE__*/React.createElement("path", {
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    strokeWidth: "2",
+    d: "M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+  })))), copySuccess && /*#__PURE__*/React.createElement("div", {
+    className: "bg-emerald-500 text-black text-xs font-bold text-center py-1"
+  }, "\u2713 \u0421\u0441\u044B\u043B\u043A\u0430 \u043D\u0430 \u043F\u0440\u043E\u0444\u0438\u043B\u044C \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u043D\u0430!"), loading ? /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 flex flex-col items-center justify-center p-8 space-y-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-slate-400"
+  }, "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043F\u0440\u043E\u0444\u0438\u043B\u044F...")) : /*#__PURE__*/React.createElement("div", {
+    className: "p-4 space-y-5 pb-20"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-start space-x-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: profile?.avatar_url || DEFAULT_AVATAR,
+    alt: "Avatar",
+    className: "w-20 h-20 rounded-full object-cover border-2 border-pink-500/60 p-0.5 shadow-lg bg-slate-900",
+    onError: e => {
+      e.currentTarget.onerror = null;
+      e.currentTarget.src = DEFAULT_AVATAR;
+    }
+  }), profile?.is_verified && /*#__PURE__*/React.createElement("span", {
+    className: "absolute bottom-0 right-0 bg-sky-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-950"
+  }, "\u2713")), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 min-w-0"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "text-base font-black text-white truncate"
+  }, profile?.first_name, " ", profile?.last_name || ""), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-pink-400 font-bold"
+  }, "@", profile?.username), profile?.bio && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-300 mt-1.5 whitespace-pre-line leading-relaxed"
+  }, profile?.bio), profile?.telegram_channel && /*#__PURE__*/React.createElement("button", {
+    onClick: () => handleOpenChannel(profile.telegram_channel),
+    className: "mt-2 inline-flex items-center space-x-1 bg-sky-950/60 border border-sky-800/60 px-2 py-0.5 rounded-lg text-[11px] text-sky-300 hover:text-white"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCE2 Telegram: ", profile.telegram_channel), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px]"
+  }, "\u2197")))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-4 gap-2 bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3 text-center"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "block text-sm font-black text-white"
+  }, posts.length), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400 font-medium"
+  }, "\u041F\u043E\u0441\u0442\u044B")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "block text-sm font-black text-white"
+  }, followersCount), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400 font-medium"
+  }, "\u041F\u043E\u0434\u043F\u0438\u0441\u0447\u0438\u043A\u0438")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "block text-sm font-black text-white"
+  }, profile?.following_count || 0), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400 font-medium"
+  }, "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0438")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "block text-sm font-black text-pink-400"
+  }, "\u2764\uFE0F ", totalLikes), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400 font-medium"
+  }, "\u041B\u0430\u0439\u043A\u0438"))), !isMe && /*#__PURE__*/React.createElement("div", {
+    className: "flex space-x-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleFollowToggle,
+    className: `flex-1 py-2.5 rounded-xl text-xs font-black transition-all ${isFollowing ? "bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700" : "bg-gradient-to-r from-pink-600 to-rose-500 text-white shadow-md shadow-pink-600/30 active:scale-95"}`
+  }, isFollowing ? "✓ В подписках" : "+ Подписаться"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      triggerHaptic("medium");
+      onOpenChat({
+        id: profile.id,
+        username: profile.username,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        avatar_url: profile.avatar_url,
+        is_verified: profile.is_verified
+      });
+      onClose();
+    },
+    className: "flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sky-400 rounded-xl text-xs font-black flex items-center justify-center space-x-1.5 transition-all active:scale-95"
+  }, /*#__PURE__*/React.createElement("svg", {
+    className: "w-4 h-4",
+    fill: "none",
+    stroke: "currentColor",
+    viewBox: "0 0 24 24"
+  }, /*#__PURE__*/React.createElement("path", {
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    strokeWidth: "2",
+    d: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+  })), /*#__PURE__*/React.createElement("span", null, "\u041D\u0430\u043F\u0438\u0441\u0430\u0442\u044C"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex border-b border-slate-800 text-xs font-bold"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      triggerHaptic("light");
+      setActiveTab("posts");
+    },
+    className: `flex-1 py-2.5 flex items-center justify-center space-x-1.5 border-b-2 transition-all ${activeTab === "posts" ? "border-pink-500 text-pink-400" : "border-transparent text-slate-500 hover:text-slate-300"}`
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCF8 \u041F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0438"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] bg-slate-800 px-1.5 py-0.2 rounded-full"
+  }, posts.length)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      triggerHaptic("light");
+      setActiveTab("reels");
+    },
+    className: `flex-1 py-2.5 flex items-center justify-center space-x-1.5 border-b-2 transition-all ${activeTab === "reels" ? "border-pink-500 text-pink-400" : "border-transparent text-slate-500 hover:text-slate-300"}`
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83C\uDFAC Reels"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] bg-slate-800 px-1.5 py-0.2 rounded-full"
+  }, reels.length))), activeTab === "posts" && /*#__PURE__*/React.createElement("div", null, posts.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "text-center py-12 space-y-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-3xl block"
+  }, "\uD83D\uDCF7"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-slate-400"
+  }, "\u041D\u0435\u0442 \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0439"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500"
+  }, "\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C \u043F\u043E\u043A\u0430 \u043D\u0435 \u043F\u043E\u0434\u0435\u043B\u0438\u043B\u0441\u044F \u0444\u043E\u0442\u043E \u0438\u043B\u0438 \u0432\u0438\u0434\u0435\u043E")) : /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-1"
+  }, posts.map(post => {
+    const thumb = post.media_urls && post.media_urls[0] || post.media_url || "";
+    const isVideo = post.media_type === "video";
+    return /*#__PURE__*/React.createElement("div", {
+      key: post.id,
+      onClick: () => {
+        triggerHaptic("light");
+        if (onSelectPost) {
+          onSelectPost(post);
+        }
+      },
+      className: "relative aspect-square bg-slate-900 overflow-hidden cursor-pointer group"
+    }, isVideo ? /*#__PURE__*/React.createElement("video", {
+      src: thumb,
+      className: "w-full h-full object-cover",
+      preload: "metadata",
+      muted: true
+    }) : /*#__PURE__*/React.createElement("img", {
+      src: thumb || DEFAULT_AVATAR,
+      alt: "",
+      className: "w-full h-full object-cover group-hover:scale-105 transition-transform duration-200",
+      onError: e => {
+        e.currentTarget.onerror = null;
+        e.currentTarget.src = DEFAULT_AVATAR;
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2 text-white text-[11px] font-bold"
+    }, /*#__PURE__*/React.createElement("span", null, "\u2764\uFE0F ", post.likes_count || 0)));
+  }))), activeTab === "reels" && /*#__PURE__*/React.createElement("div", null, reels.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "text-center py-12 space-y-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-3xl block"
+  }, "\uD83C\uDFAC"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-slate-400"
+  }, "\u041D\u0435\u0442 Reels"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500"
+  }, "\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C \u043F\u043E\u043A\u0430 \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u043B \u043A\u043E\u0440\u043E\u0442\u043A\u0438\u0435 \u0432\u0438\u0434\u0435\u043E")) : /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-1"
+  }, reels.map(reel => /*#__PURE__*/React.createElement("div", {
+    key: reel.id,
+    onClick: () => {
+      triggerHaptic("light");
+      if (onSelectPost) {
+        onSelectPost(reel);
+      }
+    },
+    className: "relative aspect-[9/16] bg-slate-900 overflow-hidden cursor-pointer group"
+  }, /*#__PURE__*/React.createElement("video", {
+    src: reel.video_url,
+    className: "w-full h-full object-cover",
+    preload: "metadata",
+    muted: true
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute bottom-1 left-1 flex items-center space-x-1 text-white text-[10px] font-bold drop-shadow-md"
+  }, /*#__PURE__*/React.createElement("span", null, "\u25B6 ", reel.views_count || reel.likes_count || 0))))))));
 }
 
 // --- File: components/Header.jsx ---
@@ -1482,6 +1801,10 @@ function StoriesBar({
   const [isPaused, setIsPaused] = useState(false);
   const [uploadingStory, setUploadingStory] = useState(false);
   const [storyMuted, setStoryMuted] = useState(false);
+  const [storyReplyText, setStoryReplyText] = useState("");
+  const [replySent, setReplySent] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [pendingFile, setPendingFile] = useState(null);
   const progressTimerRef = useRef(null);
   const fileInputRef = useRef(null);
   const isVideoStory = (url, mediaType) => {
@@ -1490,31 +1813,60 @@ function StoriesBar({
     const clean = url.split("?")[0].toLowerCase();
     return clean.endsWith(".mp4") || clean.endsWith(".webm") || clean.endsWith(".mov") || clean.endsWith(".m4v") || clean.endsWith(".ogg") || clean.includes("/video");
   };
-  const handleStoryFileSelect = async e => {
+  const handleStoryFileSelect = e => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPendingFile(file);
+    setUploadModalOpen(true);
+  };
+  const handleUploadStory = async isCloseFriends => {
+    if (!pendingFile) return;
+    setUploadModalOpen(false);
     setUploadingStory(true);
     triggerHaptic("medium");
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", pendingFile);
       const uploadRes = await Api.post("/upload", formData);
-      const isVideo = file.type.startsWith("video");
+      const isVideo = pendingFile.type.startsWith("video");
       await Api.post("/stories", {
         media_url: uploadRes.url,
         media_type: isVideo ? "video" : "image",
-        caption: ""
+        caption: "",
+        is_close_friends: isCloseFriends
       });
       SoundEngine.playFanfare();
       triggerHaptic("success");
-      alert(isVideo ? "Видео-история успешно опубликована!" : "Фото-история успешно опубликована!");
+      alert(isCloseFriends ? "💚 История для близких друзей опубликована!" : "История успешно опубликована!");
       if (onStoryCreated) onStoryCreated();
     } catch (err) {
       triggerHaptic("error");
       alert("Ошибка загрузки истории: " + (err.message || "Не удалось загрузить файл"));
     } finally {
       setUploadingStory(false);
+      setPendingFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+  const handleSendStoryReply = async e => {
+    if (e) e.preventDefault();
+    if (!storyReplyText.trim() || !activeViewerGroup) return;
+    triggerHaptic("medium");
+    const partnerId = activeViewerGroup.user.id;
+    const currentStory = activeViewerGroup.stories[currentStoryIndex];
+    try {
+      await Api.post("/chats/send", {
+        recipient_id: partnerId,
+        content: `💬 Ответ на историю: "${storyReplyText}"`,
+        media_url: currentStory?.media_url,
+        media_type: "story_reply",
+        shared_entity_id: currentStory?.id
+      });
+      setReplySent(true);
+      setStoryReplyText("");
+      setTimeout(() => setReplySent(false), 2500);
+    } catch (err) {
+      alert("Ошибка отправки ответа: " + err.message);
     }
   };
 
@@ -1617,14 +1969,15 @@ function StoriesBar({
     className: "text-[11px] text-slate-400 mt-1 max-w-[64px] truncate"
   }, uploadingStory ? "Загрузка..." : "Ваша история")), storiesGroups.map((group, idx) => {
     const hasUnseen = group.has_unseen;
+    const isCloseFriends = group.stories?.some(s => s.is_close_friends);
     return /*#__PURE__*/React.createElement("div", {
       key: idx,
       onClick: () => openStoryViewer(group),
       className: "flex flex-col items-center flex-shrink-0 cursor-pointer group"
     }, /*#__PURE__*/React.createElement("div", {
-      className: `w-16 h-16 rounded-full p-[2px] transition-transform group-hover:scale-105 ${hasUnseen ? "bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 animate-pulse" : "bg-slate-700"}`
+      className: `w-16 h-16 rounded-full p-[2px] transition-transform group-hover:scale-105 ${hasUnseen ? isCloseFriends ? "bg-gradient-to-tr from-emerald-400 via-green-500 to-teal-400 animate-pulse" : "bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 animate-pulse" : "bg-slate-700"}`
     }, /*#__PURE__*/React.createElement("img", {
-      src: group.user.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+      src: group.user.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
       alt: group.user.first_name,
       className: "w-full h-full rounded-full object-cover border-2 border-slate-950"
     })), /*#__PURE__*/React.createElement("span", {
@@ -1647,13 +2000,15 @@ function StoriesBar({
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-2"
   }, /*#__PURE__*/React.createElement("img", {
-    src: activeViewerGroup.user.avatar_url,
+    src: activeViewerGroup.user.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
     className: "w-8 h-8 rounded-full border border-white/40 object-cover"
   }), /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-bold drop-shadow"
-  }, activeViewerGroup.user.first_name), activeViewerGroup.user.is_verified && /*#__PURE__*/React.createElement("span", {
+  }, activeViewerGroup.user.first_name || activeViewerGroup.user.username), activeViewerGroup.user.is_verified && /*#__PURE__*/React.createElement("span", {
     className: "text-blue-400 text-xs"
-  }, "\u2713")), /*#__PURE__*/React.createElement("div", {
+  }, "\u2713"), activeViewerGroup.stories[currentStoryIndex]?.is_close_friends && /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] bg-emerald-500 text-slate-950 font-black px-2 py-0.5 rounded-full shadow-md"
+  }, "\uD83D\uDC9A \u0411\u043B\u0438\u0437\u043A\u0438\u0435 \u0434\u0440\u0443\u0437\u044C\u044F")), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-2"
   }, isVideoStory(activeViewerGroup.stories[currentStoryIndex]?.media_url, activeViewerGroup.stories[currentStoryIndex]?.media_type) && /*#__PURE__*/React.createElement("button", {
     onClick: () => setStoryMuted(!storyMuted),
@@ -1695,12 +2050,79 @@ function StoriesBar({
   }, /*#__PURE__*/React.createElement("span", {
     className: "inline-block px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md text-white text-sm font-medium drop-shadow"
   }, activeViewerGroup.stories[currentStoryIndex]?.caption))), /*#__PURE__*/React.createElement("div", {
-    className: "absolute bottom-4 left-4 right-4 z-20 flex items-center justify-around bg-slate-950/80 backdrop-blur-md py-2 px-4 rounded-full border border-slate-800"
+    className: "absolute bottom-3 left-3 right-3 z-20 space-y-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-around bg-slate-950/80 backdrop-blur-md py-1 px-3 rounded-full border border-slate-800/80"
   }, ["❤️", "🔥", "👏", "😂", "😍", "🎉"].map(emoji => /*#__PURE__*/React.createElement("button", {
     key: emoji,
     onClick: () => handleReaction(emoji),
-    className: "text-2xl hover:scale-125 active:scale-95 transition-transform"
-  }, emoji)))));
+    className: "text-xl hover:scale-125 active:scale-95 transition-transform"
+  }, emoji))), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleSendStoryReply,
+    className: "flex items-center space-x-2 bg-slate-950/90 backdrop-blur-md p-1.5 rounded-full border border-slate-800"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: storyReplyText,
+    onChange: e => setStoryReplyText(e.target.value),
+    onFocus: () => setIsPaused(true),
+    onBlur: () => setIsPaused(false),
+    placeholder: "\u041E\u0442\u0432\u0435\u0442\u0438\u0442\u044C \u0430\u0432\u0442\u043E\u0440\u0443 \u0432 \u043B\u0438\u0447\u043D\u044B\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F...",
+    className: "flex-1 bg-transparent px-3 py-1 text-xs text-white placeholder-slate-400 outline-none"
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    disabled: !storyReplyText.trim(),
+    className: "bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-500 hover:to-rose-400 disabled:opacity-40 text-white rounded-full px-3 py-1 text-xs font-bold transition-all"
+  }, "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C")), replySent && /*#__PURE__*/React.createElement("div", {
+    className: "text-center text-[11px] font-bold text-emerald-400 bg-slate-900/90 py-1 rounded-full border border-emerald-500/40"
+  }, "\u2713 \u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E \u0430\u0432\u0442\u043E\u0440\u0443 \u0438\u0441\u0442\u043E\u0440\u0438\u0438!"))), uploadModalOpen && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-xs space-y-3 shadow-2xl"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between border-b border-slate-800 pb-2"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-black text-white flex items-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCF8"), /*#__PURE__*/React.createElement("span", null, "\u041E\u043F\u0443\u0431\u043B\u0438\u043A\u043E\u0432\u0430\u0442\u044C \u0438\u0441\u0442\u043E\u0440\u0438\u044E")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setUploadModalOpen(false);
+      setPendingFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    className: "text-slate-400 hover:text-white"
+  }, "\u2715")), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-300"
+  }, "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0430\u0443\u0434\u0438\u0442\u043E\u0440\u0438\u044E \u0434\u043B\u044F \u0432\u0430\u0448\u0435\u0439 \u043D\u043E\u0432\u043E\u0439 \u0438\u0441\u0442\u043E\u0440\u0438\u0438:"), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2 pt-1"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => handleUploadStory(false),
+    className: "w-full p-3 rounded-2xl bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-500 hover:to-rose-400 text-white font-bold text-xs flex items-center justify-between shadow-lg shadow-pink-600/30 transition-transform active:scale-95"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-base"
+  }, "\uD83C\uDF10"), /*#__PURE__*/React.createElement("div", {
+    className: "text-left"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "block font-black"
+  }, "\u0414\u043B\u044F \u0432\u0441\u0435\u0445 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-pink-200"
+  }, "\u041F\u0443\u0431\u043B\u0438\u0447\u043D\u0430\u044F \u0438\u0441\u0442\u043E\u0440\u0438\u044F \u043D\u0430 24 \u0447\u0430\u0441\u0430"))), /*#__PURE__*/React.createElement("span", null, "\u2192")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => handleUploadStory(true),
+    className: "w-full p-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs flex items-center justify-between shadow-lg shadow-emerald-600/30 transition-transform active:scale-95"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-base"
+  }, "\uD83D\uDC9A"), /*#__PURE__*/React.createElement("div", {
+    className: "text-left"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "block font-black"
+  }, "\u0411\u043B\u0438\u0437\u043A\u0438\u0435 \u0434\u0440\u0443\u0437\u044C\u044F"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-emerald-200"
+  }, "\u0417\u0435\u043B\u0435\u043D\u0430\u044F \u0440\u0430\u043C\u043A\u0430 \u0434\u043B\u044F \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u044B\u0445"))), /*#__PURE__*/React.createElement("span", null, "\u2192"))))));
 }
 
 // --- File: components/FeedView.jsx ---
@@ -1852,7 +2274,7 @@ function FeedView({
     className: "flex items-center space-x-2.5 cursor-pointer",
     onClick: () => onOpenProfile && onOpenProfile(post.author.id)
   }, /*#__PURE__*/React.createElement("img", {
-    src: post.author.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    src: post.author.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
     alt: post.author.username,
     className: "w-9 h-9 rounded-full object-cover ring-2 ring-pink-500/30"
   }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
@@ -2031,7 +2453,7 @@ function FeedView({
     key: c.id,
     className: "flex items-start space-x-2.5"
   }, /*#__PURE__*/React.createElement("img", {
-    src: c.author?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    src: c.author?.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
     className: "w-7 h-7 rounded-full object-cover shrink-0 mt-0.5"
   }), /*#__PURE__*/React.createElement("div", {
     className: "flex-1 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/60"
@@ -2097,7 +2519,8 @@ function FeedView({
 function SearchView({
   currentUser,
   t,
-  onOpenChat
+  onOpenChat,
+  onOpenProfile
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -2210,11 +2633,15 @@ function SearchView({
     }, /*#__PURE__*/React.createElement("div", {
       className: "flex items-center justify-between"
     }, /*#__PURE__*/React.createElement("div", {
-      className: "flex items-center space-x-3"
+      onClick: () => {
+        triggerHaptic("light");
+        if (onOpenProfile) onOpenProfile(u.id);
+      },
+      className: "flex items-center space-x-3 cursor-pointer hover:opacity-85 transition-opacity flex-1 min-w-0"
     }, /*#__PURE__*/React.createElement("div", {
       className: "relative"
     }, /*#__PURE__*/React.createElement("img", {
-      src: u.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+      src: u.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
       alt: u.username,
       className: "w-12 h-12 rounded-full object-cover ring-2 ring-slate-800"
     }), u.is_verified && /*#__PURE__*/React.createElement("div", {
@@ -2276,13 +2703,15 @@ function ReelsView({
   reels = [],
   setReels,
   t,
-  user
+  user,
+  onOpenProfile
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const [commentsReelId, setCommentsReelId] = useState(null);
   const [reelComments, setReelComments] = useState([]);
   const [commentText, setCommentText] = useState("");
+  const [replyToReelComment, setReplyToReelComment] = useState(null); // { id, username }
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [deletingReel, setDeletingReel] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -2318,10 +2747,14 @@ function ReelsView({
       alert("Ошибка удаления комментария: " + err.message);
     }
   };
-  const handleReplyToReelComment = username => {
+  const handleReplyToReelComment = c => {
     triggerHaptic("light");
-    if (!username) return;
-    setCommentText(`@${username}, `);
+    if (!c || !c.author?.username) return;
+    setReplyToReelComment({
+      id: c.id,
+      username: c.author.username
+    });
+    setCommentText(`@${c.author.username} `);
     setTimeout(() => {
       reelCommentInputRef.current?.focus();
     }, 50);
@@ -2376,10 +2809,12 @@ function ReelsView({
     triggerHaptic("light");
     try {
       const newC = await Api.post(`/reels/${commentsReelId}/comments`, {
-        text: commentText
+        text: commentText,
+        parent_id: replyToReelComment?.id || null
       });
       setReelComments(prev => [...prev, newC]);
       setCommentText("");
+      setReplyToReelComment(null);
       setReels(prev => prev.map(r => r.id === commentsReelId ? {
         ...r,
         comments_count: r.comments_count + 1
@@ -2411,9 +2846,13 @@ function ReelsView({
   }, /*#__PURE__*/React.createElement("span", null, isMuted ? "🔇 Звук выкл" : "🔊 Звук вкл")), /*#__PURE__*/React.createElement("div", {
     className: "absolute right-3 bottom-20 z-20 flex flex-col items-center space-y-5"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "relative"
+    className: "relative cursor-pointer",
+    onClick: () => {
+      triggerHaptic("light");
+      if (onOpenProfile && currentReel?.author?.id) onOpenProfile(currentReel.author.id);
+    }
   }, /*#__PURE__*/React.createElement("img", {
-    src: currentReel.author.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    src: currentReel.author.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
     className: "w-12 h-12 rounded-full border-2 border-white object-cover"
   }), /*#__PURE__*/React.createElement("div", {
     className: "absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-4 bg-pink-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
@@ -2484,7 +2923,11 @@ function ReelsView({
   }))), /*#__PURE__*/React.createElement("div", {
     className: "absolute left-4 right-20 bottom-6 z-20 text-white"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-1.5 mb-1.5"
+    className: "flex items-center space-x-1.5 mb-1.5 cursor-pointer",
+    onClick: () => {
+      triggerHaptic("light");
+      if (onOpenProfile && currentReel?.author?.id) onOpenProfile(currentReel.author.id);
+    }
   }, /*#__PURE__*/React.createElement("span", {
     className: "font-bold text-sm"
   }, "@", currentReel.author.username), currentReel.author.badge_type === "gold_founder" ? /*#__PURE__*/React.createElement("span", {
@@ -2606,32 +3049,50 @@ function ReelsView({
     className: "p-4 overflow-y-auto space-y-3 flex-1"
   }, reelComments.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "text-center py-8 text-slate-500 text-xs"
-  }, "\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0435\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442. \u0411\u0443\u0434\u044C\u0442\u0435 \u043F\u0435\u0440\u0432\u044B\u043C\u0438! \u2728") : reelComments.map(c => /*#__PURE__*/React.createElement("div", {
-    key: c.id,
-    className: "flex items-start space-x-2.5"
-  }, /*#__PURE__*/React.createElement("img", {
-    src: c.author?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
-    className: "w-7 h-7 rounded-full object-cover shrink-0 mt-0.5"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "bg-slate-950 p-2.5 rounded-xl text-xs flex-1 border border-slate-800"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-0.5"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "font-bold text-white block"
-  }, "@", c.author?.username), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2"
-  }, /*#__PURE__*/React.createElement("button", {
+  }, "\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0435\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442. \u0411\u0443\u0434\u044C\u0442\u0435 \u043F\u0435\u0440\u0432\u044B\u043C\u0438! \u2728") : reelComments.map(c => {
+    const isNested = Boolean(c.parent_id);
+    return /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      className: `flex items-start space-x-2.5 transition-all ${isNested ? "ml-5 pl-2 border-l-2 border-pink-500/50 bg-pink-950/10 rounded-r-xl" : ""}`
+    }, /*#__PURE__*/React.createElement("img", {
+      src: c.author?.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
+      className: "w-7 h-7 rounded-full object-cover shrink-0 mt-0.5"
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "bg-slate-950 p-2.5 rounded-xl text-xs flex-1 border border-slate-800"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-between mb-0.5"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center space-x-1.5"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "font-bold text-white block"
+    }, "@", c.author?.username), isNested && /*#__PURE__*/React.createElement("span", {
+      className: "text-[9px] text-pink-400 bg-pink-950/60 px-1 py-0.2 rounded font-semibold"
+    }, "\u21B3 \u043E\u0442\u0432\u0435\u0442")), /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center space-x-2"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => handleReplyToReelComment(c),
+      className: "text-[10px] text-sky-400 hover:underline font-bold"
+    }, "\u041E\u0442\u0432\u0435\u0442\u0438\u0442\u044C"), (c.author?.id === user?.id || c.user_id === user?.id || currentReel.author?.id === user?.id || user?.role === "director") && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => handleDeleteReelComment(commentsReelId, c.id),
+      className: "text-[10px] text-rose-500 hover:text-rose-400",
+      title: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439"
+    }, "\uD83D\uDDD1\uFE0F"))), /*#__PURE__*/React.createElement("span", {
+      className: "text-slate-300 mt-0.5 block"
+    }, c.text)));
+  })), replyToReelComment && /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-800/90 px-4 py-1.5 flex items-center justify-between text-[11px] text-pink-300 border-t border-slate-700/60"
+  }, /*#__PURE__*/React.createElement("span", null, "\u21B3 \u041E\u0442\u0432\u0435\u0442 \u0434\u043B\u044F ", /*#__PURE__*/React.createElement("strong", {
+    className: "text-white"
+  }, "@", replyToReelComment.username)), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => handleReplyToReelComment(c.author?.username),
-    className: "text-[10px] text-sky-400 hover:underline font-bold"
-  }, "\u041E\u0442\u0432\u0435\u0442\u0438\u0442\u044C"), (c.author?.id === user?.id || c.user_id === user?.id || currentReel.author?.id === user?.id || user?.role === "director") && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => handleDeleteReelComment(commentsReelId, c.id),
-    className: "text-[10px] text-rose-500 hover:text-rose-400",
-    title: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439"
-  }, "\uD83D\uDDD1\uFE0F"))), /*#__PURE__*/React.createElement("span", {
-    className: "text-slate-300 mt-0.5 block"
-  }, c.text))))), /*#__PURE__*/React.createElement("form", {
+    onClick: () => {
+      setReplyToReelComment(null);
+      setCommentText("");
+    },
+    className: "text-slate-400 hover:text-white font-bold ml-2 text-xs"
+  }, "\u2715")), /*#__PURE__*/React.createElement("form", {
     onSubmit: submitReelComment,
     className: "p-3 border-t border-slate-800 flex space-x-2 bg-slate-950"
   }, /*#__PURE__*/React.createElement("input", {
@@ -2658,7 +3119,8 @@ function ChatView({
   user,
   activeUser,
   t,
-  onClose
+  onClose,
+  onOpenProfile
 }) {
   const [dialogs, setDialogs] = useState([]);
   const [activePartner, setActivePartner] = useState(activeUser || null);
@@ -2699,6 +3161,15 @@ function ChatView({
       openDialog(activeUser);
     }
   }, [activeUser]);
+
+  // Periodic refresh for dialogs so chatting friends never disappear
+  useEffect(() => {
+    if (activePartner) return;
+    const interval = setInterval(() => {
+      loadDialogs();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [activePartner]);
 
   // Periodic polling for incoming calls (if someone is calling current user)
   useEffect(() => {
@@ -3196,12 +3667,20 @@ function ChatView({
   }, /*#__PURE__*/React.createElement("span", null, "\u2190"), /*#__PURE__*/React.createElement("span", {
     className: "text-xs"
   }, "\u0427\u0430\u0442\u044B")), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2.5"
+    className: "flex items-center space-x-2.5 cursor-pointer hover:opacity-85 transition-opacity",
+    onClick: () => {
+      triggerHaptic("light");
+      if (onOpenProfile && activePartner?.id) onOpenProfile(activePartner.id);
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "relative"
   }, /*#__PURE__*/React.createElement("img", {
-    src: activePartner.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
-    className: "w-9 h-9 rounded-full object-cover ring-1 ring-slate-700"
+    src: activePartner.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
+    className: "w-9 h-9 rounded-full object-cover ring-1 ring-slate-700",
+    onError: e => {
+      e.currentTarget.onerror = null;
+      e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E";
+    }
   }), /*#__PURE__*/React.createElement("span", {
     className: "absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-slate-900"
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
@@ -3506,7 +3985,7 @@ function ChatView({
   }, /*#__PURE__*/React.createElement("div", {
     className: "relative w-24 h-24 mx-auto"
   }, /*#__PURE__*/React.createElement("img", {
-    src: incomingCall.caller?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    src: incomingCall.caller?.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
     alt: "Caller",
     className: "w-24 h-24 rounded-full object-cover ring-4 ring-emerald-500 animate-pulse shadow-xl"
   }), /*#__PURE__*/React.createElement("span", {
@@ -4959,6 +5438,12 @@ function ProfileView({
   const [legalModalOpen, setLegalModalOpen] = useState(false);
   const [emailAuthModalOpen, setEmailAuthModalOpen] = useState(false);
   const [founderQuestModalOpen, setFounderQuestModalOpen] = useState(false);
+  const [countryModalOpen, setCountryModalOpen] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState(typeof localStorage !== "undefined" && localStorage.getItem("vensto_user_country") || "🇺🇿 Узбекистан");
+  const [storiesArchiveOpen, setStoriesArchiveOpen] = useState(false);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [closeFriendsModalOpen, setCloseFriendsModalOpen] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(typeof localStorage !== "undefined" && localStorage.getItem("vensto_push_notifications") !== "false");
 
   // Selected Post Viewer
   const [selectedPost, setSelectedPost] = useState(null);
@@ -5139,6 +5624,61 @@ function ProfileView({
       alert("Ошибка: " + err.message);
     }
   };
+  const handleToggleIncognito = async () => {
+    triggerHaptic("medium");
+    const nextVal = !user?.is_incognito;
+    try {
+      await Api.patch("/auth/me", {
+        is_incognito: nextVal
+      });
+      onUpdateUser({
+        ...user,
+        is_incognito: nextVal
+      });
+    } catch (e) {
+      alert("Ошибка обновления режима: " + e.message);
+    }
+  };
+  const handleTogglePrivate = async () => {
+    triggerHaptic("medium");
+    const nextVal = !user?.is_private;
+    try {
+      await Api.patch("/auth/me", {
+        is_private: nextVal
+      });
+      onUpdateUser({
+        ...user,
+        is_private: nextVal
+      });
+    } catch (e) {
+      alert("Ошибка обновления приватности: " + e.message);
+    }
+  };
+  const handleShareMyProfile = () => {
+    triggerHaptic("light");
+    const username = user?.username || `id${user?.id}`;
+    const url = `https://t.me/venstogrambot?startapp=u_${username}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+    }
+    alert("✓ Ссылка на ваш профиль скопирована!");
+  };
+  const handleTogglePush = () => {
+    triggerHaptic("light");
+    const nextVal = !pushEnabled;
+    setPushEnabled(nextVal);
+    try {
+      localStorage.setItem("vensto_push_notifications", String(nextVal));
+    } catch (e) {}
+  };
+  const handleSelectCountry = countryName => {
+    triggerHaptic("selection");
+    setSelectedCountry(countryName);
+    try {
+      localStorage.setItem("vensto_user_country", countryName);
+    } catch (e) {}
+    setCountryModalOpen(false);
+  };
   const handleBuyVerified = async (months, coins) => {
     if (user.wallet_coins < coins) {
       triggerHaptic("error");
@@ -5242,7 +5782,7 @@ function ProfileView({
     className: "relative group cursor-pointer",
     onClick: () => setIsEditing(true)
   }, /*#__PURE__*/React.createElement("img", {
-    src: user.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300",
+    src: user.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
     alt: "Profile avatar",
     className: "w-20 h-20 rounded-full object-cover ring-2 ring-pink-500 shadow-xl"
   }), /*#__PURE__*/React.createElement("div", {
@@ -5421,116 +5961,181 @@ function ProfileView({
     onClick: () => setSettingsOpen(false),
     className: "text-slate-400 hover:text-white text-lg p-1"
   }, "\u2715")), /*#__PURE__*/React.createElement("div", {
-    className: "bg-gradient-to-r from-emerald-950/90 via-slate-950 to-teal-950/90 p-3.5 rounded-2xl border border-emerald-500/50 space-y-2.5 shadow-lg shadow-emerald-500/10"
+    className: "space-y-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-500 uppercase font-black tracking-wider block"
+  }, "\u0411\u044B\u0441\u0442\u0440\u044B\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F"), /*#__PURE__*/React.createElement("div", {
+    onClick: handleShareMyProfile,
+    className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-pink-500/50 transition-all"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-2.5"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "text-2xl"
-  }, "\uD83D\uDEE0\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-black text-white block"
-  }, "\u0421\u043B\u0443\u0436\u0431\u0430 \u0442\u0435\u0445\u043D\u0438\u0447\u0435\u0441\u043A\u043E\u0439 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438"), /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] text-emerald-300"
-  }, "\u041F\u043E\u043C\u043E\u0449\u044C 24/7, \u0432\u043E\u043F\u0440\u043E\u0441\u044B \u043F\u043E \u043E\u043F\u043B\u0430\u0442\u0435, \u043D\u0438\u043A\u043D\u0435\u0439\u043C\u0430\u043C \u0438 \u0432\u0435\u0440\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438"))), /*#__PURE__*/React.createElement("div", {
-    className: "bg-slate-950/80 rounded-xl p-2.5 border border-slate-800 space-y-2 text-xs"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-slate-400 text-[11px]"
-  }, "\uD83D\uDCDE \u0422\u0435\u043B\u0435\u0444\u043E\u043D \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438:"), /*#__PURE__*/React.createElement("a", {
-    href: "tel:+998507775152",
-    className: "text-emerald-400 font-mono font-bold hover:underline"
-  }, "+998 50 777 51 52")), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-slate-400 text-[11px]"
-  }, "\uD83D\uDCAC Telegram \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438:"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => openTelegramChannel("@yuksak_it"),
-    className: "text-sky-400 font-mono font-bold hover:underline flex items-center space-x-1"
-  }, /*#__PURE__*/React.createElement("span", null, "@yuksak_it"), /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px]"
-  }, "\u2197")))), /*#__PURE__*/React.createElement("div", {
-    className: "flex space-x-2 pt-0.5"
-  }, /*#__PURE__*/React.createElement("a", {
-    href: "tel:+998507775152",
-    className: "flex-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
-  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCDE"), /*#__PURE__*/React.createElement("span", null, "\u041F\u043E\u0437\u0432\u043E\u043D\u0438\u0442\u044C")), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => openTelegramChannel("@yuksak_it"),
-    className: "flex-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
-  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCAC"), /*#__PURE__*/React.createElement("span", null, "\u041D\u0430\u043F\u0438\u0441\u0430\u0442\u044C")))), /*#__PURE__*/React.createElement("div", {
-    className: "bg-gradient-to-r from-sky-950/80 via-blue-900/40 to-slate-950 p-3.5 rounded-2xl border border-sky-500/40 space-y-2"
+    className: "text-lg"
+  }, "\uD83D\uDD17"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-white block"
+  }, "\u041F\u043E\u0434\u0435\u043B\u0438\u0442\u044C\u0441\u044F \u043F\u0440\u043E\u0444\u0438\u043B\u0435\u043C"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400"
+  }, "\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443 \u0434\u043B\u044F \u0434\u0440\u0443\u0437\u0435\u0439"))), /*#__PURE__*/React.createElement("span", {
+    className: "text-pink-400 text-xs font-bold"
+  }, "\u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-r from-sky-950/80 via-blue-900/40 to-slate-950 p-3 rounded-2xl border border-sky-500/40 space-y-2"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-2"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-7 h-7 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-sm"
+    className: "w-6 h-6 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xs"
   }, "\u2713"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-bold text-white block"
   }, "\u0421\u0438\u043D\u044F\u044F \u0433\u0430\u043B\u043E\u0447\u043A\u0430 \u0432\u0435\u0440\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438"), /*#__PURE__*/React.createElement("span", {
     className: "text-[10px] text-sky-300"
-  }, user.is_verified ? "✅ Активна (3x - 5x буст охватов)" : "3x - 5x охваты и взлёт в рекомендации"))), /*#__PURE__*/React.createElement("button", {
+  }, user.is_verified ? "✅ Активна (3x - 5x буст охватов)" : "3x - 5x охваты и топ в ленте"))), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setSettingsOpen(false);
       setVerifiedModalOpen(true);
     },
     className: "bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl shadow-md transition-transform active:scale-95"
-  }, user.is_verified ? "Продлить" : "Купить"))), /*#__PURE__*/React.createElement("div", {
+  }, user.is_verified ? "Продлить" : "Получить"))), /*#__PURE__*/React.createElement("div", {
     onClick: () => {
       triggerHaptic("medium");
       setSettingsOpen(false);
       setFounderQuestModalOpen(true);
     },
-    className: "bg-gradient-to-r from-amber-950/70 via-slate-950 to-amber-950/70 p-3.5 rounded-2xl border border-amber-500/40 flex items-center justify-between cursor-pointer hover:border-amber-400 transition-all"
+    className: "bg-gradient-to-r from-amber-950/70 via-slate-950 to-amber-950/70 p-3 rounded-2xl border border-amber-500/40 flex items-center justify-between cursor-pointer hover:border-amber-400 transition-all"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-2.5"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "text-xl"
+    className: "text-lg"
   }, "\uD83D\uDC51"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-bold text-white block"
   }, "\u041B\u0438\u0433\u0430 \u0431\u043B\u043E\u0433\u0435\u0440\u043E\u0432 \u043E\u0442 \u041E\u0441\u043D\u043E\u0432\u0430\u0442\u0435\u043B\u044F"), /*#__PURE__*/React.createElement("span", {
     className: "text-[10px] text-amber-300"
-  }, "\u041A\u0432\u0435\u0441\u0442, \u0440\u0435\u0444\u0435\u0440\u0430\u043B\u044B, \u0417\u043E\u043B\u043E\u0442\u0430\u044F \u0413\u0430\u043B\u043E\u0447\u043A\u0430 \u0438 \u043F\u043E\u0434\u0430\u0440\u043E\u043A"))), /*#__PURE__*/React.createElement("span", {
+  }, "\u041A\u0432\u0435\u0441\u0442, \u0440\u0435\u0444\u0435\u0440\u0430\u043B\u044B \u0438 \u0417\u043E\u043B\u043E\u0442\u0430\u044F \u0413\u0430\u043B\u043E\u0447\u043A\u0430"))), /*#__PURE__*/React.createElement("span", {
     className: "text-amber-400 text-sm"
   }, "\u2192")), /*#__PURE__*/React.createElement("div", {
-    onClick: () => {
-      setSettingsOpen(false);
-      setSecurityModalOpen(true);
-    },
-    className: "bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-all"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2.5"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-xl"
-  }, "\uD83D\uDD12"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-bold text-white block"
-  }, "\u0417\u0430\u0449\u0438\u0442\u0438\u0442\u044C \u0430\u043A\u043A\u0430\u0443\u043D\u0442"), /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] text-slate-400"
-  }, "PIN-\u043A\u043E\u0434, Face ID, \u0431\u0438\u043E\u043C\u0435\u0442\u0440\u0438\u044F \u0438 \u0441\u0435\u0441\u0441\u0438\u0438"))), /*#__PURE__*/React.createElement("span", {
-    className: "text-slate-400 text-sm"
-  }, "\u2192")), /*#__PURE__*/React.createElement("div", {
-    className: "bg-gradient-to-tr from-amber-600/20 via-slate-950 to-yellow-600/10 p-3.5 rounded-2xl border border-amber-500/30 space-y-2"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-xs text-amber-300 font-bold block"
-  }, "\uD83D\uDC5B \u0411\u0430\u043B\u0430\u043D\u0441 Vensto Coins:"), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between"
+    className: "bg-gradient-to-tr from-amber-600/20 via-slate-950 to-yellow-600/10 p-3 rounded-2xl border border-amber-500/30 flex items-center justify-between"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-    className: "text-2xl font-black text-white"
-  }, (user.wallet_coins || 0).toLocaleString(), " \uD83E\uDE99"), /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] text-slate-400 block mt-0.5"
-  }, "\u2248 ", ((user.wallet_coins || 0) * 100).toLocaleString(), " UZS (\u0441\u0443\u043C)")), /*#__PURE__*/React.createElement("button", {
+    className: "text-[10px] text-amber-300 font-bold block"
+  }, "\uD83D\uDC5B \u0411\u0430\u043B\u0430\u043D\u0441:"), /*#__PURE__*/React.createElement("span", {
+    className: "text-lg font-black text-white"
+  }, (user.wallet_coins || 0).toLocaleString(), " \uD83E\uDE99")), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setSettingsOpen(false);
       onOpenWallet();
     },
-    className: "bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs px-3.5 py-2.5 rounded-xl shadow-lg shadow-emerald-600/30 transition-transform active:scale-95"
+    className: "bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 text-white font-black text-xs px-3 py-2 rounded-xl shadow-md transition-transform active:scale-95"
   }, "\u2795 \u041F\u043E\u043F\u043E\u043B\u043D\u0438\u0442\u044C"))), /*#__PURE__*/React.createElement("div", {
     className: "space-y-2"
   }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-500 uppercase font-black tracking-wider block"
+  }, "\u041A\u043E\u043D\u0444\u0438\u0434\u0435\u043D\u0446\u0438\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u044C \u0438 \u043F\u0440\u0438\u0432\u0430\u0442\u043D\u043E\u0441\u0442\u044C"), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\uD83D\uDD76\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-bold text-white block"
-  }, "\uD83C\uDF10 \u042F\u0437\u044B\u043A \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430 (Ilova tili):"), /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-2 gap-2"
+  }, "\u0420\u0435\u0436\u0438\u043C \u043D\u0435\u0432\u0438\u0434\u0438\u043C\u043A\u0430"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400"
+  }, "\u0421\u043A\u0440\u044B\u0442\u044C \u043E\u043D\u043B\u0430\u0439\u043D \u0438 \u0432\u0440\u0435\u043C\u044F \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0441\u0442\u0438"))), /*#__PURE__*/React.createElement("button", {
+    onClick: handleToggleIncognito,
+    className: `w-12 h-6 rounded-full transition-colors relative p-0.5 ${user?.is_incognito ? "bg-pink-600" : "bg-slate-700"}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: `w-5 h-5 rounded-full bg-white transition-transform ${user?.is_incognito ? "translate-x-6" : "translate-x-0"}`
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\uD83D\uDD12"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-white block"
+  }, "\u0417\u0430\u043A\u0440\u044B\u0442\u044B\u0439 \u0430\u043A\u043A\u0430\u0443\u043D\u0442"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400"
+  }, "\u0422\u043E\u043B\u044C\u043A\u043E \u043F\u043E\u0434\u043F\u0438\u0441\u0447\u0438\u043A\u0438 \u0432\u0438\u0434\u044F\u0442 \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0438"))), /*#__PURE__*/React.createElement("button", {
+    onClick: handleTogglePrivate,
+    className: `w-12 h-6 rounded-full transition-colors relative p-0.5 ${user?.is_private ? "bg-emerald-500" : "bg-slate-700"}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: `w-5 h-5 rounded-full bg-white transition-transform ${user?.is_private ? "translate-x-6" : "translate-x-0"}`
+  }))), /*#__PURE__*/React.createElement("div", {
+    onClick: () => {
+      setSettingsOpen(false);
+      setSecurityModalOpen(true);
+    },
+    className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-all"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\uD83D\uDEE1\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-white block"
+  }, "\u0417\u0430\u0449\u0438\u0442\u0438\u0442\u044C \u0430\u043A\u043A\u0430\u0443\u043D\u0442"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400"
+  }, "PIN-\u043A\u043E\u0434, Face ID \u0438 \u0431\u0438\u043E\u043C\u0435\u0442\u0440\u0438\u044F"))), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 text-sm"
+  }, "\u2192")), /*#__PURE__*/React.createElement("div", {
+    onClick: () => {
+      setSettingsOpen(false);
+      setCloseFriendsModalOpen(true);
+    },
+    className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-emerald-500/50 transition-all"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\uD83D\uDC9A"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-white block"
+  }, "\u0411\u043B\u0438\u0437\u043A\u0438\u0435 \u0434\u0440\u0443\u0437\u044C\u044F"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-emerald-400"
+  }, "\u0421\u043F\u0438\u0441\u043E\u043A \u0434\u043B\u044F \u043F\u0440\u0438\u0432\u0430\u0442\u043D\u044B\u0445 Stories"))), /*#__PURE__*/React.createElement("span", {
+    className: "text-emerald-400 text-xs font-bold"
+  }, "\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C"))), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-500 uppercase font-black tracking-wider block"
+  }, "\u041A\u043E\u043D\u0442\u0435\u043D\u0442 \u0438 \u0438\u0441\u0442\u043E\u0440\u0438\u044F"), /*#__PURE__*/React.createElement("div", {
+    onClick: () => {
+      setSettingsOpen(false);
+      setStoriesArchiveOpen(true);
+    },
+    className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-all"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\uD83D\uDCE6"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-white block"
+  }, "\u0410\u0440\u0445\u0438\u0432 \u0438\u0441\u0442\u043E\u0440\u0438\u0439"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400"
+  }, "\u0412\u0441\u0435 \u0432\u0430\u0448\u0438 \u043F\u0440\u043E\u0448\u043B\u044B\u0435 Stories"))), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 text-sm"
+  }, "\u2192")), /*#__PURE__*/React.createElement("div", {
+    onClick: () => {
+      setSettingsOpen(false);
+      setActivityModalOpen(true);
+    },
+    className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-all"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\u2764\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-white block"
+  }, "\u0412\u0430\u0448\u0438 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400"
+  }, "\u041F\u043E\u043D\u0440\u0430\u0432\u0438\u0432\u0448\u0438\u0435\u0441\u044F \u043F\u043E\u0441\u0442\u044B \u0438 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438"))), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 text-sm"
+  }, "\u2192"))), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-500 uppercase font-black tracking-wider block"
+  }, "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F"), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-1.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-white block"
+  }, "\uD83C\uDF10 \u042F\u0437\u044B\u043A \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430:"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-1.5"
   }, [{
     code: "ru",
     label: "🇷🇺 Русский"
@@ -5549,14 +6154,49 @@ function ProfileView({
       triggerHaptic("selection");
       onLanguageChange(l.code);
     },
-    className: `py-2 px-3 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between ${lang === l.code ? "bg-pink-600 text-white border-pink-500 shadow-md shadow-pink-600/30" : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"}`
+    className: `py-1.5 px-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between ${lang === l.code ? "bg-pink-600 text-white border-pink-500 shadow-md shadow-pink-600/30" : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"}`
   }, /*#__PURE__*/React.createElement("span", null, l.label), lang === l.code && /*#__PURE__*/React.createElement("span", null, "\u2713"))))), /*#__PURE__*/React.createElement("div", {
-    className: "bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    onClick: () => {
+      setSettingsOpen(false);
+      setCountryModalOpen(true);
+    },
+    className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\uD83D\uDCCD"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-bold text-white block"
-  }, "\u26A1 \u042D\u043A\u043E\u043D\u043E\u043C\u0438\u044F \u0442\u0440\u0430\u0444\u0438\u043A\u0430 (Data Saver)"), /*#__PURE__*/React.createElement("span", {
+  }, "\u0421\u0442\u0440\u0430\u043D\u0430 / \u0420\u0435\u0433\u0438\u043E\u043D:"), /*#__PURE__*/React.createElement("span", {
     className: "text-[10px] text-slate-400"
-  }, "\u0421\u0436\u0438\u043C\u0430\u0442\u044C \u0444\u043E\u0442\u043E \u0438 \u0432\u0438\u0434\u0435\u043E \u043F\u0440\u0438 \u0441\u043B\u0430\u0431\u043E\u043C \u0438\u043D\u0442\u0435\u0440\u043D\u0435\u0442\u0435")), /*#__PURE__*/React.createElement("button", {
+  }, selectedCountry))), /*#__PURE__*/React.createElement("span", {
+    className: "text-sky-400 text-xs font-bold"
+  }, "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u2197")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\uD83D\uDD14"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-white block"
+  }, "\u0423\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400"
+  }, "Push-\u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u043E \u043B\u0430\u0439\u043A\u0430\u0445 \u0438 \u043E\u0442\u0432\u0435\u0442\u0430\u0445"))), /*#__PURE__*/React.createElement("button", {
+    onClick: handleTogglePush,
+    className: `w-12 h-6 rounded-full transition-colors relative p-0.5 ${pushEnabled ? "bg-pink-600" : "bg-slate-700"}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: `w-5 h-5 rounded-full bg-white transition-transform ${pushEnabled ? "translate-x-6" : "translate-x-0"}`
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\u26A1"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-white block"
+  }, "\u042D\u043A\u043E\u043D\u043E\u043C\u0438\u044F \u0442\u0440\u0430\u0444\u0438\u043A\u0430"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400"
+  }, "\u0421\u0436\u0438\u043C\u0430\u0442\u044C \u0444\u043E\u0442\u043E \u0438 \u0432\u0438\u0434\u0435\u043E"))), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       triggerHaptic("light");
       onToggleDataSaver();
@@ -5570,46 +6210,63 @@ function ProfileView({
       setSettingsOpen(false);
       setEmailAuthModalOpen(true);
     },
-    className: "bg-slate-950 p-3.5 rounded-2xl border border-pink-500/30 flex items-center justify-between cursor-pointer hover:border-pink-500/60 transition-colors"
+    className: "bg-slate-950 p-3 rounded-2xl border border-pink-500/30 flex items-center justify-between cursor-pointer hover:border-pink-500/60 transition-colors"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-3"
+    className: "flex items-center space-x-2.5"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "text-xl"
+    className: "text-lg"
   }, "\u2709\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-bold text-white block"
-  }, "\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044F \u0438 \u0432\u0445\u043E\u0434 \u043F\u043E Email"), /*#__PURE__*/React.createElement("span", {
+  }, "Email \u0438 \u043F\u0430\u0440\u043E\u043B\u044C"), /*#__PURE__*/React.createElement("span", {
     className: "text-[10px] text-pink-400"
-  }, "\u0421\u0432\u043E\u0431\u043E\u0434\u043D\u044B\u0439 \u043D\u0438\u043A\u043D\u0435\u0439\u043C, \u043A\u043E\u0434 \u043D\u0430 \u043F\u043E\u0447\u0442\u0443 \u0438 \u0441\u0431\u0440\u043E\u0441 \u043F\u0430\u0440\u043E\u043B\u044F"))), /*#__PURE__*/React.createElement("span", {
+  }, "\u0420\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u0432\u0445\u043E\u0434 \u0438 \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C"))), /*#__PURE__*/React.createElement("span", {
     className: "text-pink-400 text-sm"
-  }, "\u2192")), user.avatar_url && /*#__PURE__*/React.createElement("div", {
-    onClick: () => {
-      setSettingsOpen(false);
-      handleDeleteAvatar();
-    },
-    className: "bg-rose-950/30 hover:bg-rose-900/50 p-3 rounded-2xl border border-rose-900/50 flex items-center justify-between cursor-pointer transition-all"
+  }, "\u2192"))), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-500 uppercase font-black tracking-wider block"
+  }, "\u041F\u043E\u043C\u043E\u0449\u044C \u0438 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u044B"), /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-r from-emerald-950/80 via-slate-950 to-teal-950/80 p-3 rounded-2xl border border-emerald-500/40 space-y-2"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-2"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "text-base"
-  }, "\uD83D\uDDD1\uFE0F"), /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-bold text-rose-300"
-  }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0444\u043E\u0442\u043E\u0433\u0440\u0430\u0444\u0438\u044E \u0430\u0432\u0430\u0442\u0430\u0440\u043A\u0438")), /*#__PURE__*/React.createElement("span", {
-    className: "text-rose-400 text-xs font-semibold"
-  }, "\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C")), /*#__PURE__*/React.createElement("div", {
+    className: "text-lg"
+  }, "\uD83D\uDEE0\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-black text-white block"
+  }, "\u0421\u043B\u0443\u0436\u0431\u0430 \u0442\u0435\u0445\u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-emerald-300"
+  }, "\u041F\u043E\u043C\u043E\u0449\u044C 24/7, \u0432\u043E\u043F\u0440\u043E\u0441\u044B \u043F\u043E \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0443"))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950/80 rounded-xl p-2 border border-slate-800 space-y-1.5 text-xs"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 text-[11px]"
+  }, "\uD83D\uDCDE \u0422\u0435\u043B\u0435\u0444\u043E\u043D:"), /*#__PURE__*/React.createElement("a", {
+    href: "tel:+998507775152",
+    className: "text-emerald-400 font-mono font-bold hover:underline"
+  }, "+998 50 777 51 52")), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 text-[11px]"
+  }, "\uD83D\uDCAC Telegram:"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => openTelegramChannel("@yuksak_it"),
+    className: "text-sky-400 font-mono font-bold hover:underline"
+  }, "@yuksak_it \u2197")))), /*#__PURE__*/React.createElement("div", {
     onClick: () => {
       setSettingsOpen(false);
       setLegalModalOpen(true);
     },
     className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2"
+    className: "flex items-center space-x-2.5"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-base"
   }, "\u2696\uFE0F"), /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-bold text-slate-300"
   }, "\u0417\u0430\u043A\u043E\u043D\u044B \u0420\u0423\u0437 \u0438 \u043F\u0440\u0430\u0432\u0438\u043B\u0430 \u043F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u044B")), /*#__PURE__*/React.createElement("span", {
     className: "text-slate-400 text-xs"
-  }, "\u0427\u0438\u0442\u0430\u0442\u044C \u2197")), /*#__PURE__*/React.createElement("div", {
+  }, "\u0427\u0438\u0442\u0430\u0442\u044C \u2197"))), /*#__PURE__*/React.createElement("div", {
     className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-1.5 text-xs"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex justify-between text-slate-400"
@@ -5623,7 +6280,98 @@ function ProfileView({
     className: "flex justify-between text-slate-400"
   }, /*#__PURE__*/React.createElement("span", null, "\u041F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u0430:"), /*#__PURE__*/React.createElement("span", {
     className: "text-slate-500"
-  }, "VENSTOGRAM v2.5 Live"))))), securityModalOpen && /*#__PURE__*/React.createElement("div", {
+  }, "VENSTOGRAM v2.5 Live"))))), countryModalOpen && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm space-y-3 shadow-2xl"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between border-b border-slate-800 pb-2"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-black text-white flex items-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCCD"), /*#__PURE__*/React.createElement("span", null, "\u0412\u044B\u0431\u043E\u0440 \u0441\u0442\u0440\u0430\u043D\u044B \u0438 \u0440\u0435\u0433\u0438\u043E\u043D\u0430")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setCountryModalOpen(false),
+    className: "text-slate-400 hover:text-white"
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-1.5 pt-1"
+  }, [{
+    name: "🇺🇿 Узбекистан (O'zbekiston)",
+    desc: "Ташкент, Самарканд, Бухара"
+  }, {
+    name: "🇰🇿 Казахстан (Qazaqstan)",
+    desc: "Астана, Алматы, Шымкент"
+  }, {
+    name: "🇷🇺 Россия (Россия)",
+    desc: "Москва, Санкт-Петербург, регионы"
+  }, {
+    name: "🇹🇷 Турция (Türkiye)",
+    desc: "Стамбул, Анкара, Анталья"
+  }, {
+    name: "🌐 Весь мир (Global)",
+    desc: "Международный охват публикаций"
+  }].map(c => /*#__PURE__*/React.createElement("button", {
+    key: c.name,
+    type: "button",
+    onClick: () => handleSelectCountry(c.name),
+    className: `w-full p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${selectedCountry === c.name ? "bg-sky-950/70 border-sky-500 text-sky-300 font-bold" : "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700"}`
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs block font-bold"
+  }, c.name), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400"
+  }, c.desc)), selectedCountry === c.name && /*#__PURE__*/React.createElement("span", {
+    className: "text-sky-400"
+  }, "\u2713")))))), storiesArchiveOpen && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col p-4 animate-in fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between pb-3 border-b border-slate-800"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-black text-white flex items-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCE6"), /*#__PURE__*/React.createElement("span", null, "\u0410\u0440\u0445\u0438\u0432 \u0438\u0441\u0442\u043E\u0440\u0438\u0439 (Stories)")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setStoriesArchiveOpen(false),
+    className: "text-slate-400 hover:text-white text-lg p-1"
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 overflow-y-auto py-6 text-center space-y-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-4xl block"
+  }, "\uD83C\uDF9E\uFE0F"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-slate-300"
+  }, "\u0410\u0440\u0445\u0438\u0432 \u0432\u0430\u0448\u0438\u0445 \u0438\u0441\u0442\u043E\u0440\u0438\u0439 \u0437\u0430\u0449\u0438\u0449\u0435\u043D"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 max-w-xs mx-auto"
+  }, "\u0412\u0441\u0435 \u043E\u043F\u0443\u0431\u043B\u0438\u043A\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u0432\u0430\u043C\u0438 Stories \u043F\u043E\u0441\u043B\u0435 24 \u0447\u0430\u0441\u043E\u0432 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u044E\u0442\u0441\u044F \u0432 \u043F\u0435\u0440\u0441\u043E\u043D\u0430\u043B\u044C\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432, \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0439 \u0442\u043E\u043B\u044C\u043A\u043E \u0432\u0430\u043C."))), activityModalOpen && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col p-4 animate-in fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between pb-3 border-b border-slate-800"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-black text-white flex items-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\u2764\uFE0F"), /*#__PURE__*/React.createElement("span", null, "\u0412\u0430\u0448\u0438 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0432 Venstogram")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setActivityModalOpen(false),
+    className: "text-slate-400 hover:text-white text-lg p-1"
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 overflow-y-auto py-6 text-center space-y-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-4xl block"
+  }, "\u2728"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-slate-300"
+  }, "\u0418\u0441\u0442\u043E\u0440\u0438\u044F \u043E\u0442\u043C\u0435\u0442\u043E\u043A \u0438 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0435\u0432"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-500 max-w-xs mx-auto"
+  }, "\u0417\u0434\u0435\u0441\u044C \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0430\u0435\u0442\u0441\u044F \u043F\u043E\u043B\u043D\u0430\u044F \u0438\u0441\u0442\u043E\u0440\u0438\u044F \u0432\u0430\u0448\u0438\u0445 \u043B\u0430\u0439\u043A\u043E\u0432, \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0435\u0432 \u0438 \u0440\u0435\u043F\u043E\u0441\u0442\u043E\u0432. \u0412\u0430\u0448\u0438 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u0443\u044E\u0442\u0441\u044F \u0432 \u0440\u0435\u0430\u043B\u044C\u043D\u043E\u043C \u0432\u0440\u0435\u043C\u0435\u043D\u0438."))), closeFriendsModalOpen && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col p-4 animate-in fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between pb-3 border-b border-slate-800"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-black text-white flex items-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDC9A"), /*#__PURE__*/React.createElement("span", null, "\u0411\u043B\u0438\u0437\u043A\u0438\u0435 \u0434\u0440\u0443\u0437\u044C\u044F (Close Friends)")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setCloseFriendsModalOpen(false),
+    className: "text-slate-400 hover:text-white text-lg p-1"
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 overflow-y-auto py-6 text-center space-y-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-4xl block"
+  }, "\uD83D\uDEE1\uFE0F"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-emerald-400"
+  }, "\u041F\u0440\u0438\u0432\u0430\u0442\u043D\u044B\u0439 \u0441\u043F\u0438\u0441\u043E\u043A \u0434\u043B\u044F \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u044B\u0445 Stories"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-400 max-w-xs mx-auto"
+  }, "\u041A\u043E\u0433\u0434\u0430 \u0432\u044B \u0432\u044B\u043A\u043B\u0430\u0434\u044B\u0432\u0430\u0435\u0442\u0435 \u0438\u0441\u0442\u043E\u0440\u0438\u044E \u0441\u043E \u0437\u043D\u0430\u0447\u043A\u043E\u043C \xAB\u0411\u043B\u0438\u0437\u043A\u0438\u0435 \u0434\u0440\u0443\u0437\u044C\u044F\xBB, \u0435\u0451 \u0432\u0438\u0434\u044F\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0438 \u0438\u0437 \u044D\u0442\u043E\u0433\u043E \u0441\u043F\u0438\u0441\u043A\u0430 \u0441 \u0437\u0435\u043B\u0435\u043D\u043E\u0439 \u0440\u0430\u043C\u043A\u043E\u0439."))), securityModalOpen && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
   }, /*#__PURE__*/React.createElement("form", {
     onSubmit: handleSaveSecurity,
@@ -5803,7 +6551,7 @@ function ProfileView({
   }, /*#__PURE__*/React.createElement("div", {
     className: "relative"
   }, /*#__PURE__*/React.createElement("img", {
-    src: editAvatarUrl || user.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300",
+    src: editAvatarUrl || user.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
     alt: "Avatar preview",
     className: "w-20 h-20 rounded-full object-cover ring-2 ring-pink-500 shadow-md"
   }), uploadingAvatar && /*#__PURE__*/React.createElement("div", {
@@ -6600,7 +7348,7 @@ function AdminView({
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-2.5"
   }, /*#__PURE__*/React.createElement("img", {
-    src: u.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+    src: u.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
     className: "w-10 h-10 rounded-full object-cover"
   }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-1"
@@ -6940,7 +7688,7 @@ function AdminView({
     }, /*#__PURE__*/React.createElement("div", {
       className: "flex items-center space-x-3"
     }, /*#__PURE__*/React.createElement("img", {
-      src: u.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+      src: u.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E",
       className: "w-12 h-12 rounded-full object-cover ring-2 ring-pink-500"
     }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
       className: "text-sm font-bold text-white block"
@@ -7328,6 +8076,11 @@ function RegistrationModal({
   const [firstName, setFirstName] = useState(user?.first_name || "");
   const [lastName, setLastName] = useState(user?.last_name || "");
   const [birthYear, setBirthYear] = useState(user?.birth_year || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [emailCode, setEmailCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeTimer, setCodeTimer] = useState(0);
 
   // Initial username candidate
   const initialUsername = user?.username && !user.username.startsWith("user_") ? user.username : "";
@@ -7340,6 +8093,42 @@ function RegistrationModal({
   const [suggestions, setSuggestions] = useState([]);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  useEffect(() => {
+    let interval = null;
+    if (codeTimer > 0) {
+      interval = setInterval(() => setCodeTimer(prev => prev - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [codeTimer]);
+  const handleSendCode = async () => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      setErrorMsg("Укажите корректный адрес электронной почты");
+      triggerHaptic("error");
+      return;
+    }
+    setSendingCode(true);
+    setErrorMsg("");
+    triggerHaptic("light");
+    try {
+      await Api.post("/auth/send-code", {
+        email: cleanEmail,
+        username: username.trim().toLowerCase().replace(/^@/, "") || `u_${Date.now()}`,
+        first_name: firstName.trim() || "Пользователь",
+        last_name: lastName.trim() || "",
+        password: "VenstoPassword2026!",
+        birth_year: parseInt(birthYear) || 2000
+      });
+      setCodeSent(true);
+      setCodeTimer(60);
+      triggerHaptic("success");
+    } catch (e) {
+      setErrorMsg(e.message || "Не удалось отправить код на почту");
+      triggerHaptic("error");
+    } finally {
+      setSendingCode(false);
+    }
+  };
 
   // Live availability check
   useEffect(() => {
@@ -7403,13 +8192,17 @@ function RegistrationModal({
     setSaving(true);
     triggerHaptic("heavy");
     try {
-      const res = await Api.patch("/auth/me", {
+      const patchData = {
         first_name: trimmedFirst,
         last_name: lastName.trim(),
         birth_year: bYear,
         username: trimmedUser,
         is_registered: true
-      });
+      };
+      if (email.trim()) {
+        patchData.email = email.trim().toLowerCase();
+      }
+      const res = await Api.patch("/auth/me", patchData);
       try {
         localStorage.setItem(`vensto_account_created_${user?.id || 1}`, "true");
       } catch (e) {}
@@ -7529,6 +8322,36 @@ function RegistrationModal({
   }, /*#__PURE__*/React.createElement("span", null, "@", sug), /*#__PURE__*/React.createElement("span", {
     className: "text-[9px]"
   }, "\u2795")))))), /*#__PURE__*/React.createElement("div", {
+    className: "border-t border-slate-800/80 pt-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-sky-400 uppercase tracking-wider font-extrabold block mb-1"
+  }, "\u0428\u0430\u0433 3: Email \u0438 \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C (\u043F\u043E \u0436\u0435\u043B\u0430\u043D\u0438\u044E)"), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex space-x-2"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    value: email,
+    onChange: e => setEmail(e.target.value),
+    placeholder: "\u0412\u0430\u0448\u0430 \u043F\u043E\u0447\u0442\u0430: name@gmail.com",
+    className: "flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition"
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handleSendCode,
+    disabled: sendingCode || codeTimer > 0 || !email.includes("@"),
+    className: "bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-bold text-xs px-3 py-2 rounded-xl transition shrink-0"
+  }, sendingCode ? "..." : codeTimer > 0 ? `${codeTimer}с` : "Получить код")), codeSent && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-1 animate-in fade-in"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-emerald-400 block font-semibold"
+  }, "\u2713 6-\u0437\u043D\u0430\u0447\u043D\u044B\u0439 \u043A\u043E\u0434 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D \u043D\u0430 ", email), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    maxLength: 6,
+    value: emailCode,
+    onChange: e => setEmailCode(e.target.value.replace(/[^0-9]/g, "")),
+    placeholder: "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 6 \u0446\u0438\u0444\u0440 \u0438\u0437 \u043F\u0438\u0441\u044C\u043C\u0430",
+    className: "w-full bg-slate-950 border border-emerald-500/60 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none font-mono text-center tracking-widest text-sm"
+  })))), /*#__PURE__*/React.createElement("div", {
     className: "bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80 text-[10px] text-slate-400 space-y-1"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-white font-bold block"
@@ -7576,6 +8399,16 @@ function App() {
   const [activeChatUser, setActiveChatUser] = useState(null);
   const [founderQuestOpen, setFounderQuestOpen] = useState(false);
   const [isRegistered, setIsRegistered] = useState(true);
+  const [viewingProfileUserId, setViewingProfileUserId] = useState(null);
+  const [selectedPostModal, setSelectedPostModal] = useState(null);
+  const handleOpenProfile = targetUserId => {
+    if (!targetUserId) return;
+    if (user && targetUserId === user.id) {
+      setActiveTab("profile");
+    } else {
+      setViewingProfileUserId(targetUserId);
+    }
+  };
 
   // Initialize Telegram SDK & Authentication
   useEffect(() => {
@@ -7740,16 +8573,18 @@ function App() {
     setPosts: setPosts,
     t: t,
     user: user,
-    onOpenProfile: () => setActiveTab("profile")
+    onOpenProfile: handleOpenProfile
   })), activeTab === "search" && /*#__PURE__*/React.createElement(SearchView, {
     currentUser: user,
     t: t,
-    onOpenChat: handleOpenUserChat
+    onOpenChat: handleOpenUserChat,
+    onOpenProfile: handleOpenProfile
   }), activeTab === "reels" && /*#__PURE__*/React.createElement(ReelsView, {
     reels: reels,
     setReels: setReels,
     t: t,
-    user: user
+    user: user,
+    onOpenProfile: handleOpenProfile
   }), activeTab === "marketplace" && /*#__PURE__*/React.createElement(MarketplaceView, {
     user: user,
     t: t,
@@ -7785,6 +8620,7 @@ function App() {
     user: user,
     activeUser: activeChatUser,
     t: t,
+    onOpenProfile: handleOpenProfile,
     onClose: () => {
       setChatOpen(false);
       setActiveChatUser(null);
@@ -7793,6 +8629,21 @@ function App() {
     user: user,
     onClose: () => setFounderQuestOpen(false),
     onUserUpdated: updated => setUser(updated)
+  }), viewingProfileUserId && /*#__PURE__*/React.createElement(UserProfileModal, {
+    userId: viewingProfileUserId,
+    currentUser: user,
+    t: t,
+    onClose: () => setViewingProfileUserId(null),
+    onOpenChat: chatPartner => {
+      handleOpenUserChat(chatPartner);
+    },
+    onSelectPost: post => setSelectedPostModal(post)
+  }), selectedPostModal && /*#__PURE__*/React.createElement(PostModal, {
+    post: selectedPostModal,
+    currentUser: user,
+    t: t,
+    onClose: () => setSelectedPostModal(null),
+    onOpenChat: handleOpenUserChat
   }));
 }
 

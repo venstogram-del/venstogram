@@ -3,7 +3,7 @@ import { triggerHaptic } from "../telegram.js";
 import { SoundEngine } from "../sound.js";
 import { Api } from "../api.js";
 
-export function ChatView({ user, activeUser, t, onClose }) {
+export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
   const [dialogs, setDialogs] = useState([]);
   const [activePartner, setActivePartner] = useState(activeUser || null);
   const [messages, setMessages] = useState([]);
@@ -44,6 +44,15 @@ export function ChatView({ user, activeUser, t, onClose }) {
       openDialog(activeUser);
     }
   }, [activeUser]);
+
+  // Periodic refresh for dialogs so chatting friends never disappear
+  useEffect(() => {
+    if (activePartner) return;
+    const interval = setInterval(() => {
+      loadDialogs();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [activePartner]);
 
   // Periodic polling for incoming calls (if someone is calling current user)
   useEffect(() => {
@@ -566,11 +575,21 @@ export function ChatView({ user, activeUser, t, onClose }) {
                 <span className="text-xs">Чаты</span>
               </button>
 
-              <div className="flex items-center space-x-2.5">
+              <div
+                className="flex items-center space-x-2.5 cursor-pointer hover:opacity-85 transition-opacity"
+                onClick={() => {
+                  triggerHaptic("light");
+                  if (onOpenProfile && activePartner?.id) onOpenProfile(activePartner.id);
+                }}
+              >
                 <div className="relative">
                   <img
-                    src={activePartner.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150"}
+                    src={activePartner.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
                     className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-700"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E";
+                    }}
                   />
                   <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-slate-900" />
                 </div>
@@ -1054,7 +1073,7 @@ export function ChatView({ user, activeUser, t, onClose }) {
           <div className="w-full max-w-sm bg-slate-900 border border-emerald-500/50 rounded-3xl p-6 text-center space-y-5 shadow-2xl shadow-emerald-500/20">
             <div className="relative w-24 h-24 mx-auto">
               <img
-                src={incomingCall.caller?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
+                src={incomingCall.caller?.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
                 alt="Caller"
                 className="w-24 h-24 rounded-full object-cover ring-4 ring-emerald-500 animate-pulse shadow-xl"
               />

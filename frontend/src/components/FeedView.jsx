@@ -169,7 +169,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
                 onClick={() => onOpenProfile && onOpenProfile(post.author.id)}
               >
                 <img
-                  src={post.author.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
+                  src={post.author.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
                   alt={post.author.username}
                   className="w-9 h-9 rounded-full object-cover ring-2 ring-pink-500/30"
                 />
@@ -406,7 +406,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
                 comments.map((c) => (
                   <div key={c.id} className="flex items-start space-x-2.5">
                     <img
-                      src={c.author?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
+                      src={c.author?.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
                       className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5"
                     />
                     <div className="flex-1 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/60">

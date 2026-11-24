@@ -8,7 +8,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -127,6 +127,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Route alias: automatically rewrite /api/chat/* to /api/chats/* so all chat endpoints work seamlessly
+@app.middleware("http")
+async def chat_alias_middleware(request: Request, call_next):
+    path = request.scope.get("path", "")
+    if path.startswith("/api/chat/") and not path.startswith("/api/chats/"):
+        request.scope["path"] = path.replace("/api/chat/", "/api/chats/", 1)
+    return await call_next(request)
 
 # Ensure uploads directory exists
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)

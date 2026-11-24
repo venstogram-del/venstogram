@@ -3,12 +3,13 @@ import { triggerHaptic } from "../telegram.js";
 import { SoundEngine } from "../sound.js";
 import { Api } from "../api.js";
 
-export function ReelsView({ reels = [], setReels, t, user }) {
+export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const [commentsReelId, setCommentsReelId] = useState(null);
   const [reelComments, setReelComments] = useState([]);
   const [commentText, setCommentText] = useState("");
+  const [replyToReelComment, setReplyToReelComment] = useState(null); // { id, username }
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [deletingReel, setDeletingReel] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -50,10 +51,11 @@ export function ReelsView({ reels = [], setReels, t, user }) {
     }
   };
 
-  const handleReplyToReelComment = (username) => {
+  const handleReplyToReelComment = (c) => {
     triggerHaptic("light");
-    if (!username) return;
-    setCommentText(`@${username}, `);
+    if (!c || !c.author?.username) return;
+    setReplyToReelComment({ id: c.id, username: c.author.username });
+    setCommentText(`@${c.author.username} `);
     setTimeout(() => {
       reelCommentInputRef.current?.focus();
     }, 50);
@@ -123,10 +125,12 @@ export function ReelsView({ reels = [], setReels, t, user }) {
 
     try {
       const newC = await Api.post(`/reels/${commentsReelId}/comments`, {
-        text: commentText
+        text: commentText,
+        parent_id: replyToReelComment?.id || null
       });
       setReelComments((prev) => [...prev, newC]);
       setCommentText("");
+      setReplyToReelComment(null);
       setReels((prev) =>
         prev.map((r) =>
           r.id === commentsReelId ? { ...r, comments_count: r.comments_count + 1 } : r
@@ -173,9 +177,15 @@ export function ReelsView({ reels = [], setReels, t, user }) {
       {/* Right Floating Actions Bar */}
       <div className="absolute right-3 bottom-20 z-20 flex flex-col items-center space-y-5">
         {/* Author Avatar with Follow button */}
-        <div className="relative">
+        <div
+          className="relative cursor-pointer"
+          onClick={() => {
+            triggerHaptic("light");
+            if (onOpenProfile && currentReel?.author?.id) onOpenProfile(currentReel.author.id);
+          }}
+        >
           <img
-            src={currentReel.author.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
+            src={currentReel.author.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
             className="w-12 h-12 rounded-full border-2 border-white object-cover"
           />
           <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-4 bg-pink-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
@@ -248,7 +258,13 @@ export function ReelsView({ reels = [], setReels, t, user }) {
 
       {/* Bottom Info Bar */}
       <div className="absolute left-4 right-20 bottom-6 z-20 text-white">
-        <div className="flex items-center space-x-1.5 mb-1.5">
+        <div
+          className="flex items-center space-x-1.5 mb-1.5 cursor-pointer"
+          onClick={() => {
+            triggerHaptic("light");
+            if (onOpenProfile && currentReel?.author?.id) onOpenProfile(currentReel.author.id);
+          }}
+        >
           <span className="font-bold text-sm">@{currentReel.author.username}</span>
           {currentReel.author.badge_type === "gold_founder" ? (
             <span className="text-amber-400 text-xs font-bold" title="Золотая Галочка Основателя">👑</span>
@@ -387,38 +403,71 @@ export function ReelsView({ reels = [], setReels, t, user }) {
                   Комментариев пока нет. Будьте первыми! ✨
                 </div>
               ) : (
-                reelComments.map((c) => (
-                  <div key={c.id} className="flex items-start space-x-2.5">
-                    <img src={c.author?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5" />
-                    <div className="bg-slate-950 p-2.5 rounded-xl text-xs flex-1 border border-slate-800">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="font-bold text-white block">@{c.author?.username}</span>
-                        <div className="flex items-center space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => handleReplyToReelComment(c.author?.username)}
-                            className="text-[10px] text-sky-400 hover:underline font-bold"
-                          >
-                            Ответить
-                          </button>
-                          {(c.author?.id === user?.id || c.user_id === user?.id || currentReel.author?.id === user?.id || user?.role === "director") && (
+                reelComments.map((c) => {
+                  const isNested = Boolean(c.parent_id);
+                  return (
+                    <div
+                      key={c.id}
+                      className={`flex items-start space-x-2.5 transition-all ${
+                        isNested ? "ml-5 pl-2 border-l-2 border-pink-500/50 bg-pink-950/10 rounded-r-xl" : ""
+                      }`}
+                    >
+                      <img src={c.author?.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5" />
+                      <div className="bg-slate-950 p-2.5 rounded-xl text-xs flex-1 border border-slate-800">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <div className="flex items-center space-x-1.5">
+                            <span className="font-bold text-white block">@{c.author?.username}</span>
+                            {isNested && (
+                              <span className="text-[9px] text-pink-400 bg-pink-950/60 px-1 py-0.2 rounded font-semibold">
+                                ↳ ответ
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
                             <button
                               type="button"
-                              onClick={() => handleDeleteReelComment(commentsReelId, c.id)}
-                              className="text-[10px] text-rose-500 hover:text-rose-400"
-                              title="Удалить комментарий"
+                              onClick={() => handleReplyToReelComment(c)}
+                              className="text-[10px] text-sky-400 hover:underline font-bold"
                             >
-                              🗑️
+                              Ответить
                             </button>
-                          )}
+                            {(c.author?.id === user?.id || c.user_id === user?.id || currentReel.author?.id === user?.id || user?.role === "director") && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteReelComment(commentsReelId, c.id)}
+                                className="text-[10px] text-rose-500 hover:text-rose-400"
+                                title="Удалить комментарий"
+                              >
+                                🗑️
+                              </button>
+                            )}
+                          </div>
                         </div>
+                        <span className="text-slate-300 mt-0.5 block">{c.text}</span>
                       </div>
-                      <span className="text-slate-300 mt-0.5 block">{c.text}</span>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
+
+            {/* Reply Banner */}
+            {replyToReelComment && (
+              <div className="bg-slate-800/90 px-4 py-1.5 flex items-center justify-between text-[11px] text-pink-300 border-t border-slate-700/60">
+                <span>↳ Ответ для <strong className="text-white">@{replyToReelComment.username}</strong></span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReplyToReelComment(null);
+                    setCommentText("");
+                  }}
+                  className="text-slate-400 hover:text-white font-bold ml-2 text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             <form onSubmit={submitReelComment} className="p-3 border-t border-slate-800 flex space-x-2 bg-slate-950">
               <input
                 type="text"

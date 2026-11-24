@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, case
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, timezone
 from app.database.session import get_db
-from app.models.entities import User, Post, PostLike, PostComment
+from app.models.entities import User, Post, PostLike, PostComment, Follow
 from app.schemas.all_schemas import PostCreate, CommentCreate
 from app.api.deps import get_current_user
 from app.core.ai_moderator import ai_moderator
@@ -20,12 +20,20 @@ async def get_feed(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    # Prioritize posts from users current_user follows + own posts
+    following_res = await db.execute(
+        select(Follow.following_id).where(Follow.follower_id == current_user.id)
+    )
+    following_ids = set(following_res.scalars().all())
+    priority_ids = following_ids.union({current_user.id})
+    friend_priority = case((Post.user_id.in_(priority_ids), 1), else_=0) if priority_ids else 0
+
     query = (
         select(Post)
         .options(selectinload(Post.author))
         .where(Post.moderation_status != "rejected")
         .join(User)
-        .order_by(desc(User.is_verified), desc(Post.created_at))
+        .order_by(desc(friend_priority), desc(User.is_verified), desc(Post.created_at))
         .offset(offset)
         .limit(limit)
     )
@@ -195,6 +203,7 @@ async def add_post_comment(
     return {
         "id": comment.id,
         "text": comment.text,
+        "parent_id": comment.parent_id,
         "created_at": comment.created_at.isoformat(),
         "author": {
             "id": current_user.id,

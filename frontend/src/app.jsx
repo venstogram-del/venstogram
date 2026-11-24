@@ -16,6 +16,8 @@ import { WalletModal } from "./components/WalletModal.jsx";
 import { CreatePostModal } from "./components/CreatePostModal.jsx";
 import { FounderQuestModal } from "./components/FounderQuestModal.jsx";
 import { RegistrationModal } from "./components/RegistrationModal.jsx";
+import { UserProfileModal } from "./components/UserProfileModal.jsx";
+import { PostModal } from "./components/PostModal.jsx";
 
 export function App() {
   const safeGetItem = (k) => { try { return localStorage.getItem(k); } catch(e) { return null; } };
@@ -42,6 +44,17 @@ export function App() {
   const [activeChatUser, setActiveChatUser] = useState(null);
   const [founderQuestOpen, setFounderQuestOpen] = useState(false);
   const [isRegistered, setIsRegistered] = useState(true);
+  const [viewingProfileUserId, setViewingProfileUserId] = useState(null);
+  const [selectedPostModal, setSelectedPostModal] = useState(null);
+
+  const handleOpenProfile = (targetUserId) => {
+    if (!targetUserId) return;
+    if (user && targetUserId === user.id) {
+      setActiveTab("profile");
+    } else {
+      setViewingProfileUserId(targetUserId);
+    }
+  };
 
   // Initialize Telegram SDK & Authentication
   useEffect(() => {
@@ -251,7 +264,7 @@ export function App() {
               setPosts={setPosts}
               t={t}
               user={user}
-              onOpenProfile={() => setActiveTab("profile")}
+              onOpenProfile={handleOpenProfile}
             />
           </div>
         )}
@@ -261,11 +274,18 @@ export function App() {
             currentUser={user}
             t={t}
             onOpenChat={handleOpenUserChat}
+            onOpenProfile={handleOpenProfile}
           />
         )}
 
         {activeTab === "reels" && (
-          <ReelsView reels={reels} setReels={setReels} t={t} user={user} />
+          <ReelsView
+            reels={reels}
+            setReels={setReels}
+            t={t}
+            user={user}
+            onOpenProfile={handleOpenProfile}
+          />
         )}
 
         {activeTab === "marketplace" && (
@@ -326,6 +346,7 @@ export function App() {
           user={user}
           activeUser={activeChatUser}
           t={t}
+          onOpenProfile={handleOpenProfile}
           onClose={() => {
             setChatOpen(false);
             setActiveChatUser(null);
@@ -338,6 +359,29 @@ export function App() {
           user={user}
           onClose={() => setFounderQuestOpen(false)}
           onUserUpdated={(updated) => setUser(updated)}
+        />
+      )}
+
+      {viewingProfileUserId && (
+        <UserProfileModal
+          userId={viewingProfileUserId}
+          currentUser={user}
+          t={t}
+          onClose={() => setViewingProfileUserId(null)}
+          onOpenChat={(chatPartner) => {
+            handleOpenUserChat(chatPartner);
+          }}
+          onSelectPost={(post) => setSelectedPostModal(post)}
+        />
+      )}
+
+      {selectedPostModal && (
+        <PostModal
+          post={selectedPostModal}
+          currentUser={user}
+          t={t}
+          onClose={() => setSelectedPostModal(null)}
+          onOpenChat={handleOpenUserChat}
         />
       )}
     </div>

@@ -7,6 +7,11 @@ export function RegistrationModal({ user, onComplete }) {
   const [firstName, setFirstName] = useState(user?.first_name || "");
   const [lastName, setLastName] = useState(user?.last_name || "");
   const [birthYear, setBirthYear] = useState(user?.birth_year || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [emailCode, setEmailCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeTimer, setCodeTimer] = useState(0);
   
   // Initial username candidate
   const initialUsername = (user?.username && !user.username.startsWith("user_"))
@@ -21,6 +26,44 @@ export function RegistrationModal({ user, onComplete }) {
   const [suggestions, setSuggestions] = useState([]);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    let interval = null;
+    if (codeTimer > 0) {
+      interval = setInterval(() => setCodeTimer((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [codeTimer]);
+
+  const handleSendCode = async () => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      setErrorMsg("Укажите корректный адрес электронной почты");
+      triggerHaptic("error");
+      return;
+    }
+    setSendingCode(true);
+    setErrorMsg("");
+    triggerHaptic("light");
+    try {
+      await Api.post("/auth/send-code", {
+        email: cleanEmail,
+        username: username.trim().toLowerCase().replace(/^@/, "") || `u_${Date.now()}`,
+        first_name: firstName.trim() || "Пользователь",
+        last_name: lastName.trim() || "",
+        password: "VenstoPassword2026!",
+        birth_year: parseInt(birthYear) || 2000
+      });
+      setCodeSent(true);
+      setCodeTimer(60);
+      triggerHaptic("success");
+    } catch (e) {
+      setErrorMsg(e.message || "Не удалось отправить код на почту");
+      triggerHaptic("error");
+    } finally {
+      setSendingCode(false);
+    }
+  };
 
   // Live availability check
   useEffect(() => {
@@ -94,13 +137,17 @@ export function RegistrationModal({ user, onComplete }) {
     triggerHaptic("heavy");
 
     try {
-      const res = await Api.patch("/auth/me", {
+      const patchData = {
         first_name: trimmedFirst,
         last_name: lastName.trim(),
         birth_year: bYear,
         username: trimmedUser,
         is_registered: true
-      });
+      };
+      if (email.trim()) {
+        patchData.email = email.trim().toLowerCase();
+      }
+      const res = await Api.patch("/auth/me", patchData);
 
       try {
         localStorage.setItem(`vensto_account_created_${user?.id || 1}`, "true");
@@ -265,6 +312,48 @@ export function RegistrationModal({ user, onComplete }) {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Step 3: Email Security & Code */}
+          <div className="border-t border-slate-800/80 pt-3">
+            <span className="text-[10px] text-sky-400 uppercase tracking-wider font-extrabold block mb-1">
+              Шаг 3: Email и безопасность (по желанию)
+            </span>
+            <div className="space-y-2">
+              <div className="flex space-x-2">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Ваша почта: name@gmail.com"
+                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendCode}
+                  disabled={sendingCode || codeTimer > 0 || !email.includes("@")}
+                  className="bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-bold text-xs px-3 py-2 rounded-xl transition shrink-0"
+                >
+                  {sendingCode ? "..." : codeTimer > 0 ? `${codeTimer}с` : "Получить код"}
+                </button>
+              </div>
+
+              {codeSent && (
+                <div className="space-y-1 animate-in fade-in">
+                  <span className="text-[10px] text-emerald-400 block font-semibold">
+                    ✓ 6-значный код отправлен на {email}
+                  </span>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={emailCode}
+                    onChange={(e) => setEmailCode(e.target.value.replace(/[^0-9]/g, ""))}
+                    placeholder="Введите 6 цифр из письма"
+                    className="w-full bg-slate-950 border border-emerald-500/60 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none font-mono text-center tracking-widest text-sm"
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Feature highlights unlock */}

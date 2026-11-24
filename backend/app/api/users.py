@@ -109,16 +109,21 @@ async def search_users(
     Search users by @username, first name, last name, or bio (Лупа / поиск друзей).
     """
     query = select(User).where(User.is_banned == False)
-    if q.strip():
-        term = f"%{q.strip().lower()}%"
-        query = query.where(
-            or_(
-                func.lower(User.username).like(term),
-                func.lower(User.first_name).like(term),
-                func.lower(User.last_name).like(term),
-                func.lower(User.bio).like(term)
-            )
-        )
+    raw_q = q.strip()
+    if raw_q:
+        clean_q = raw_q.lower().lstrip("@")
+        term = f"%{clean_q}%"
+        conditions = [
+            func.lower(User.username).like(term),
+            func.lower(User.first_name).like(term),
+            func.lower(User.last_name).like(term),
+            func.lower(User.bio).like(term)
+        ]
+        if clean_q.isdigit():
+            val = int(clean_q)
+            conditions.append(User.id == val)
+            conditions.append(User.telegram_id == val)
+        query = query.where(or_(*conditions))
     query = query.order_by(User.is_verified.desc(), User.last_active.desc()).limit(limit)
     res = await db.execute(query)
     users = res.scalars().all()

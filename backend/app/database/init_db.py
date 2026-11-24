@@ -30,12 +30,16 @@ async def init_models():
     from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Auto-migrate newly added columns for users table
+        # Auto-migrate newly added columns for users, stories, and comments
         for col_sql in [
             "ALTER TABLE users ADD COLUMN is_registered BOOLEAN DEFAULT 0",
             "ALTER TABLE users ADD COLUMN birth_year INTEGER",
             "ALTER TABLE users ADD COLUMN birth_date VARCHAR(32)",
-            "ALTER TABLE users ADD COLUMN badge_type VARCHAR(32) DEFAULT 'blue'"
+            "ALTER TABLE users ADD COLUMN badge_type VARCHAR(32) DEFAULT 'blue'",
+            "ALTER TABLE users ADD COLUMN is_incognito BOOLEAN DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN is_private BOOLEAN DEFAULT 0",
+            "ALTER TABLE stories ADD COLUMN is_close_friends BOOLEAN DEFAULT 0",
+            "ALTER TABLE reel_comments ADD COLUMN parent_id INTEGER"
         ]:
             try:
                 await conn.execute(text(col_sql))

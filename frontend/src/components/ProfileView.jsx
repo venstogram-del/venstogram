@@ -24,6 +24,16 @@ export function ProfileView({
   const [legalModalOpen, setLegalModalOpen] = useState(false);
   const [emailAuthModalOpen, setEmailAuthModalOpen] = useState(false);
   const [founderQuestModalOpen, setFounderQuestModalOpen] = useState(false);
+  const [countryModalOpen, setCountryModalOpen] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState(
+    (typeof localStorage !== "undefined" && localStorage.getItem("vensto_user_country")) || "🇺🇿 Узбекистан"
+  );
+  const [storiesArchiveOpen, setStoriesArchiveOpen] = useState(false);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [closeFriendsModalOpen, setCloseFriendsModalOpen] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(
+    (typeof localStorage !== "undefined" && localStorage.getItem("vensto_push_notifications") !== "false")
+  );
 
   // Selected Post Viewer
   const [selectedPost, setSelectedPost] = useState(null);
@@ -220,6 +230,56 @@ export function ProfileView({
     }
   };
 
+  const handleToggleIncognito = async () => {
+    triggerHaptic("medium");
+    const nextVal = !user?.is_incognito;
+    try {
+      await Api.patch("/auth/me", { is_incognito: nextVal });
+      onUpdateUser({ ...user, is_incognito: nextVal });
+    } catch (e) {
+      alert("Ошибка обновления режима: " + e.message);
+    }
+  };
+
+  const handleTogglePrivate = async () => {
+    triggerHaptic("medium");
+    const nextVal = !user?.is_private;
+    try {
+      await Api.patch("/auth/me", { is_private: nextVal });
+      onUpdateUser({ ...user, is_private: nextVal });
+    } catch (e) {
+      alert("Ошибка обновления приватности: " + e.message);
+    }
+  };
+
+  const handleShareMyProfile = () => {
+    triggerHaptic("light");
+    const username = user?.username || `id${user?.id}`;
+    const url = `https://t.me/venstogrambot?startapp=u_${username}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+    }
+    alert("✓ Ссылка на ваш профиль скопирована!");
+  };
+
+  const handleTogglePush = () => {
+    triggerHaptic("light");
+    const nextVal = !pushEnabled;
+    setPushEnabled(nextVal);
+    try {
+      localStorage.setItem("vensto_push_notifications", String(nextVal));
+    } catch (e) {}
+  };
+
+  const handleSelectCountry = (countryName) => {
+    triggerHaptic("selection");
+    setSelectedCountry(countryName);
+    try {
+      localStorage.setItem("vensto_user_country", countryName);
+    } catch (e) {}
+    setCountryModalOpen(false);
+  };
+
   const handleBuyVerified = async (months, coins) => {
     if (user.wallet_coins < coins) {
       triggerHaptic("error");
@@ -340,7 +400,7 @@ export function ProfileView({
       <div className="flex items-center space-x-4">
         <div className="relative group cursor-pointer" onClick={() => setIsEditing(true)}>
           <img
-            src={user.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300"}
+            src={user.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
             alt="Profile avatar"
             className="w-20 h-20 rounded-full object-cover ring-2 ring-pink-500 shadow-xl"
           />
@@ -622,131 +682,78 @@ export function ProfileView({
               </button>
             </div>
 
-            {/* Tech Support Contact Card - Prominent at the Top */}
-            <div className="bg-gradient-to-r from-emerald-950/90 via-slate-950 to-teal-950/90 p-3.5 rounded-2xl border border-emerald-500/50 space-y-2.5 shadow-lg shadow-emerald-500/10">
-              <div className="flex items-center space-x-2.5">
-                <span className="text-2xl">🛠️</span>
-                <div>
-                  <span className="text-xs font-black text-white block">Служба технической поддержки</span>
-                  <span className="text-[10px] text-emerald-300">Помощь 24/7, вопросы по оплате, никнеймам и верификации</span>
+            {/* Quick Actions */}
+            <div className="space-y-2">
+              <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider block">
+                Быстрые действия
+              </span>
+
+              {/* Share My Profile Button */}
+              <div
+                onClick={handleShareMyProfile}
+                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-pink-500/50 transition-all"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-lg">🔗</span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Поделиться профилем</span>
+                    <span className="text-[10px] text-slate-400">Скопировать ссылку для друзей</span>
+                  </div>
                 </div>
+                <span className="text-pink-400 text-xs font-bold">Копировать</span>
               </div>
 
-              <div className="bg-slate-950/80 rounded-xl p-2.5 border border-slate-800 space-y-2 text-xs">
+              {/* Venstogram Verified Buy/Status Option */}
+              <div className="bg-gradient-to-r from-sky-950/80 via-blue-900/40 to-slate-950 p-3 rounded-2xl border border-sky-500/40 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-[11px]">📞 Телефон поддержки:</span>
-                  <a
-                    href="tel:+998507775152"
-                    className="text-emerald-400 font-mono font-bold hover:underline"
-                  >
-                    +998 50 777 51 52
-                  </a>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-[11px]">💬 Telegram поддержки:</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-6 h-6 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xs">
+                      ✓
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-white block">Синяя галочка верификации</span>
+                      <span className="text-[10px] text-sky-300">
+                        {user.is_verified ? "✅ Активна (3x - 5x буст охватов)" : "3x - 5x охваты и топ в ленте"}
+                      </span>
+                    </div>
+                  </div>
                   <button
-                    type="button"
-                    onClick={() => openTelegramChannel("@yuksak_it")}
-                    className="text-sky-400 font-mono font-bold hover:underline flex items-center space-x-1"
+                    onClick={() => {
+                      setSettingsOpen(false);
+                      setVerifiedModalOpen(true);
+                    }}
+                    className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl shadow-md transition-transform active:scale-95"
                   >
-                    <span>@yuksak_it</span>
-                    <span className="text-[10px]">↗</span>
+                    {user.is_verified ? "Продлить" : "Получить"}
                   </button>
                 </div>
               </div>
 
-              <div className="flex space-x-2 pt-0.5">
-                <a
-                  href="tel:+998507775152"
-                  className="flex-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
-                >
-                  <span>📞</span>
-                  <span>Позвонить</span>
-                </a>
-                <button
-                  type="button"
-                  onClick={() => openTelegramChannel("@yuksak_it")}
-                  className="flex-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
-                >
-                  <span>💬</span>
-                  <span>Написать</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Venstogram Verified Buy/Status Option */}
-            <div className="bg-gradient-to-r from-sky-950/80 via-blue-900/40 to-slate-950 p-3.5 rounded-2xl border border-sky-500/40 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-7 h-7 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-sm">
-                    ✓
-                  </div>
+              {/* Founder League Blogger Quest */}
+              <div
+                onClick={() => {
+                  triggerHaptic("medium");
+                  setSettingsOpen(false);
+                  setFounderQuestModalOpen(true);
+                }}
+                className="bg-gradient-to-r from-amber-950/70 via-slate-950 to-amber-950/70 p-3 rounded-2xl border border-amber-500/40 flex items-center justify-between cursor-pointer hover:border-amber-400 transition-all"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-lg">👑</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">Синяя галочка верификации</span>
-                    <span className="text-[10px] text-sky-300">
-                      {user.is_verified ? "✅ Активна (3x - 5x буст охватов)" : "3x - 5x охваты и взлёт в рекомендации"}
-                    </span>
+                    <span className="text-xs font-bold text-white block">Лига блогеров от Основателя</span>
+                    <span className="text-[10px] text-amber-300">Квест, рефералы и Золотая Галочка</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setSettingsOpen(false);
-                    setVerifiedModalOpen(true);
-                  }}
-                  className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl shadow-md transition-transform active:scale-95"
-                >
-                  {user.is_verified ? "Продлить" : "Купить"}
-                </button>
+                <span className="text-amber-400 text-sm">→</span>
               </div>
-            </div>
 
-            {/* Founder League Blogger Quest */}
-            <div
-              onClick={() => {
-                triggerHaptic("medium");
-                setSettingsOpen(false);
-                setFounderQuestModalOpen(true);
-              }}
-              className="bg-gradient-to-r from-amber-950/70 via-slate-950 to-amber-950/70 p-3.5 rounded-2xl border border-amber-500/40 flex items-center justify-between cursor-pointer hover:border-amber-400 transition-all"
-            >
-              <div className="flex items-center space-x-2.5">
-                <span className="text-xl">👑</span>
+              {/* Wallet & Coins Card */}
+              <div className="bg-gradient-to-tr from-amber-600/20 via-slate-950 to-yellow-600/10 p-3 rounded-2xl border border-amber-500/30 flex items-center justify-between">
                 <div>
-                  <span className="text-xs font-bold text-white block">Лига блогеров от Основателя</span>
-                  <span className="text-[10px] text-amber-300">Квест, рефералы, Золотая Галочка и подарок</span>
-                </div>
-              </div>
-              <span className="text-amber-400 text-sm">→</span>
-            </div>
-
-            {/* Account Security (PIN & Biometrics) */}
-            <div
-              onClick={() => {
-                setSettingsOpen(false);
-                setSecurityModalOpen(true);
-              }}
-              className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-all"
-            >
-              <div className="flex items-center space-x-2.5">
-                <span className="text-xl">🔒</span>
-                <div>
-                  <span className="text-xs font-bold text-white block">Защитить аккаунт</span>
-                  <span className="text-[10px] text-slate-400">PIN-код, Face ID, биометрия и сессии</span>
-                </div>
-              </div>
-              <span className="text-slate-400 text-sm">→</span>
-            </div>
-
-            {/* Wallet & Coins Card */}
-            <div className="bg-gradient-to-tr from-amber-600/20 via-slate-950 to-yellow-600/10 p-3.5 rounded-2xl border border-amber-500/30 space-y-2">
-              <span className="text-xs text-amber-300 font-bold block">👛 Баланс Vensto Coins:</span>
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-2xl font-black text-white">
+                  <span className="text-[10px] text-amber-300 font-bold block">👛 Баланс:</span>
+                  <span className="text-lg font-black text-white">
                     {(user.wallet_coins || 0).toLocaleString()} 🪙
-                  </span>
-                  <span className="text-[10px] text-slate-400 block mt-0.5">
-                    ≈ {((user.wallet_coins || 0) * 100).toLocaleString()} UZS (сум)
                   </span>
                 </div>
                 <button
@@ -754,114 +761,316 @@ export function ProfileView({
                     setSettingsOpen(false);
                     onOpenWallet();
                   }}
-                  className="bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs px-3.5 py-2.5 rounded-xl shadow-lg shadow-emerald-600/30 transition-transform active:scale-95"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 text-white font-black text-xs px-3 py-2 rounded-xl shadow-md transition-transform active:scale-95"
                 >
                   ➕ Пополнить
                 </button>
               </div>
             </div>
 
-            {/* Language Switcher */}
+            {/* Privacy & Confidentiality */}
             <div className="space-y-2">
-              <span className="text-xs font-bold text-white block">🌐 Язык интерфейса (Ilova tili):</span>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { code: "ru", label: "🇷🇺 Русский" },
-                  { code: "uz_latn", label: "🇺🇿 O'zbekcha" },
-                  { code: "uz_cyrl", label: "🇺🇿 Ўзбекча" },
-                  { code: "en", label: "🇬🇧 English" }
-                ].map((l) => (
-                  <button
-                    key={l.code}
-                    onClick={() => {
-                      triggerHaptic("selection");
-                      onLanguageChange(l.code);
-                    }}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between ${
-                      lang === l.code
-                        ? "bg-pink-600 text-white border-pink-500 shadow-md shadow-pink-600/30"
-                        : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
-                    }`}
-                  >
-                    <span>{l.label}</span>
-                    {lang === l.code && <span>✓</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
+              <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider block">
+                Конфиденциальность и приватность
+              </span>
 
-            {/* Data Saver Toggle */}
-            <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
-              <div>
-                <span className="text-xs font-bold text-white block">⚡ Экономия трафика (Data Saver)</span>
-                <span className="text-[10px] text-slate-400">Сжимать фото и видео при слабом интернете</span>
-              </div>
-              <button
-                onClick={() => {
-                  triggerHaptic("light");
-                  onToggleDataSaver();
-                }}
-                className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
-                  dataSaver ? "bg-emerald-500" : "bg-slate-700"
-                }`}
-              >
-                <div
-                  className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                    dataSaver ? "translate-x-6" : "translate-x-0"
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Email Registration & Account Recovery */}
-            <div
-              onClick={() => {
-                triggerHaptic("light");
-                setSettingsOpen(false);
-                setEmailAuthModalOpen(true);
-              }}
-              className="bg-slate-950 p-3.5 rounded-2xl border border-pink-500/30 flex items-center justify-between cursor-pointer hover:border-pink-500/60 transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <span className="text-xl">✉️</span>
-                <div>
-                  <span className="text-xs font-bold text-white block">Регистрация и вход по Email</span>
-                  <span className="text-[10px] text-pink-400">Свободный никнейм, код на почту и сброс пароля</span>
+              {/* Incognito Stealth Mode */}
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-lg">🕶️</span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Режим невидимка</span>
+                    <span className="text-[10px] text-slate-400">Скрыть онлайн и время активности</span>
+                  </div>
                 </div>
+                <button
+                  onClick={handleToggleIncognito}
+                  className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
+                    user?.is_incognito ? "bg-pink-600" : "bg-slate-700"
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                      user?.is_incognito ? "translate-x-6" : "translate-x-0"
+                    }`}
+                  />
+                </button>
               </div>
-              <span className="text-pink-400 text-sm">→</span>
-            </div>
 
-            {/* Remove Avatar Option */}
-            {user.avatar_url && (
+              {/* Private Profile Toggle */}
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-lg">🔒</span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Закрытый аккаунт</span>
+                    <span className="text-[10px] text-slate-400">Только подписчики видят публикации</span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleTogglePrivate}
+                  className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
+                    user?.is_private ? "bg-emerald-500" : "bg-slate-700"
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                      user?.is_private ? "translate-x-6" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Account Security (PIN & Biometrics) */}
               <div
                 onClick={() => {
                   setSettingsOpen(false);
-                  handleDeleteAvatar();
+                  setSecurityModalOpen(true);
                 }}
-                className="bg-rose-950/30 hover:bg-rose-900/50 p-3 rounded-2xl border border-rose-900/50 flex items-center justify-between cursor-pointer transition-all"
+                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-all"
               >
-                <div className="flex items-center space-x-2">
-                  <span className="text-base">🗑️</span>
-                  <span className="text-xs font-bold text-rose-300">Удалить фотографию аватарки</span>
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-lg">🛡️</span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Защитить аккаунт</span>
+                    <span className="text-[10px] text-slate-400">PIN-код, Face ID и биометрия</span>
+                  </div>
                 </div>
-                <span className="text-rose-400 text-xs font-semibold">Сбросить</span>
+                <span className="text-slate-400 text-sm">→</span>
               </div>
-            )}
 
-            {/* Legal Policies Button (Законы РУз) */}
-            <div
-              onClick={() => {
-                setSettingsOpen(false);
-                setLegalModalOpen(true);
-              }}
-              className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700"
-            >
-              <div className="flex items-center space-x-2">
-                <span className="text-base">⚖️</span>
-                <span className="text-xs font-bold text-slate-300">Законы РУз и правила платформы</span>
+              {/* Close Friends */}
+              <div
+                onClick={() => {
+                  setSettingsOpen(false);
+                  setCloseFriendsModalOpen(true);
+                }}
+                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-emerald-500/50 transition-all"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-lg">💚</span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Близкие друзья</span>
+                    <span className="text-[10px] text-emerald-400">Список для приватных Stories</span>
+                  </div>
+                </div>
+                <span className="text-emerald-400 text-xs font-bold">Настроить</span>
               </div>
-              <span className="text-slate-400 text-xs">Читать ↗</span>
+            </div>
+
+            {/* Content & Archive */}
+            <div className="space-y-2">
+              <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider block">
+                Контент и история
+              </span>
+
+              {/* Stories Archive */}
+              <div
+                onClick={() => {
+                  setSettingsOpen(false);
+                  setStoriesArchiveOpen(true);
+                }}
+                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-all"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-lg">📦</span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Архив историй</span>
+                    <span className="text-[10px] text-slate-400">Все ваши прошлые Stories</span>
+                  </div>
+                </div>
+                <span className="text-slate-400 text-sm">→</span>
+              </div>
+
+              {/* Your Activity */}
+              <div
+                onClick={() => {
+                  setSettingsOpen(false);
+                  setActivityModalOpen(true);
+                }}
+                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-all"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-lg">❤️</span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Ваши действия</span>
+                    <span className="text-[10px] text-slate-400">Понравившиеся посты и комментарии</span>
+                  </div>
+                </div>
+                <span className="text-slate-400 text-sm">→</span>
+              </div>
+            </div>
+
+            {/* App Preferences */}
+            <div className="space-y-2">
+              <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider block">
+                Настройки приложения
+              </span>
+
+              {/* Language Switcher */}
+              <div className="space-y-1.5">
+                <span className="text-xs font-bold text-white block">🌐 Язык интерфейса:</span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { code: "ru", label: "🇷🇺 Русский" },
+                    { code: "uz_latn", label: "🇺🇿 O'zbekcha" },
+                    { code: "uz_cyrl", label: "🇺🇿 Ўзбекча" },
+                    { code: "en", label: "🇬🇧 English" }
+                  ].map((l) => (
+                    <button
+                      key={l.code}
+                      onClick={() => {
+                        triggerHaptic("selection");
+                        onLanguageChange(l.code);
+                      }}
+                      className={`py-1.5 px-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between ${
+                        lang === l.code
+                          ? "bg-pink-600 text-white border-pink-500 shadow-md shadow-pink-600/30"
+                          : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
+                      }`}
+                    >
+                      <span>{l.label}</span>
+                      {lang === l.code && <span>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Country Selection */}
+              <div
+                onClick={() => {
+                  setSettingsOpen(false);
+                  setCountryModalOpen(true);
+                }}
+                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-lg">📍</span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Страна / Регион:</span>
+                    <span className="text-[10px] text-slate-400">{selectedCountry}</span>
+                  </div>
+                </div>
+                <span className="text-sky-400 text-xs font-bold">Изменить ↗</span>
+              </div>
+
+              {/* Push Notifications Toggle */}
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-lg">🔔</span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Уведомления</span>
+                    <span className="text-[10px] text-slate-400">Push-сообщения о лайках и ответах</span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleTogglePush}
+                  className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
+                    pushEnabled ? "bg-pink-600" : "bg-slate-700"
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                      pushEnabled ? "translate-x-6" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Data Saver Toggle */}
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-lg">⚡</span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Экономия трафика</span>
+                    <span className="text-[10px] text-slate-400">Сжимать фото и видео</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    triggerHaptic("light");
+                    onToggleDataSaver();
+                  }}
+                  className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
+                    dataSaver ? "bg-emerald-500" : "bg-slate-700"
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                      dataSaver ? "translate-x-6" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Email Registration & Account Recovery */}
+              <div
+                onClick={() => {
+                  triggerHaptic("light");
+                  setSettingsOpen(false);
+                  setEmailAuthModalOpen(true);
+                }}
+                className="bg-slate-950 p-3 rounded-2xl border border-pink-500/30 flex items-center justify-between cursor-pointer hover:border-pink-500/60 transition-colors"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-lg">✉️</span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Email и пароль</span>
+                    <span className="text-[10px] text-pink-400">Резервный вход и безопасность</span>
+                  </div>
+                </div>
+                <span className="text-pink-400 text-sm">→</span>
+              </div>
+            </div>
+
+            {/* Support and Legal */}
+            <div className="space-y-2">
+              <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider block">
+                Помощь и контакты
+              </span>
+
+              {/* Support Card */}
+              <div className="bg-gradient-to-r from-emerald-950/80 via-slate-950 to-teal-950/80 p-3 rounded-2xl border border-emerald-500/40 space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg">🛠️</span>
+                  <div>
+                    <span className="text-xs font-black text-white block">Служба техподдержки</span>
+                    <span className="text-[10px] text-emerald-300">Помощь 24/7, вопросы по аккаунту</span>
+                  </div>
+                </div>
+                <div className="bg-slate-950/80 rounded-xl p-2 border border-slate-800 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-[11px]">📞 Телефон:</span>
+                    <a href="tel:+998507775152" className="text-emerald-400 font-mono font-bold hover:underline">
+                      +998 50 777 51 52
+                    </a>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-[11px]">💬 Telegram:</span>
+                    <button
+                      type="button"
+                      onClick={() => openTelegramChannel("@yuksak_it")}
+                      className="text-sky-400 font-mono font-bold hover:underline"
+                    >
+                      @yuksak_it ↗
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Legal Policies */}
+              <div
+                onClick={() => {
+                  setSettingsOpen(false);
+                  setLegalModalOpen(true);
+                }}
+                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-base">⚖️</span>
+                  <span className="text-xs font-bold text-slate-300">Законы РУз и правила платформы</span>
+                </div>
+                <span className="text-slate-400 text-xs">Читать ↗</span>
+              </div>
             </div>
 
             {/* Account Info */}
@@ -879,6 +1088,128 @@ export function ProfileView({
                 <span className="text-slate-500">VENSTOGRAM v2.5 Live</span>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Country & Region Modal */}
+      {countryModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm space-y-3 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <h3 className="text-sm font-black text-white flex items-center space-x-1.5">
+                <span>📍</span>
+                <span>Выбор страны и региона</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setCountryModalOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-1.5 pt-1">
+              {[
+                { name: "🇺🇿 Узбекистан (O'zbekiston)", desc: "Ташкент, Самарканд, Бухара" },
+                { name: "🇰🇿 Казахстан (Qazaqstan)", desc: "Астана, Алматы, Шымкент" },
+                { name: "🇷🇺 Россия (Россия)", desc: "Москва, Санкт-Петербург, регионы" },
+                { name: "🇹🇷 Турция (Türkiye)", desc: "Стамбул, Анкара, Анталья" },
+                { name: "🌐 Весь мир (Global)", desc: "Международный охват публикаций" }
+              ].map((c) => (
+                <button
+                  key={c.name}
+                  type="button"
+                  onClick={() => handleSelectCountry(c.name)}
+                  className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                    selectedCountry === c.name
+                      ? "bg-sky-950/70 border-sky-500 text-sky-300 font-bold"
+                      : "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700"
+                  }`}
+                >
+                  <div>
+                    <span className="text-xs block font-bold">{c.name}</span>
+                    <span className="text-[10px] text-slate-400">{c.desc}</span>
+                  </div>
+                  {selectedCountry === c.name && <span className="text-sky-400">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stories Archive Modal */}
+      {storiesArchiveOpen && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col p-4 animate-in fade-in">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <h3 className="text-sm font-black text-white flex items-center space-x-2">
+              <span>📦</span>
+              <span>Архив историй (Stories)</span>
+            </h3>
+            <button
+              onClick={() => setStoriesArchiveOpen(false)}
+              className="text-slate-400 hover:text-white text-lg p-1"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto py-6 text-center space-y-3">
+            <span className="text-4xl block">🎞️</span>
+            <p className="text-xs font-bold text-slate-300">Архив ваших историй защищен</p>
+            <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+              Все опубликованные вами Stories после 24 часов автоматически сохраняются в персональный архив, доступный только вам.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Your Activity Modal */}
+      {activityModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col p-4 animate-in fade-in">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <h3 className="text-sm font-black text-white flex items-center space-x-2">
+              <span>❤️</span>
+              <span>Ваши действия в Venstogram</span>
+            </h3>
+            <button
+              onClick={() => setActivityModalOpen(false)}
+              className="text-slate-400 hover:text-white text-lg p-1"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto py-6 text-center space-y-3">
+            <span className="text-4xl block">✨</span>
+            <p className="text-xs font-bold text-slate-300">История отметок и комментариев</p>
+            <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+              Здесь отображается полная история ваших лайков, комментариев и репостов. Ваши действия синхронизируются в реальном времени.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Close Friends Modal */}
+      {closeFriendsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col p-4 animate-in fade-in">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <h3 className="text-sm font-black text-white flex items-center space-x-2">
+              <span>💚</span>
+              <span>Близкие друзья (Close Friends)</span>
+            </h3>
+            <button
+              onClick={() => setCloseFriendsModalOpen(false)}
+              className="text-slate-400 hover:text-white text-lg p-1"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto py-6 text-center space-y-3">
+            <span className="text-4xl block">🛡️</span>
+            <p className="text-xs font-bold text-emerald-400">Приватный список для избранных Stories</p>
+            <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+              Когда вы выкладываете историю со значком «Близкие друзья», её видят только пользователи из этого списка с зеленой рамкой.
+            </p>
           </div>
         </div>
       )}
@@ -1118,7 +1449,7 @@ export function ProfileView({
             <div className="flex flex-col items-center justify-center space-y-2 py-2">
               <div className="relative">
                 <img
-                  src={editAvatarUrl || user.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300"}
+                  src={editAvatarUrl || user.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
                   alt="Avatar preview"
                   className="w-20 h-20 rounded-full object-cover ring-2 ring-pink-500 shadow-md"
                 />

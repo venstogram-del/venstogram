@@ -62,6 +62,7 @@ async def get_active_stories(
             "media_url": s.media_url,
             "media_type": s.media_type,
             "caption": s.caption,
+            "is_close_friends": getattr(s, "is_close_friends", False),
             "views_count": s.views_count,
             "is_seen": is_seen,
             "created_at": s.created_at.isoformat() if s.created_at else None,
@@ -86,6 +87,7 @@ async def create_story(
         media_url=req.media_url,
         media_type=req.media_type,
         caption=req.caption or "",
+        is_close_friends=req.is_close_friends,
         expires_at=now + timedelta(hours=24)
     )
     db.add(story)

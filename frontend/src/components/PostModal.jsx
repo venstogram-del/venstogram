@@ -20,6 +20,7 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
   const [reportReason, setReportReason] = useState("Запрещенный контент / Порнография (Ст. 130 УК РУз)");
   const [isSaved, setIsSaved] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [replyToComment, setReplyToComment] = useState(null); // { id, username }
 
   const commentInputRef = useRef(null);
 
@@ -79,8 +80,12 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
     setNewComment("");
 
     try {
-      const added = await Api.post(`/posts/${currentPost.id}/comments`, { text });
+      const added = await Api.post(`/posts/${currentPost.id}/comments`, {
+        text,
+        parent_id: replyToComment?.id || null
+      });
       setComments((prev) => [...prev, added]);
+      setReplyToComment(null);
 
       const updated = {
         ...currentPost,
@@ -91,10 +96,11 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
     } catch (e) {}
   };
 
-  const handleReplyToComment = (authorUsername) => {
+  const handleReplyToComment = (c) => {
     triggerHaptic("light");
-    if (!authorUsername) return;
-    setNewComment(`@${authorUsername}, `);
+    if (!c || !c.author?.username) return;
+    setReplyToComment({ id: c.id, username: c.author.username });
+    setNewComment(`@${c.author.username} `);
     setTimeout(() => {
       commentInputRef.current?.focus();
     }, 50);
@@ -167,7 +173,7 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
         <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <img
-              src={currentPost.author?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
+              src={currentPost.author?.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
               className="w-9 h-9 rounded-full object-cover ring-1 ring-pink-500"
             />
             <div>
@@ -304,41 +310,73 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
               Будьте первым, кто оставит комментарий! ✨
             </div>
           ) : (
-            comments.map((c) => (
-              <div key={c.id} className="flex items-start space-x-2 text-xs">
-                <img
-                  src={c.author?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
-                  className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5"
-                />
-                <div className="bg-slate-900 p-2 rounded-xl border border-slate-800/80 flex-1">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-black text-pink-400">@{c.author?.username}</span>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => handleReplyToComment(c.author?.username)}
-                        className="text-[10px] text-sky-400 hover:underline font-bold"
-                      >
-                        Ответить
-                      </button>
-                      {(c.author?.id === currentUser?.id || c.user_id === currentUser?.id || currentPost.author?.id === currentUser?.id || currentUser?.role === "director") && (
+            comments.map((c) => {
+              const isNested = Boolean(c.parent_id);
+              return (
+                <div
+                  key={c.id}
+                  className={`flex items-start space-x-2 text-xs transition-all ${
+                    isNested ? "ml-5 pl-2 border-l-2 border-pink-500/50 bg-pink-950/10 rounded-r-xl" : ""
+                  }`}
+                >
+                  <img
+                    src={c.author?.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
+                    className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5"
+                  />
+                  <div className="bg-slate-900 p-2 rounded-xl border border-slate-800/80 flex-1">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-black text-pink-400">@{c.author?.username}</span>
+                        {isNested && (
+                          <span className="text-[9px] text-pink-400/80 bg-pink-950/60 px-1 py-0.2 rounded font-semibold">
+                            ↳ ответ
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2">
                         <button
                           type="button"
-                          onClick={() => handleDeleteComment(c.id)}
-                          className="text-[10px] text-rose-500 hover:text-rose-400"
-                          title="Удалить комментарий"
+                          onClick={() => handleReplyToComment(c)}
+                          className="text-[10px] text-sky-400 hover:underline font-bold"
                         >
-                          🗑️
+                          Ответить
                         </button>
-                      )}
+                        {(c.author?.id === currentUser?.id || c.user_id === currentUser?.id || currentPost.author?.id === currentUser?.id || currentUser?.role === "director") && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteComment(c.id)}
+                            className="text-[10px] text-rose-500 hover:text-rose-400"
+                            title="Удалить комментарий"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </div>
                     </div>
+                    <span className="text-slate-200">{c.text}</span>
                   </div>
-                  <span className="text-slate-200">{c.text}</span>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
+
+        {/* Reply Indicator Banner */}
+        {replyToComment && (
+          <div className="bg-slate-800/90 px-3 py-1.5 flex items-center justify-between text-[11px] text-pink-300 border-t border-slate-700/60">
+            <span>↳ Ответ для <strong className="text-white">@{replyToComment.username}</strong></span>
+            <button
+              type="button"
+              onClick={() => {
+                setReplyToComment(null);
+                setNewComment("");
+              }}
+              className="text-slate-400 hover:text-white font-bold ml-2 text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Add Comment Input Bar */}
         <form onSubmit={handleAddComment} className="p-2.5 bg-slate-900 border-t border-slate-800 flex items-center space-x-2">
@@ -373,7 +411,7 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
             ) : (
               likers.map((u) => (
                 <div key={u.id} className="flex items-center space-x-2 text-xs">
-                  <img src={u.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"} className="w-7 h-7 rounded-full object-cover" />
+                  <img src={u.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"} className="w-7 h-7 rounded-full object-cover" />
                   <div>
                     <span className="font-bold text-white block">{u.first_name}</span>
                     <span className="text-[10px] text-pink-400">@{u.username}</span>

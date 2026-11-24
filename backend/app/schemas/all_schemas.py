@@ -60,6 +60,8 @@ class UserProfileUpdate(BaseModel):
     language_code: Optional[str] = None
     wallet_pin: Optional[str] = None
     biometric_enabled: Optional[bool] = None
+    is_incognito: Optional[bool] = None
+    is_private: Optional[bool] = None
 
 class UsernameOrderCreate(BaseModel):
     listing_id: Optional[int] = None
@@ -90,6 +92,7 @@ class StoryCreate(BaseModel):
     media_url: str
     media_type: str = "image"
     caption: Optional[str] = ""
+    is_close_friends: bool = False
 
 class StoryReactionCreate(BaseModel):
     reaction: str = "❤️"
@@ -104,6 +107,7 @@ class ReelCreate(BaseModel):
 
 class ReelCommentCreate(BaseModel):
     text: str
+    parent_id: Optional[int] = None
 
 # --- Battles & Gifts ---
 class BattleInviteCreate(BaseModel):

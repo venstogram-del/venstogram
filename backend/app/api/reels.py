@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, case
 from sqlalchemy.orm import selectinload
 from typing import Optional
 from app.database.session import get_db
-from app.models.entities import User, Reel, ReelLike, ReelComment
+from app.models.entities import User, Reel, ReelLike, ReelComment, Follow
 from app.schemas.all_schemas import ReelCreate, ReelCommentCreate
 from app.api.deps import get_current_user
 
@@ -17,12 +17,20 @@ async def get_reels(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    # Prioritize reels from friends / creators the user follows + own reels
+    following_res = await db.execute(
+        select(Follow.following_id).where(Follow.follower_id == current_user.id)
+    )
+    following_ids = set(following_res.scalars().all())
+    priority_ids = following_ids.union({current_user.id})
+    friend_priority = case((Reel.user_id.in_(priority_ids), 1), else_=0) if priority_ids else 0
+
     query = (
         select(Reel)
         .options(selectinload(Reel.author))
         .where(Reel.is_flagged == False)
         .join(User)
-        .order_by(desc(User.is_verified), desc(Reel.likes_count), desc(Reel.created_at))
+        .order_by(desc(friend_priority), desc(User.is_verified), desc(Reel.likes_count), desc(Reel.created_at))
         .offset(offset)
         .limit(limit)
     )
@@ -148,6 +156,7 @@ async def get_reel_comments(
         {
             "id": c.id,
             "text": c.text,
+            "parent_id": getattr(c, "parent_id", None),
             "created_at": c.created_at.isoformat() if c.created_at else None,
             "author": {
                 "id": c.author.id,
@@ -176,6 +185,7 @@ async def add_reel_comment(
     comment = ReelComment(
         reel_id=reel_id,
         user_id=current_user.id,
+        parent_id=req.parent_id,
         text=req.text
     )
     db.add(comment)
@@ -186,6 +196,7 @@ async def add_reel_comment(
     return {
         "id": comment.id,
         "text": comment.text,
+        "parent_id": comment.parent_id,
         "created_at": comment.created_at.isoformat(),
         "author": {
             "id": current_user.id,

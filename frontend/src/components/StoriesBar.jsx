@@ -10,6 +10,10 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
   const [isPaused, setIsPaused] = useState(false);
   const [uploadingStory, setUploadingStory] = useState(false);
   const [storyMuted, setStoryMuted] = useState(false);
+  const [storyReplyText, setStoryReplyText] = useState("");
+  const [replySent, setReplySent] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [pendingFile, setPendingFile] = useState(null);
   const progressTimerRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -20,35 +24,65 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
     return clean.endsWith(".mp4") || clean.endsWith(".webm") || clean.endsWith(".mov") || clean.endsWith(".m4v") || clean.endsWith(".ogg") || clean.includes("/video");
   };
 
-  const handleStoryFileSelect = async (e) => {
+  const handleStoryFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPendingFile(file);
+    setUploadModalOpen(true);
+  };
 
+  const handleUploadStory = async (isCloseFriends) => {
+    if (!pendingFile) return;
+    setUploadModalOpen(false);
     setUploadingStory(true);
     triggerHaptic("medium");
 
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", pendingFile);
       const uploadRes = await Api.post("/upload", formData);
 
-      const isVideo = file.type.startsWith("video");
+      const isVideo = pendingFile.type.startsWith("video");
       await Api.post("/stories", {
         media_url: uploadRes.url,
         media_type: isVideo ? "video" : "image",
-        caption: ""
+        caption: "",
+        is_close_friends: isCloseFriends
       });
 
       SoundEngine.playFanfare();
       triggerHaptic("success");
-      alert(isVideo ? "Видео-история успешно опубликована!" : "Фото-история успешно опубликована!");
+      alert(isCloseFriends ? "💚 История для близких друзей опубликована!" : "История успешно опубликована!");
       if (onStoryCreated) onStoryCreated();
     } catch (err) {
       triggerHaptic("error");
       alert("Ошибка загрузки истории: " + (err.message || "Не удалось загрузить файл"));
     } finally {
       setUploadingStory(false);
+      setPendingFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleSendStoryReply = async (e) => {
+    if (e) e.preventDefault();
+    if (!storyReplyText.trim() || !activeViewerGroup) return;
+    triggerHaptic("medium");
+    const partnerId = activeViewerGroup.user.id;
+    const currentStory = activeViewerGroup.stories[currentStoryIndex];
+    try {
+      await Api.post("/chats/send", {
+        recipient_id: partnerId,
+        content: `💬 Ответ на историю: "${storyReplyText}"`,
+        media_url: currentStory?.media_url,
+        media_type: "story_reply",
+        shared_entity_id: currentStory?.id
+      });
+      setReplySent(true);
+      setStoryReplyText("");
+      setTimeout(() => setReplySent(false), 2500);
+    } catch (err) {
+      alert("Ошибка отправки ответа: " + err.message);
     }
   };
 
@@ -163,6 +197,7 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
         {/* Stories list */}
         {storiesGroups.map((group, idx) => {
           const hasUnseen = group.has_unseen;
+          const isCloseFriends = group.stories?.some((s) => s.is_close_friends);
           return (
             <div
               key={idx}
@@ -172,12 +207,14 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
               <div
                 className={`w-16 h-16 rounded-full p-[2px] transition-transform group-hover:scale-105 ${
                   hasUnseen
-                    ? "bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 animate-pulse"
+                    ? isCloseFriends
+                      ? "bg-gradient-to-tr from-emerald-400 via-green-500 to-teal-400 animate-pulse"
+                      : "bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 animate-pulse"
                     : "bg-slate-700"
                 }`}
               >
                 <img
-                  src={group.user.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
+                  src={group.user.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
                   alt={group.user.first_name}
                   className="w-full h-full rounded-full object-cover border-2 border-slate-950"
                 />
@@ -216,13 +253,18 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
           <div className="absolute top-5 left-4 right-4 z-20 flex items-center justify-between text-white">
             <div className="flex items-center space-x-2">
               <img
-                src={activeViewerGroup.user.avatar_url}
+                src={activeViewerGroup.user.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
                 className="w-8 h-8 rounded-full border border-white/40 object-cover"
               />
               <span className="text-xs font-bold drop-shadow">
-                {activeViewerGroup.user.first_name}
+                {activeViewerGroup.user.first_name || activeViewerGroup.user.username}
               </span>
               {activeViewerGroup.user.is_verified && <span className="text-blue-400 text-xs">✓</span>}
+              {activeViewerGroup.stories[currentStoryIndex]?.is_close_friends && (
+                <span className="text-[10px] bg-emerald-500 text-slate-950 font-black px-2 py-0.5 rounded-full shadow-md">
+                  💚 Близкие друзья
+                </span>
+              )}
             </div>
             <div className="flex items-center space-x-2">
               {isVideoStory(
@@ -301,17 +343,108 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
             )}
           </div>
 
-          {/* Bottom Quick Reactions Bar */}
-          <div className="absolute bottom-4 left-4 right-4 z-20 flex items-center justify-around bg-slate-950/80 backdrop-blur-md py-2 px-4 rounded-full border border-slate-800">
-            {["❤️", "🔥", "👏", "😂", "😍", "🎉"].map((emoji) => (
+          {/* Bottom Quick Reactions & DM Reply Bar */}
+          <div className="absolute bottom-3 left-3 right-3 z-20 space-y-2">
+            <div className="flex items-center justify-around bg-slate-950/80 backdrop-blur-md py-1 px-3 rounded-full border border-slate-800/80">
+              {["❤️", "🔥", "👏", "😂", "😍", "🎉"].map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => handleReaction(emoji)}
+                  className="text-xl hover:scale-125 active:scale-95 transition-transform"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+
+            <form
+              onSubmit={handleSendStoryReply}
+              className="flex items-center space-x-2 bg-slate-950/90 backdrop-blur-md p-1.5 rounded-full border border-slate-800"
+            >
+              <input
+                type="text"
+                value={storyReplyText}
+                onChange={(e) => setStoryReplyText(e.target.value)}
+                onFocus={() => setIsPaused(true)}
+                onBlur={() => setIsPaused(false)}
+                placeholder="Ответить автору в личные сообщения..."
+                className="flex-1 bg-transparent px-3 py-1 text-xs text-white placeholder-slate-400 outline-none"
+              />
               <button
-                key={emoji}
-                onClick={() => handleReaction(emoji)}
-                className="text-2xl hover:scale-125 active:scale-95 transition-transform"
+                type="submit"
+                disabled={!storyReplyText.trim()}
+                className="bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-500 hover:to-rose-400 disabled:opacity-40 text-white rounded-full px-3 py-1 text-xs font-bold transition-all"
               >
-                {emoji}
+                Отправить
               </button>
-            ))}
+            </form>
+
+            {replySent && (
+              <div className="text-center text-[11px] font-bold text-emerald-400 bg-slate-900/90 py-1 rounded-full border border-emerald-500/40">
+                ✓ Сообщение отправлено автору истории!
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Upload Story Audience Modal */}
+      {uploadModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-xs space-y-3 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <h3 className="text-sm font-black text-white flex items-center space-x-1.5">
+                <span>📸</span>
+                <span>Опубликовать историю</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setUploadModalOpen(false);
+                  setPendingFile(null);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              Выберите аудиторию для вашей новой истории:
+            </p>
+
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => handleUploadStory(false)}
+                className="w-full p-3 rounded-2xl bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-500 hover:to-rose-400 text-white font-bold text-xs flex items-center justify-between shadow-lg shadow-pink-600/30 transition-transform active:scale-95"
+              >
+                <div className="flex items-center space-x-2">
+                  <span className="text-base">🌐</span>
+                  <div className="text-left">
+                    <span className="block font-black">Для всех пользователей</span>
+                    <span className="text-[10px] text-pink-200">Публичная история на 24 часа</span>
+                  </div>
+                </div>
+                <span>→</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleUploadStory(true)}
+                className="w-full p-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs flex items-center justify-between shadow-lg shadow-emerald-600/30 transition-transform active:scale-95"
+              >
+                <div className="flex items-center space-x-2">
+                  <span className="text-base">💚</span>
+                  <div className="text-left">
+                    <span className="block font-black">Близкие друзья</span>
+                    <span className="text-[10px] text-emerald-200">Зеленая рамка для избранных</span>
+                  </div>
+                </div>
+                <span>→</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

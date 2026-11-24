@@ -47,6 +47,8 @@ class User(Base):
     email_code_expires_at = Column(DateTime, nullable=True)
     is_email_verified = Column(Boolean, default=False)
     is_registered = Column(Boolean, default=False) # True when name, surname, birth_year & username setup completed
+    is_incognito = Column(Boolean, default=False) # Режим невидимка (скрыть активность / онлайн)
+    is_private = Column(Boolean, default=False) # Закрытый аккаунт
     
     # Founder Quest & Referrals
     referred_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -141,6 +143,7 @@ class Story(Base):
     media_url = Column(String(512), nullable=False)
     media_type = Column(String(32), default="image") # image, video
     caption = Column(String(256), default="")
+    is_close_friends = Column(Boolean, default=False)
     views_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=utcnow, index=True)
     expires_at = Column(DateTime, nullable=False, index=True)
@@ -201,6 +204,7 @@ class ReelComment(Base):
     id = Column(Integer, primary_key=True, index=True)
     reel_id = Column(Integer, ForeignKey("reels.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_id = Column(Integer, ForeignKey("reel_comments.id", ondelete="CASCADE"), nullable=True)
     text = Column(Text, default="")
     created_at = Column(DateTime, default=utcnow)
 

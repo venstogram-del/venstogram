@@ -11,6 +11,7 @@ const files = [
   'api.js',
   'components/ShareModal.jsx',
   'components/PostModal.jsx',
+  'components/UserProfileModal.jsx',
   'components/Header.jsx',
   'components/BottomNav.jsx',
   'components/StoriesBar.jsx',

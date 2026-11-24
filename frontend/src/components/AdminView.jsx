@@ -861,7 +861,7 @@ export function AdminView({ user, t }) {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2.5">
                     <img
-                      src={u.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
+                      src={u.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
                       className="w-10 h-10 rounded-full object-cover"
                     />
                     <div>
@@ -1363,7 +1363,7 @@ export function AdminView({ user, t }) {
                 <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2">
                   <div className="flex items-center space-x-3">
                     <img
-                      src={u.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
+                      src={u.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
                       className="w-12 h-12 rounded-full object-cover ring-2 ring-pink-500"
                     />
                     <div>

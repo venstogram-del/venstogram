@@ -17,7 +17,7 @@ export function ShareModal({ item, type = "reel", onClose, t }) {
 
   const loadRecentDialogs = async () => {
     try {
-      const res = await Api.get("/chat/dialogs");
+      const res = await Api.get("/chats/dialogs");
       if (Array.isArray(res)) {
         // Res may contain partner objects
         const users = res.map((d) => d.partner || d.user || d).filter(Boolean);
@@ -65,7 +65,7 @@ export function ShareModal({ item, type = "reel", onClose, t }) {
     try {
       for (const recipientId of selectedUserIds) {
         try {
-          await Api.post("/chat/send", {
+          await Api.post("/chats/send", {
             recipient_id: recipientId,
             content: shareText,
             media_url: mediaUrl,
@@ -203,7 +203,7 @@ export function ShareModal({ item, type = "reel", onClose, t }) {
                 >
                   <div className="flex items-center space-x-2.5">
                     <img
-                      src={u.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
+                      src={u.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
                       alt={u.username}
                       className="w-8 h-8 rounded-full object-cover border border-slate-700"
                     />

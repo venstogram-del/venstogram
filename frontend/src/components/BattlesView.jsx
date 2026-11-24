@@ -194,7 +194,7 @@ export function BattlesView({ user, t, onUpdateCoins }) {
             <span className="text-amber-400 text-[10px] font-bold uppercase tracking-wider mr-1">MVP</span>
             {battle.mvp_sponsors.map((mvp, idx) => (
               <div key={idx} className="flex items-center space-x-1" title={`${mvp.username}: ${mvp.total_coins} coins`}>
-                <img src={mvp.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80"} className="w-5 h-5 rounded-full object-cover border border-amber-400" />
+                <img src={mvp.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"} className="w-5 h-5 rounded-full object-cover border border-amber-400" />
                 <span className="text-[10px] text-white font-medium">{mvp.total_coins}🪙</span>
               </div>
             ))}
@@ -225,7 +225,7 @@ export function BattlesView({ user, t, onUpdateCoins }) {
         {/* Guest Stream Box */}
         <div className="relative w-full h-full bg-slate-900 overflow-hidden flex items-center justify-center">
           <img
-            src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop&q=80"
+            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"
             className="w-full h-full object-cover opacity-90"
             alt="Guest"
           />
