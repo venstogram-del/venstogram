@@ -5,14 +5,14 @@ from sqlalchemy import select, or_, func, and_
 from typing import List, Optional
 from app.database.session import get_db
 from app.models.entities import User, Follow, Post, Reel, UsernameListing
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_user_optional
 
 router = APIRouter(prefix="/users", tags=["Users & Search"])
 
 @router.get("/check-username")
 async def check_username(
     username: str = Query(..., min_length=1, max_length=64),
-    current_user: Optional[User] = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
     cleaned = username.strip().lower()

@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import Depends, HTTPException, status, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +39,24 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Account is suspended: {user.ban_reason or 'Terms of service violation'}"
         )
+    return user
+
+async def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials = Security(security_scheme),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    if not credentials:
+        return None
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    if not payload or "sub" not in payload:
+        return None
+    try:
+        telegram_id = int(payload["sub"])
+    except (ValueError, TypeError):
+        return None
+    res = await db.execute(select(User).where(User.telegram_id == telegram_id))
+    user = res.scalars().first()
     return user
 
 async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
