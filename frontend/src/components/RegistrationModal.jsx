@@ -6,6 +6,7 @@ import { Api } from "../api.js";
 export function RegistrationModal({ user, onComplete }) {
   const [firstName, setFirstName] = useState(user?.first_name || "");
   const [lastName, setLastName] = useState(user?.last_name || "");
+  const [birthYear, setBirthYear] = useState(user?.birth_year || "");
   
   // Initial username candidate
   const initialUsername = (user?.username && !user.username.startsWith("user_"))
@@ -33,7 +34,7 @@ export function RegistrationModal({ user, onComplete }) {
 
     if (trimmed.length < 3) {
       setAvailable(false);
-      setStatusMsg("Минимум 3 символа");
+      setStatusMsg("Минимум 3 символа (латиница, цифры и _)");
       setSuggestions([]);
       return;
     }
@@ -68,15 +69,23 @@ export function RegistrationModal({ user, onComplete }) {
       return;
     }
 
+    const bYear = parseInt(birthYear);
+    const currentYear = new Date().getFullYear();
+    if (!birthYear || isNaN(bYear) || bYear < 1940 || bYear > currentYear - 6) {
+      setErrorMsg(`Пожалуйста, укажите реальный год рождения (от 1940 до ${currentYear - 6})`);
+      triggerHaptic("error");
+      return;
+    }
+
     const trimmedUser = username.trim().toLowerCase().replace(/^@/, "");
     if (!trimmedUser || trimmedUser.length < 3) {
-      setErrorMsg("Никнейм должен быть от 3 символов (латиница, цифры и _)");
+      setErrorMsg("Никнейм должен быть от 3 символов (только латиница, цифры и _)");
       triggerHaptic("error");
       return;
     }
 
     if (available === false) {
-      setErrorMsg("Этот никнейм занят. Выберите другой или нажмите на вариант с цифрой ниже");
+      setErrorMsg("Этот никнейм занят. Выберите другой или нажмите на предложенный вариант ниже");
       triggerHaptic("error");
       return;
     }
@@ -88,7 +97,9 @@ export function RegistrationModal({ user, onComplete }) {
       const res = await Api.patch("/auth/me", {
         first_name: trimmedFirst,
         last_name: lastName.trim(),
-        username: trimmedUser
+        birth_year: bYear,
+        username: trimmedUser,
+        is_registered: true
       });
 
       try {
@@ -103,11 +114,13 @@ export function RegistrationModal({ user, onComplete }) {
           ...user,
           first_name: trimmedFirst,
           last_name: lastName.trim(),
-          username: trimmedUser
+          birth_year: bYear,
+          username: trimmedUser,
+          is_registered: true
         });
       }
     } catch (err) {
-      setErrorMsg(err.message || "Ошибка создания аккаунта. Попробуйте еще раз.");
+      setErrorMsg(err.message || "Ошибка регистрации. Попробуйте еще раз.");
       triggerHaptic("error");
     } finally {
       setSaving(false);
@@ -115,63 +128,93 @@ export function RegistrationModal({ user, onComplete }) {
   };
 
   return (
-    <div className="fixed inset-0 z-70 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl shadow-pink-500/10">
+    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-4 sm:p-6 overflow-y-auto">
+      <div className="w-full max-w-md mx-auto space-y-4 my-auto py-4">
         
-        {/* Header Icon & Welcome */}
+        {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 flex items-center justify-center mx-auto shadow-xl shadow-pink-500/30">
-            <span className="text-white font-black text-2xl tracking-tighter">V</span>
+          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 flex items-center justify-center mx-auto shadow-2xl shadow-pink-500/40">
+            <span className="text-white font-black text-3xl tracking-tighter">V</span>
           </div>
           <div>
-            <h2 className="text-lg font-black text-white">Создание аккаунта</h2>
+            <h1 className="text-xl font-black bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+              Добро пожаловать в Venstogram
+            </h1>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              Добро пожаловать в <b>Venstogram</b> — первую социальную сеть нового поколения!
+              Заполните данные для создания личного профиля и начала публикаций
             </p>
           </div>
         </div>
 
         {errorMsg && (
-          <div className="bg-rose-950/70 border border-rose-500/50 p-2.5 rounded-xl text-xs text-rose-300">
+          <div className="bg-rose-950/80 border border-rose-500/60 p-3 rounded-2xl text-xs text-rose-200 animate-in shake">
             ⚠️ {errorMsg}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3.5">
-          {/* First Name */}
-          <div>
-            <label className="text-[11px] font-bold text-slate-300 block mb-1">
-              Ваше имя <span className="text-pink-400">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              placeholder="Например, Азизбек"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500"
-            />
+        <form onSubmit={handleSubmit} className="space-y-4 bg-slate-900/90 border border-slate-800 p-5 rounded-3xl shadow-xl">
+          {/* Step 1: Personal Information */}
+          <div className="border-b border-slate-800/80 pb-3">
+            <span className="text-[10px] text-pink-400 uppercase tracking-wider font-extrabold block mb-2">
+              Шаг 1: Личные данные
+            </span>
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* First Name */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Имя <span className="text-pink-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Азизбек"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition"
+                />
+              </div>
+
+              {/* Last Name */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Фамилия
+                </label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Каримов"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition"
+                />
+              </div>
+            </div>
+
+            {/* Birth Year */}
+            <div className="mt-2.5">
+              <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                Год рождения <span className="text-pink-400">*</span>
+              </label>
+              <input
+                type="number"
+                required
+                min="1940"
+                max={new Date().getFullYear() - 6}
+                value={birthYear}
+                onChange={(e) => setBirthYear(e.target.value)}
+                placeholder="Например: 2002"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition font-mono"
+              />
+            </div>
           </div>
 
-          {/* Last Name */}
+          {/* Step 2: Account Creation & Nickname */}
           <div>
-            <label className="text-[11px] font-bold text-slate-300 block mb-1">
-              Фамилия <span className="text-slate-500 font-normal">(необязательно)</span>
-            </label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              placeholder="Например, Каримов"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500"
-            />
-          </div>
-
-          {/* Username with live check */}
-          <div>
+            <span className="text-[10px] text-amber-400 uppercase tracking-wider font-extrabold block mb-2">
+              Шаг 2: Создание аккаунта
+            </span>
             <label className="text-[11px] font-bold text-slate-300 flex items-center justify-between mb-1">
               <span>Придумайте ваш @никнейм <span className="text-pink-400">*</span></span>
-              {checking && <span className="text-[10px] text-slate-400">Проверка...</span>}
+              {checking && <span className="text-[10px] text-slate-400 animate-pulse">Проверка...</span>}
             </label>
             <div className="relative">
               <span className="absolute left-3.5 top-2.5 text-slate-400 text-xs font-mono font-bold">@</span>
@@ -183,9 +226,9 @@ export function RegistrationModal({ user, onComplete }) {
                 placeholder="ваш_никнейм"
                 className={`w-full bg-slate-950 border rounded-xl pl-8 pr-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none transition ${
                   available === true
-                    ? "border-emerald-500 focus:border-emerald-400"
+                    ? "border-emerald-500 focus:border-emerald-400 shadow-sm shadow-emerald-500/20"
                     : available === false
-                    ? "border-rose-500 focus:border-rose-400"
+                    ? "border-rose-500 focus:border-rose-400 shadow-sm shadow-rose-500/20"
                     : "border-slate-800 focus:border-pink-500"
                 }`}
               />
@@ -193,27 +236,30 @@ export function RegistrationModal({ user, onComplete }) {
 
             {/* Status message */}
             {statusMsg && (
-              <p className={`text-[10px] mt-1 font-medium ${available ? "text-emerald-400" : "text-rose-400"}`}>
-                {statusMsg}
+              <p className={`text-[10px] mt-1.5 font-bold ${available ? "text-emerald-400" : "text-rose-400"}`}>
+                {available ? "✓ " : "✕ "} {statusMsg}
               </p>
             )}
 
-            {/* Suggestions Chips with digits */}
+            {/* Numeric suggestion chips if username is taken */}
             {suggestions && suggestions.length > 0 && (
-              <div className="mt-2 space-y-1">
-                <span className="text-[10px] text-slate-400 block font-medium">Свободные варианты с цифрой:</span>
+              <div className="mt-2.5 bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800 space-y-1.5">
+                <span className="text-[10px] text-slate-400 block font-semibold">
+                  Свободные варианты с цифрами (нажмите для выбора):
+                </span>
                 <div className="flex flex-wrap gap-1.5">
                   {suggestions.map((sug) => (
                     <button
                       key={sug}
                       type="button"
                       onClick={() => {
-                        triggerHaptic("light");
+                        triggerHaptic("selection");
                         setUsername(sug);
                       }}
-                      className="bg-slate-950 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-[10px] font-mono transition"
+                      className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition flex items-center space-x-1"
                     >
-                      @{sug} +
+                      <span>@{sug}</span>
+                      <span className="text-[9px]">➕</span>
                     </button>
                   ))}
                 </div>
@@ -221,17 +267,29 @@ export function RegistrationModal({ user, onComplete }) {
             )}
           </div>
 
+          {/* Feature highlights unlock */}
+          <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80 text-[10px] text-slate-400 space-y-1">
+            <span className="text-white font-bold block">После создания аккаунта вам откроются:</span>
+            <div className="flex items-center space-x-2">
+              <span>📸 Лента и Stories</span>
+              <span>•</span>
+              <span>🎬 Reels</span>
+              <span>•</span>
+              <span>💬 Личные сообщения</span>
+            </div>
+          </div>
+
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={saving || available === false || !firstName.trim() || !username.trim()}
-            className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center space-x-2 mt-4 ${
-              saving || available === false || !firstName.trim() || !username.trim()
+            disabled={saving || available === false || !firstName.trim() || !birthYear || !username.trim()}
+            className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-xl flex items-center justify-center space-x-2 ${
+              saving || available === false || !firstName.trim() || !birthYear || !username.trim()
                 ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50"
                 : "bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:from-pink-400 hover:to-amber-400 text-white shadow-pink-500/30 active:scale-98"
             }`}
           >
-            <span>{saving ? "Создание аккаунта..." : "🚀 Создать себе аккаунт"}</span>
+            <span>{saving ? "Создание аккаунта..." : "🚀 Создать аккаунт и войти"}</span>
           </button>
         </form>
       </div>

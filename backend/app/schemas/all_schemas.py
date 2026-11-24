@@ -51,6 +51,9 @@ class UserProfileUpdate(BaseModel):
     bio: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    birth_year: Optional[int] = None
+    birth_date: Optional[str] = None
+    is_registered: Optional[bool] = None
     avatar_url: Optional[str] = None
     website: Optional[str] = None
     telegram_channel: Optional[str] = None

@@ -41,7 +41,7 @@ export function App() {
   const [chatOpen, setChatOpen] = useState(false);
   const [activeChatUser, setActiveChatUser] = useState(null);
   const [founderQuestOpen, setFounderQuestOpen] = useState(false);
-  const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(true);
 
   // Initialize Telegram SDK & Authentication
   useEffect(() => {
@@ -117,11 +117,20 @@ export function App() {
 
       // Check if registration / account creation onboarding is needed
       const currentResolvedUser = authResult?.user || tgUser;
+      const isDirector = currentResolvedUser?.role === "director" || currentResolvedUser?.telegram_id === 1477103854;
       const resolvedUserId = currentResolvedUser?.id || 1;
-      const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`);
-      const isDefault = !currentResolvedUser?.username || currentResolvedUser.username.startsWith("user_");
-      if (!hasCreated && isDefault) {
-        setRegistrationOpen(true);
+      const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`) === "true";
+      const hasProfile = Boolean(
+        currentResolvedUser?.birth_year &&
+        currentResolvedUser?.first_name &&
+        currentResolvedUser?.username &&
+        !currentResolvedUser.username.startsWith("user_")
+      );
+
+      if (isDirector || hasCreated || hasProfile) {
+        setIsRegistered(true);
+      } else {
+        setIsRegistered(false);
       }
 
       // Check deep link parameters
@@ -192,6 +201,21 @@ export function App() {
           Загрузка платформы...
         </span>
       </div>
+    );
+  }
+
+  // Mandatory initial registration and account creation view
+  if (!isRegistered) {
+    return (
+      <RegistrationModal
+        user={user}
+        onComplete={(updatedUser) => {
+          setUser(updatedUser);
+          setIsRegistered(true);
+          safeSetItem(`vensto_account_created_${updatedUser?.id || user?.id || 1}`, "true");
+          loadAllContent();
+        }}
+      />
     );
   }
 
@@ -314,16 +338,6 @@ export function App() {
           user={user}
           onClose={() => setFounderQuestOpen(false)}
           onUserUpdated={(updated) => setUser(updated)}
-        />
-      )}
-
-      {registrationOpen && (
-        <RegistrationModal
-          user={user}
-          onComplete={(updatedUser) => {
-            setUser(updatedUser);
-            setRegistrationOpen(false);
-          }}
         />
       )}
     </div>

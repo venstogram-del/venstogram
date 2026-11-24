@@ -46,6 +46,7 @@ class User(Base):
     email_verification_code = Column(String(16), nullable=True)
     email_code_expires_at = Column(DateTime, nullable=True)
     is_email_verified = Column(Boolean, default=False)
+    is_registered = Column(Boolean, default=False) # True when name, surname, birth_year & username setup completed
     
     # Founder Quest & Referrals
     referred_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

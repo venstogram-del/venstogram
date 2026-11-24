@@ -87,38 +87,53 @@ if dp is not None:
             tg_id = message.from_user.id
             is_admin = tg_id in settings.ADMIN_TELEGRAM_IDS
 
-            # Check and register / update user and referrals
+            # Check and register / update user and referrals safely under heavy concurrent traffic
             referrer_user = None
-            async with AsyncSessionLocal() as session:
-                res = await session.execute(select(User).where(User.telegram_id == tg_id))
-                user = res.scalars().first()
+            try:
+                async with AsyncSessionLocal() as session:
+                    res = await session.execute(select(User).where(User.telegram_id == tg_id))
+                    user = res.scalars().first()
 
-                # Handle referral link e.g. ref_1477103854 or ref_5
-                if start_param.startswith("ref_"):
-                    ref_val = start_param[4:].strip()
-                    if ref_val.isdigit():
-                        ref_int = int(ref_val)
-                        ref_res = await session.execute(
-                            select(User).where((User.id == ref_int) | (User.telegram_id == ref_int))
+                    # Handle referral link e.g. ref_1477103854 or ref_5
+                    if start_param.startswith("ref_"):
+                        ref_val = start_param[4:].strip()
+                        if ref_val.isdigit():
+                            ref_int = int(ref_val)
+                            ref_res = await session.execute(
+                                select(User).where((User.id == ref_int) | (User.telegram_id == ref_int))
+                            )
+                            referrer_user = ref_res.scalars().first()
+
+                    if not user:
+                        base_username = message.from_user.username or f"user_{tg_id}"
+                        # Check collision if another user has this username
+                        existing_u = (await session.execute(select(User.id).where(User.username == base_username))).scalars().first()
+                        final_username = f"user_{tg_id}" if existing_u else base_username
+
+                        user = User(
+                            telegram_id=tg_id,
+                            username=final_username,
+                            first_name=message.from_user.first_name or "",
+                            last_name=message.from_user.last_name or "",
+                            language_code=message.from_user.language_code or "ru",
+                            wallet_coins=100000 if is_admin else 0,
+                            referred_by_id=referrer_user.id if referrer_user and referrer_user.id != tg_id else None,
+                            referral_code=f"ref_{tg_id}",
+                            is_registered=True if is_admin else False
                         )
-                        referrer_user = ref_res.scalars().first()
-
-                if not user:
-                    user = User(
-                        telegram_id=tg_id,
-                        username=message.from_user.username or f"user_{tg_id}",
-                        first_name=message.from_user.first_name or "",
-                        last_name=message.from_user.last_name or "",
-                        language_code=message.from_user.language_code or "ru",
-                        wallet_coins=100000 if is_admin else 0,
-                        referred_by_id=referrer_user.id if referrer_user and referrer_user.id != tg_id else None,
-                        referral_code=f"ref_{tg_id}"
-                    )
-                    session.add(user)
-                    await session.commit()
-                elif referrer_user and not user.referred_by_id and referrer_user.id != user.id:
-                    user.referred_by_id = referrer_user.id
-                    await session.commit()
+                        session.add(user)
+                        try:
+                            await session.commit()
+                        except Exception:
+                            await session.rollback()
+                    elif referrer_user and not user.referred_by_id and referrer_user.id != user.id:
+                        user.referred_by_id = referrer_user.id
+                        try:
+                            await session.commit()
+                        except Exception:
+                            await session.rollback()
+            except Exception as db_err:
+                print(f"[Bot cmd_start safe DB handler] {db_err}")
             
             greeting = (
                 "👋 <b>Добро пожаловать в Venstogram</b> — первая социальная сеть и медиаэкосистема нового поколения."

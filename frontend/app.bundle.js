@@ -7322,6 +7322,7 @@ function RegistrationModal({
 }) {
   const [firstName, setFirstName] = useState(user?.first_name || "");
   const [lastName, setLastName] = useState(user?.last_name || "");
+  const [birthYear, setBirthYear] = useState(user?.birth_year || "");
 
   // Initial username candidate
   const initialUsername = user?.username && !user.username.startsWith("user_") ? user.username : "";
@@ -7346,7 +7347,7 @@ function RegistrationModal({
     }
     if (trimmed.length < 3) {
       setAvailable(false);
-      setStatusMsg("Минимум 3 символа");
+      setStatusMsg("Минимум 3 символа (латиница, цифры и _)");
       setSuggestions([]);
       return;
     }
@@ -7376,14 +7377,21 @@ function RegistrationModal({
       triggerHaptic("error");
       return;
     }
+    const bYear = parseInt(birthYear);
+    const currentYear = new Date().getFullYear();
+    if (!birthYear || isNaN(bYear) || bYear < 1940 || bYear > currentYear - 6) {
+      setErrorMsg(`Пожалуйста, укажите реальный год рождения (от 1940 до ${currentYear - 6})`);
+      triggerHaptic("error");
+      return;
+    }
     const trimmedUser = username.trim().toLowerCase().replace(/^@/, "");
     if (!trimmedUser || trimmedUser.length < 3) {
-      setErrorMsg("Никнейм должен быть от 3 символов (латиница, цифры и _)");
+      setErrorMsg("Никнейм должен быть от 3 символов (только латиница, цифры и _)");
       triggerHaptic("error");
       return;
     }
     if (available === false) {
-      setErrorMsg("Этот никнейм занят. Выберите другой или нажмите на вариант с цифрой ниже");
+      setErrorMsg("Этот никнейм занят. Выберите другой или нажмите на предложенный вариант ниже");
       triggerHaptic("error");
       return;
     }
@@ -7393,7 +7401,9 @@ function RegistrationModal({
       const res = await Api.patch("/auth/me", {
         first_name: trimmedFirst,
         last_name: lastName.trim(),
-        username: trimmedUser
+        birth_year: bYear,
+        username: trimmedUser,
+        is_registered: true
       });
       try {
         localStorage.setItem(`vensto_account_created_${user?.id || 1}`, "true");
@@ -7405,62 +7415,85 @@ function RegistrationModal({
           ...user,
           first_name: trimmedFirst,
           last_name: lastName.trim(),
-          username: trimmedUser
+          birth_year: bYear,
+          username: trimmedUser,
+          is_registered: true
         });
       }
     } catch (err) {
-      setErrorMsg(err.message || "Ошибка создания аккаунта. Попробуйте еще раз.");
+      setErrorMsg(err.message || "Ошибка регистрации. Попробуйте еще раз.");
       triggerHaptic("error");
     } finally {
       setSaving(false);
     }
   };
   return /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 z-70 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in"
+    className: "fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-4 sm:p-6 overflow-y-auto"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl shadow-pink-500/10"
+    className: "w-full max-w-md mx-auto space-y-4 my-auto py-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "text-center space-y-2"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-14 h-14 rounded-2xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 flex items-center justify-center mx-auto shadow-xl shadow-pink-500/30"
+    className: "w-16 h-16 rounded-3xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 flex items-center justify-center mx-auto shadow-2xl shadow-pink-500/40"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "text-white font-black text-2xl tracking-tighter"
-  }, "V")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
-    className: "text-lg font-black text-white"
-  }, "\u0421\u043E\u0437\u0434\u0430\u043D\u0438\u0435 \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0430"), /*#__PURE__*/React.createElement("p", {
+    className: "text-white font-black text-3xl tracking-tighter"
+  }, "V")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", {
+    className: "text-xl font-black bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent"
+  }, "\u0414\u043E\u0431\u0440\u043E \u043F\u043E\u0436\u0430\u043B\u043E\u0432\u0430\u0442\u044C \u0432 Venstogram"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-400 mt-1 leading-relaxed"
-  }, "\u0414\u043E\u0431\u0440\u043E \u043F\u043E\u0436\u0430\u043B\u043E\u0432\u0430\u0442\u044C \u0432 ", /*#__PURE__*/React.createElement("b", null, "Venstogram"), " \u2014 \u043F\u0435\u0440\u0432\u0443\u044E \u0441\u043E\u0446\u0438\u0430\u043B\u044C\u043D\u0443\u044E \u0441\u0435\u0442\u044C \u043D\u043E\u0432\u043E\u0433\u043E \u043F\u043E\u043A\u043E\u043B\u0435\u043D\u0438\u044F!"))), errorMsg && /*#__PURE__*/React.createElement("div", {
-    className: "bg-rose-950/70 border border-rose-500/50 p-2.5 rounded-xl text-xs text-rose-300"
+  }, "\u0417\u0430\u043F\u043E\u043B\u043D\u0438\u0442\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u0434\u043B\u044F \u0441\u043E\u0437\u0434\u0430\u043D\u0438\u044F \u043B\u0438\u0447\u043D\u043E\u0433\u043E \u043F\u0440\u043E\u0444\u0438\u043B\u044F \u0438 \u043D\u0430\u0447\u0430\u043B\u0430 \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0439"))), errorMsg && /*#__PURE__*/React.createElement("div", {
+    className: "bg-rose-950/80 border border-rose-500/60 p-3 rounded-2xl text-xs text-rose-200 animate-in shake"
   }, "\u26A0\uFE0F ", errorMsg), /*#__PURE__*/React.createElement("form", {
     onSubmit: handleSubmit,
-    className: "space-y-3.5"
+    className: "space-y-4 bg-slate-900/90 border border-slate-800 p-5 rounded-3xl shadow-xl"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "border-b border-slate-800/80 pb-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-pink-400 uppercase tracking-wider font-extrabold block mb-2"
+  }, "\u0428\u0430\u0433 1: \u041B\u0438\u0447\u043D\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2.5"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "text-[11px] font-bold text-slate-300 block mb-1"
-  }, "\u0412\u0430\u0448\u0435 \u0438\u043C\u044F ", /*#__PURE__*/React.createElement("span", {
+  }, "\u0418\u043C\u044F ", /*#__PURE__*/React.createElement("span", {
     className: "text-pink-400"
   }, "*")), /*#__PURE__*/React.createElement("input", {
     type: "text",
     required: true,
     value: firstName,
     onChange: e => setFirstName(e.target.value),
-    placeholder: "\u041D\u0430\u043F\u0440\u0438\u043C\u0435\u0440, \u0410\u0437\u0438\u0437\u0431\u0435\u043A",
-    className: "w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500"
+    placeholder: "\u0410\u0437\u0438\u0437\u0431\u0435\u043A",
+    className: "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition"
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "text-[11px] font-bold text-slate-300 block mb-1"
-  }, "\u0424\u0430\u043C\u0438\u043B\u0438\u044F ", /*#__PURE__*/React.createElement("span", {
-    className: "text-slate-500 font-normal"
-  }, "(\u043D\u0435\u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E)")), /*#__PURE__*/React.createElement("input", {
+  }, "\u0424\u0430\u043C\u0438\u043B\u0438\u044F"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: lastName,
     onChange: e => setLastName(e.target.value),
-    placeholder: "\u041D\u0430\u043F\u0440\u0438\u043C\u0435\u0440, \u041A\u0430\u0440\u0438\u043C\u043E\u0432",
-    className: "w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500"
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    placeholder: "\u041A\u0430\u0440\u0438\u043C\u043E\u0432",
+    className: "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-2.5"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-[11px] font-bold text-slate-300 block mb-1"
+  }, "\u0413\u043E\u0434 \u0440\u043E\u0436\u0434\u0435\u043D\u0438\u044F ", /*#__PURE__*/React.createElement("span", {
+    className: "text-pink-400"
+  }, "*")), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    required: true,
+    min: "1940",
+    max: new Date().getFullYear() - 6,
+    value: birthYear,
+    onChange: e => setBirthYear(e.target.value),
+    placeholder: "\u041D\u0430\u043F\u0440\u0438\u043C\u0435\u0440: 2002",
+    className: "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition font-mono"
+  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-amber-400 uppercase tracking-wider font-extrabold block mb-2"
+  }, "\u0428\u0430\u0433 2: \u0421\u043E\u0437\u0434\u0430\u043D\u0438\u0435 \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0430"), /*#__PURE__*/React.createElement("label", {
     className: "text-[11px] font-bold text-slate-300 flex items-center justify-between mb-1"
   }, /*#__PURE__*/React.createElement("span", null, "\u041F\u0440\u0438\u0434\u0443\u043C\u0430\u0439\u0442\u0435 \u0432\u0430\u0448 @\u043D\u0438\u043A\u043D\u0435\u0439\u043C ", /*#__PURE__*/React.createElement("span", {
     className: "text-pink-400"
   }, "*")), checking && /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] text-slate-400"
+    className: "text-[10px] text-slate-400 animate-pulse"
   }, "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430...")), /*#__PURE__*/React.createElement("div", {
     className: "relative"
   }, /*#__PURE__*/React.createElement("span", {
@@ -7471,28 +7504,36 @@ function RegistrationModal({
     value: username,
     onChange: e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "")),
     placeholder: "\u0432\u0430\u0448_\u043D\u0438\u043A\u043D\u0435\u0439\u043C",
-    className: `w-full bg-slate-950 border rounded-xl pl-8 pr-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none transition ${available === true ? "border-emerald-500 focus:border-emerald-400" : available === false ? "border-rose-500 focus:border-rose-400" : "border-slate-800 focus:border-pink-500"}`
+    className: `w-full bg-slate-950 border rounded-xl pl-8 pr-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none transition ${available === true ? "border-emerald-500 focus:border-emerald-400 shadow-sm shadow-emerald-500/20" : available === false ? "border-rose-500 focus:border-rose-400 shadow-sm shadow-rose-500/20" : "border-slate-800 focus:border-pink-500"}`
   })), statusMsg && /*#__PURE__*/React.createElement("p", {
-    className: `text-[10px] mt-1 font-medium ${available ? "text-emerald-400" : "text-rose-400"}`
-  }, statusMsg), suggestions && suggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "mt-2 space-y-1"
+    className: `text-[10px] mt-1.5 font-bold ${available ? "text-emerald-400" : "text-rose-400"}`
+  }, available ? "✓ " : "✕ ", " ", statusMsg), suggestions && suggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "mt-2.5 bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800 space-y-1.5"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] text-slate-400 block font-medium"
-  }, "\u0421\u0432\u043E\u0431\u043E\u0434\u043D\u044B\u0435 \u0432\u0430\u0440\u0438\u0430\u043D\u0442\u044B \u0441 \u0446\u0438\u0444\u0440\u043E\u0439:"), /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] text-slate-400 block font-semibold"
+  }, "\u0421\u0432\u043E\u0431\u043E\u0434\u043D\u044B\u0435 \u0432\u0430\u0440\u0438\u0430\u043D\u0442\u044B \u0441 \u0446\u0438\u0444\u0440\u0430\u043C\u0438 (\u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u0434\u043B\u044F \u0432\u044B\u0431\u043E\u0440\u0430):"), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap gap-1.5"
   }, suggestions.map(sug => /*#__PURE__*/React.createElement("button", {
     key: sug,
     type: "button",
     onClick: () => {
-      triggerHaptic("light");
+      triggerHaptic("selection");
       setUsername(sug);
     },
-    className: "bg-slate-950 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-[10px] font-mono transition"
-  }, "@", sug, " +"))))), /*#__PURE__*/React.createElement("button", {
+    className: "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition flex items-center space-x-1"
+  }, /*#__PURE__*/React.createElement("span", null, "@", sug), /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px]"
+  }, "\u2795")))))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80 text-[10px] text-slate-400 space-y-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-white font-bold block"
+  }, "\u041F\u043E\u0441\u043B\u0435 \u0441\u043E\u0437\u0434\u0430\u043D\u0438\u044F \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0430 \u0432\u0430\u043C \u043E\u0442\u043A\u0440\u043E\u044E\u0442\u0441\u044F:"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCF8 \u041B\u0435\u043D\u0442\u0430 \u0438 Stories"), /*#__PURE__*/React.createElement("span", null, "\u2022"), /*#__PURE__*/React.createElement("span", null, "\uD83C\uDFAC Reels"), /*#__PURE__*/React.createElement("span", null, "\u2022"), /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCAC \u041B\u0438\u0447\u043D\u044B\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F"))), /*#__PURE__*/React.createElement("button", {
     type: "submit",
-    disabled: saving || available === false || !firstName.trim() || !username.trim(),
-    className: `w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center space-x-2 mt-4 ${saving || available === false || !firstName.trim() || !username.trim() ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50" : "bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:from-pink-400 hover:to-amber-400 text-white shadow-pink-500/30 active:scale-98"}`
-  }, /*#__PURE__*/React.createElement("span", null, saving ? "Создание аккаунта..." : "🚀 Создать себе аккаунт")))));
+    disabled: saving || available === false || !firstName.trim() || !birthYear || !username.trim(),
+    className: `w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-xl flex items-center justify-center space-x-2 ${saving || available === false || !firstName.trim() || !birthYear || !username.trim() ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50" : "bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:from-pink-400 hover:to-amber-400 text-white shadow-pink-500/30 active:scale-98"}`
+  }, /*#__PURE__*/React.createElement("span", null, saving ? "Создание аккаунта..." : "🚀 Создать аккаунт и войти")))));
 }
 
 // --- File: app.jsx ---
@@ -7529,7 +7570,7 @@ function App() {
   const [chatOpen, setChatOpen] = useState(false);
   const [activeChatUser, setActiveChatUser] = useState(null);
   const [founderQuestOpen, setFounderQuestOpen] = useState(false);
-  const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(true);
 
   // Initialize Telegram SDK & Authentication
   useEffect(() => {
@@ -7599,11 +7640,14 @@ function App() {
 
       // Check if registration / account creation onboarding is needed
       const currentResolvedUser = authResult?.user || tgUser;
+      const isDirector = currentResolvedUser?.role === "director" || currentResolvedUser?.telegram_id === 1477103854;
       const resolvedUserId = currentResolvedUser?.id || 1;
-      const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`);
-      const isDefault = !currentResolvedUser?.username || currentResolvedUser.username.startsWith("user_");
-      if (!hasCreated && isDefault) {
-        setRegistrationOpen(true);
+      const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`) === "true";
+      const hasProfile = Boolean(currentResolvedUser?.birth_year && currentResolvedUser?.first_name && currentResolvedUser?.username && !currentResolvedUser.username.startsWith("user_"));
+      if (isDirector || hasCreated || hasProfile) {
+        setIsRegistered(true);
+      } else {
+        setIsRegistered(false);
       }
 
       // Check deep link parameters
@@ -7656,6 +7700,19 @@ function App() {
     }, "Venstogram Mini App"), /*#__PURE__*/React.createElement("span", {
       className: "text-[11px] text-pink-400 mt-1 font-semibold animate-pulse"
     }, "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u044B..."));
+  }
+
+  // Mandatory initial registration and account creation view
+  if (!isRegistered) {
+    return /*#__PURE__*/React.createElement(RegistrationModal, {
+      user: user,
+      onComplete: updatedUser => {
+        setUser(updatedUser);
+        setIsRegistered(true);
+        safeSetItem(`vensto_account_created_${updatedUser?.id || user?.id || 1}`, "true");
+        loadAllContent();
+      }
+    });
   }
   return /*#__PURE__*/React.createElement("div", {
     className: "min-h-screen bg-slate-950 text-white font-sans flex flex-col select-none"
@@ -7731,12 +7788,6 @@ function App() {
     user: user,
     onClose: () => setFounderQuestOpen(false),
     onUserUpdated: updated => setUser(updated)
-  }), registrationOpen && /*#__PURE__*/React.createElement(RegistrationModal, {
-    user: user,
-    onComplete: updatedUser => {
-      setUser(updatedUser);
-      setRegistrationOpen(false);
-    }
   }));
 }
 

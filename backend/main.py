@@ -22,10 +22,50 @@ from app.websocket import endpoints as ws_endpoints
 from app.bot.bot import bot, dp
 
 bot_polling_task: asyncio.Task = None
+keepalive_task: asyncio.Task = None
+
+async def anti_sleep_keepalive():
+    """
+    Continuous background self-ping loop that keeps Render awake 24/7.
+    Sends external HTTPS requests to https://venstogram.onrender.com every 4 minutes.
+    """
+    import urllib.request
+    
+    # Initial wait after container starts
+    await asyncio.sleep(25)
+    
+    urls_to_ping = [
+        "https://venstogram.onrender.com/health",
+        "https://venstogram.onrender.com/api/ping"
+    ]
+    
+    while True:
+        try:
+            loop = asyncio.get_running_loop()
+            for url in urls_to_ping:
+                try:
+                    def _do_ping(u):
+                        req = urllib.request.Request(
+                            u,
+                            headers={"User-Agent": "Venstogram-AntiSleep-KeepAlive/1.0"}
+                        )
+                        with urllib.request.urlopen(req, timeout=12) as resp:
+                            return resp.status
+                    status = await loop.run_in_executor(None, _do_ping, url)
+                    if settings.DEBUG:
+                        print(f"[Anti-Sleep] KeepAlive ping to {url} -> {status}")
+                except Exception:
+                    pass
+        except Exception as err:
+            if settings.DEBUG:
+                print(f"[Anti-Sleep Error] {err}")
+        
+        # Ping every 240 seconds (4 minutes). Render's sleep timeout is 15 minutes.
+        await asyncio.sleep(240)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global bot_polling_task
+    global bot_polling_task, keepalive_task
     print("[Venstogram] Starting up backend service...")
     
     # 1. Initialize DB and seed demo content
@@ -35,7 +75,11 @@ async def lifespan(app: FastAPI):
     # 2. Ensure uploads directory exists
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
-    # 3. Start Aiogram Bot Polling in background
+    # 3. Launch Anti-Sleep Daemon
+    keepalive_task = asyncio.create_task(anti_sleep_keepalive())
+    print("[Venstogram] Anti-Sleep 24/7 Daemon activated.")
+
+    # 4. Start Aiogram Bot Polling in background
     if bot and dp:
         try:
             print("[Venstogram] Clearing webhook and launching Telegram Bot polling...")
@@ -61,6 +105,8 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     print("[Venstogram] Shutting down backend service...")
+    if keepalive_task:
+        keepalive_task.cancel()
     if bot_polling_task:
         bot_polling_task.cancel()
     if bot:
@@ -108,11 +154,24 @@ app.include_router(admin.router, prefix="/api")
 app.include_router(upload.router, prefix="/api")
 app.include_router(ws_endpoints.router)
 
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
+from datetime import datetime, timezone
+
+@app.get("/health")
+@app.get("/api/health")
+@app.get("/api/ping")
+async def health_check():
+    return JSONResponse(content={
+        "status": "healthy",
+        "service": "Venstogram Core API",
+        "keep_alive": True,
+        "server_time": datetime.now(timezone.utc).isoformat(),
+        "platform": "Venstogram Engine 24/7"
+    })
 
 @app.get("/")
 async def root():
-    return RedirectResponse(url="/app")
+    return RedirectResponse(url="/app/")
 
 if __name__ == "__main__":
     import uvicorn

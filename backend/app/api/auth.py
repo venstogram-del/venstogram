@@ -103,6 +103,9 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request, db: AsyncSes
             "bio": user.bio,
             "role": user.role,
             "is_verified": user.is_verified,
+            "birth_year": user.birth_year,
+            "birth_date": user.birth_date,
+            "is_registered": bool(user.is_registered or user.birth_year or (user.username and not user.username.startswith("user_"))),
             "wallet_coins": user.wallet_coins,
             "wallet_uzs": user.wallet_uzs,
             "language_code": user.language_code
@@ -143,6 +146,9 @@ async def dev_login(req: DevAuthRequest, db: AsyncSession = Depends(get_db)):
             "bio": user.bio,
             "role": user.role,
             "is_verified": user.is_verified,
+            "birth_year": user.birth_year,
+            "birth_date": user.birth_date,
+            "is_registered": bool(user.is_registered or user.birth_year or (user.username and not user.username.startswith("user_"))),
             "wallet_coins": user.wallet_coins,
             "wallet_uzs": user.wallet_uzs,
             "language_code": user.language_code
@@ -168,6 +174,9 @@ async def get_me(current_user: User = Depends(get_current_user)):
         "verified_until": current_user.verified_until,
         "wallet_coins": current_user.wallet_coins,
         "wallet_uzs": current_user.wallet_uzs,
+        "birth_year": current_user.birth_year,
+        "birth_date": current_user.birth_date,
+        "is_registered": bool(current_user.is_registered or current_user.birth_year or (current_user.username and not current_user.username.startswith("user_"))),
         "language_code": current_user.language_code,
         "biometric_enabled": current_user.biometric_enabled,
         "has_pin": bool(current_user.wallet_pin),
@@ -244,6 +253,16 @@ async def update_profile(
         current_user.first_name = req.first_name
     if req.last_name is not None:
         current_user.last_name = req.last_name
+    if req.birth_year is not None:
+        current_user.birth_year = req.birth_year
+    if req.birth_date is not None:
+        current_user.birth_date = req.birth_date
+    if req.is_registered is not None:
+        current_user.is_registered = req.is_registered
+    else:
+        # Auto-mark registered if first_name and username are present
+        if current_user.first_name and current_user.username and not current_user.username.startswith("user_"):
+            current_user.is_registered = True
     if req.website is not None:
         current_user.website = req.website
     if req.language_code is not None:
@@ -262,6 +281,9 @@ async def update_profile(
         "username": current_user.username,
         "first_name": current_user.first_name,
         "last_name": current_user.last_name,
+        "birth_year": current_user.birth_year,
+        "birth_date": current_user.birth_date,
+        "is_registered": bool(current_user.is_registered),
         "avatar_url": current_user.avatar_url,
         "bio": current_user.bio,
         "website": current_user.website,
@@ -417,6 +439,9 @@ async def verify_email_code(req: EmailVerifyCodeRequest, db: AsyncSession = Depe
             "bio": user.bio,
             "role": user.role,
             "is_verified": user.is_verified,
+            "birth_year": user.birth_year,
+            "birth_date": user.birth_date,
+            "is_registered": bool(user.is_registered or user.birth_year or (user.username and not user.username.startswith("user_"))),
             "wallet_coins": user.wallet_coins,
             "wallet_uzs": user.wallet_uzs,
             "language_code": user.language_code
@@ -453,6 +478,9 @@ async def login_email(req: EmailLoginRequest, db: AsyncSession = Depends(get_db)
             "bio": user.bio,
             "role": user.role,
             "is_verified": user.is_verified,
+            "birth_year": user.birth_year,
+            "birth_date": user.birth_date,
+            "is_registered": bool(user.is_registered or user.birth_year or (user.username and not user.username.startswith("user_"))),
             "wallet_coins": user.wallet_coins,
             "wallet_uzs": user.wallet_uzs,
             "language_code": user.language_code
