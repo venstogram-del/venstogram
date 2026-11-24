@@ -24,6 +24,7 @@ const files = [
   'components/ProfileView.jsx',
   'components/AdminView.jsx',
   'components/CreatePostModal.jsx',
+  'components/RegistrationModal.jsx',
   'app.jsx'
 ];
 

@@ -18,56 +18,23 @@ if settings.BOT_TOKEN:
     dp = Dispatcher()
 
 def get_webapp_keyboard(start_param: str = "", is_admin: bool = False) -> InlineKeyboardMarkup:
-    """Builds inline keyboard with launch button into Telegram Mini App with deep link param."""
+    """Builds inline keyboard with launch button into Telegram Mini App."""
     base_url = settings.WEBAPP_URL
     app_url = f"{base_url}?startapp={start_param}" if start_param else base_url
     is_https = app_url.startswith("https://")
     
     if is_https:
         main_button = InlineKeyboardButton(
-            text="🚀 Открыть Венстограм",
+            text="🚀 Открыть Venstogram",
             web_app=WebAppInfo(url=app_url)
         )
-        reels_button = InlineKeyboardButton(
-            text="🎬 Reels",
-            web_app=WebAppInfo(url=f"{base_url}?tab=reels")
-        )
-        market_button = InlineKeyboardButton(
-            text="💎 Маркетплейс юзернеймов",
-            web_app=WebAppInfo(url=f"{base_url}?tab=marketplace")
-        )
-        admin_button = InlineKeyboardButton(
-            text="🛡️ Админ-панель (Директор)",
-            web_app=WebAppInfo(url=f"{base_url}?tab=admin")
-        )
     else:
-        # Fallback when running locally over HTTP (Telegram requires HTTPS for WebAppInfo)
         main_button = InlineKeyboardButton(
-            text="🚀 Открыть Venstogram (Web)",
+            text="🚀 Открыть Venstogram",
             url=app_url
         )
-        reels_button = InlineKeyboardButton(
-            text="🎬 Reels",
-            url=f"{base_url}?tab=reels"
-        )
-        market_button = InlineKeyboardButton(
-            text="💎 Маркетплейс",
-            url=f"{base_url}?tab=marketplace"
-        )
-        admin_button = InlineKeyboardButton(
-            text="🛡️ Админ-панель",
-            url=f"{base_url}?tab=admin"
-        )
 
-    rows = [
-        [main_button],
-        [reels_button, market_button]
-    ]
-    if is_admin:
-        rows.append([admin_button])
-
-    kb = InlineKeyboardMarkup(inline_keyboard=rows)
-    return kb
+    return InlineKeyboardMarkup(inline_keyboard=[[main_button]])
 
 
 async def send_bot_push_notification(
@@ -154,17 +121,7 @@ if dp is not None:
                     await session.commit()
             
             greeting = (
-                f"👋 <b>Добро пожаловать в Венстограм!</b>\n"
-                f"<b>Первая социальная сеть и медиа-экосистема нового поколения.</b>\n\n"
-                f"• 📸 <b>Лента и Stories</b> — делитесь яркими моментами и фото\n"
-                f"• 🎬 <b>Reels</b> — вертикальные видео с алгоритмическим бустом в топ\n"
-                f"• 🪙 <b>Vensto Coins</b> — монеты платформы для буста видео и подарков в баттлах\n"
-                f"• 💎 <b>Маркетплейс редких @никнеймов</b> — эксклюзивные имена и бренды\n"
-                f"• 👑 <b>Лига блогеров от Основателя (/quest)</b> — выполни квест и получи Золотую Галочку!\n"
-                f"• 📞 <b>Служба техподдержки:</b> <code>+998 50 777 51 52</code>\n"
-                f"• 💬 <b>Telegram поддержки:</b> @yuksak_it\n"
-                f"• 📧 <b>Официальная почта:</b> <code>venstogram@gmail.com</code>\n\n"
-                f"Нажмите кнопку <b>«🚀 Открыть Венстограм»</b> ниже, чтобы начать! 👇"
+                "👋 <b>Добро пожаловать в Venstogram</b> — первая социальная сеть и медиаэкосистема нового поколения."
             )
 
             try:
@@ -186,7 +143,7 @@ if dp is not None:
     async def cmd_quest(message: types.Message):
         """Displays blogger league quest status and personal referral invite link."""
         from app.database.session import AsyncSessionLocal
-        from app.models.entities import User, Post, Follower
+        from app.models.entities import User, Post, Follow
         from sqlalchemy import select, func
 
         tg_id = message.from_user.id
@@ -201,7 +158,7 @@ if dp is not None:
             ref_count_res = await session.execute(select(func.count(User.id)).where(User.referred_by_id == user.id))
             ref_count = ref_count_res.scalar() or 0
 
-            followers_res = await session.execute(select(func.count(Follower.id)).where(Follower.following_id == user.id))
+            followers_res = await session.execute(select(func.count(Follow.id)).where(Follow.following_id == user.id))
             followers_count = followers_res.scalar() or 0
 
             posts_res = await session.execute(select(func.count(Post.id)).where(Post.user_id == user.id))

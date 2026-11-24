@@ -77,8 +77,9 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request, db: AsyncSes
             user.first_name = tg_user.get("first_name")
         if tg_user.get("last_name"):
             user.last_name = tg_user.get("last_name")
-        if raw_username:
-            user.username = raw_username
+        if not user.username or user.username.startswith("user_"):
+            if raw_username:
+                user.username = raw_username
         user.last_active = now
         if client_ip:
             user.last_ip = client_ip

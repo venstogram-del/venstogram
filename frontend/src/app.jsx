@@ -15,6 +15,7 @@ import { ChatView } from "./components/ChatView.jsx";
 import { WalletModal } from "./components/WalletModal.jsx";
 import { CreatePostModal } from "./components/CreatePostModal.jsx";
 import { FounderQuestModal } from "./components/FounderQuestModal.jsx";
+import { RegistrationModal } from "./components/RegistrationModal.jsx";
 
 export function App() {
   const safeGetItem = (k) => { try { return localStorage.getItem(k); } catch(e) { return null; } };
@@ -40,6 +41,7 @@ export function App() {
   const [chatOpen, setChatOpen] = useState(false);
   const [activeChatUser, setActiveChatUser] = useState(null);
   const [founderQuestOpen, setFounderQuestOpen] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
 
   // Initialize Telegram SDK & Authentication
   useEffect(() => {
@@ -111,6 +113,15 @@ export function App() {
           wallet_coins: 100000,
           is_verified: true
         });
+      }
+
+      // Check if registration / account creation onboarding is needed
+      const currentResolvedUser = authResult?.user || tgUser;
+      const resolvedUserId = currentResolvedUser?.id || 1;
+      const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`);
+      const isDefault = !currentResolvedUser?.username || currentResolvedUser.username.startsWith("user_");
+      if (!hasCreated && isDefault) {
+        setRegistrationOpen(true);
       }
 
       // Check deep link parameters
@@ -303,6 +314,16 @@ export function App() {
           user={user}
           onClose={() => setFounderQuestOpen(false)}
           onUserUpdated={(updated) => setUser(updated)}
+        />
+      )}
+
+      {registrationOpen && (
+        <RegistrationModal
+          user={user}
+          onComplete={(updatedUser) => {
+            setUser(updatedUser);
+            setRegistrationOpen(false);
+          }}
         />
       )}
     </div>
