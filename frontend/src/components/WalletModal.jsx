@@ -14,6 +14,11 @@ export function WalletModal({ user, t, onClose, onUpdateUser }) {
   const [paymentMethod, setPaymentMethod] = useState("click"); // click, payme, uzum, stars
   const [copiedCard, setCopiedCard] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptPreview, setReceiptPreview] = useState("");
+  const [orderNote, setOrderNote] = useState("");
+  const [submittingOrder, setSubmittingOrder] = useState(false);
+  const [submittedOrder, setSubmittedOrder] = useState(null);
 
   useEffect(() => {
     // If biometric enabled, auto prompt
@@ -51,21 +56,46 @@ export function WalletModal({ user, t, onClose, onUpdateUser }) {
     } catch (e) {}
   };
 
+  const handleReceiptChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      triggerHaptic("light");
+      setReceiptFile(file);
+      setReceiptPreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleTopUp = async () => {
+    setSubmittingOrder(true);
     triggerHaptic("medium");
-    SoundEngine.playFanfare();
 
     try {
+      let uploadedReceiptUrl = "";
+      if (receiptFile) {
+        const formData = new FormData();
+        formData.append("file", receiptFile);
+        const uploadRes = await Api.post("/upload", formData);
+        uploadedReceiptUrl = uploadRes.url || "";
+      }
+
       const res = await Api.post("/wallet/topup", {
         amount_coins: topupAmount,
-        payment_method: paymentMethod
+        payment_method: paymentMethod,
+        receipt_url: uploadedReceiptUrl,
+        note: orderNote.trim()
       });
-      alert(res.message);
-      onUpdateUser({ ...user, wallet_coins: res.new_coins });
-      setActiveTab("history");
-      loadTransactions();
+
+      SoundEngine.playFanfare();
+      triggerHaptic("success");
+      setSubmittedOrder(res);
+      setReceiptFile(null);
+      setReceiptPreview("");
+      setOrderNote("");
     } catch (err) {
-      alert(err.message);
+      triggerHaptic("error");
+      alert(err.message || "Ошибка отправки заявки");
+    } finally {
+      setSubmittingOrder(false);
     }
   };
 
@@ -267,12 +297,76 @@ export function WalletModal({ user, t, onClose, onUpdateUser }) {
                   ))}
                 </div>
 
-                <button
-                  onClick={handleTopUp}
-                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-emerald-600/30 transition-all mt-3"
-                >
-                  Оплатить {(topupAmount * 100).toLocaleString()} UZS
-                </button>
+                {/* Submitted Order Status or Action Form */}
+                {submittedOrder ? (
+                  <div className="bg-emerald-950/40 border border-emerald-500/40 p-4 rounded-2xl text-center space-y-2 mt-2">
+                    <span className="text-3xl block">⏳</span>
+                    <h4 className="text-sm font-black text-emerald-300">
+                      Заявка #{submittedOrder.order_id} отправлена!
+                    </h4>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Заявка на <b>+{submittedOrder.amount_coins?.toLocaleString()} 🪙</b> (
+                      {submittedOrder.amount_uzs?.toLocaleString()} сум) передана на подтверждение Основателю платформы.
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      Монеты поступят на ваш баланс автоматически после проверки чека Директором.
+                    </p>
+                    <button
+                      onClick={() => setSubmittedOrder(null)}
+                      className="mt-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded-xl text-xs shadow-md"
+                    >
+                      Понятно
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Receipt Upload & Note */}
+                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2 mt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-300">Чек / Скриншот перевода:</span>
+                        <label className="text-[10px] bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold px-2.5 py-1 rounded-lg cursor-pointer border border-slate-700 transition">
+                          <span>{receiptFile ? "✓ Чек прикреплен" : "📎 Прикрепить чек"}</span>
+                          <input type="file" accept="image/*" onChange={handleReceiptChange} className="hidden" />
+                        </label>
+                      </div>
+                      {receiptPreview && (
+                        <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-700">
+                          <img src={receiptPreview} alt="Receipt" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReceiptFile(null);
+                              setReceiptPreview("");
+                            }}
+                            className="absolute top-1 right-1 bg-black/70 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+                      <input
+                        type="text"
+                        placeholder="Примечание (ФИО плательщика или последние 4 цифры карты)"
+                        value={orderNote}
+                        onChange={(e) => setOrderNote(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-start space-x-2">
+                      <span>🛡️</span>
+                      <span>Для защиты от накруток монеты начисляются только после ручного подтверждения перевода Администратором.</span>
+                    </div>
+
+                    <button
+                      onClick={handleTopUp}
+                      disabled={submittingOrder}
+                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-emerald-600/30 transition-all mt-1"
+                    >
+                      {submittingOrder ? "Отправка заявки..." : `Отправить заявку на ${(topupAmount * 100).toLocaleString()} UZS`}
+                    </button>
+                  </>
+                )}
               </div>
             )}
 

@@ -45,13 +45,28 @@ export function CreatePostModal({ t, onClose, onPostCreated, dataSaver }) {
       const hashtags = (caption.match(/#[a-zа-яё0-9_]+/gi) || []).map((h) => h.slice(1));
 
       // 3. Create post
+      const isVideo = selectedFile.type.startsWith("video");
       const postRes = await Api.post("/posts", {
         caption,
         media_urls: [uploadRes.url],
-        media_type: selectedFile.type.startsWith("video") ? "video" : "image",
+        media_type: isVideo ? "video" : "image",
         location,
         hashtags
       });
+
+      // 4. If video, automatically publish to Reels too for algorithmic discovery
+      if (isVideo) {
+        try {
+          await Api.post("/reels", {
+            video_url: uploadRes.url,
+            caption: caption,
+            audio_title: "Оригинальный звук",
+            thumbnail_url: ""
+          });
+        } catch (e) {
+          console.warn("Reel sync error", e);
+        }
+      }
 
       SoundEngine.playFanfare();
       alert(postRes.message);
@@ -84,14 +99,25 @@ export function CreatePostModal({ t, onClose, onPostCreated, dataSaver }) {
             </label>
           ) : (
             <div>
-              <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-black mb-2">
-                <img
-                  src={previewUrl}
-                  alt="Preview"
-                  className={`w-full h-full object-cover transition-all ${
-                    filters.find((f) => f.id === activeFilter)?.class || ""
-                  }`}
-                />
+              <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-black mb-2 flex items-center justify-center">
+                {selectedFile?.type.startsWith("video") ? (
+                  <video
+                    src={previewUrl}
+                    controls
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <img
+                    src={previewUrl}
+                    alt="Preview"
+                    className={`w-full h-full object-cover transition-all ${
+                      filters.find((f) => f.id === activeFilter)?.class || ""
+                    }`}
+                  />
+                )}
                 <button
                   type="button"
                   onClick={() => {

@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from app.database.session import get_db
 from app.models.entities import (
     User, Post, Reel, LiveBattle, BattleGift,
-    ContentReport, Transaction, AdminAuditLog
+    ContentReport, Transaction, AdminAuditLog, CoinOrder
 )
 from app.schemas.all_schemas import ModerateActionRequest
 from app.api.deps import get_admin_user
@@ -837,6 +837,163 @@ async def delete_sponsored_ad(
     await db.delete(ad)
     await db.commit()
     return {"status": "ok", "message": "Рекламная кампания успешно удалена"}
+
+
+@router.get("/coin-orders")
+async def get_coin_orders(
+    status: str = "all",
+    admin_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from sqlalchemy.orm import selectinload
+    query = select(CoinOrder).options(selectinload(CoinOrder.user)).order_by(desc(CoinOrder.created_at))
+    if status != "all":
+        query = query.where(CoinOrder.status == status)
+    
+    res = await db.execute(query)
+    orders = res.scalars().all()
+    return [
+        {
+            "id": o.id,
+            "user_id": o.user_id,
+            "user": {
+                "id": o.user.id,
+                "username": o.user.username,
+                "first_name": o.user.first_name,
+                "last_name": o.user.last_name,
+                "telegram_id": o.user.telegram_id,
+                "avatar_url": o.user.avatar_url
+            } if o.user else None,
+            "amount_coins": o.amount_coins,
+            "amount_uzs": o.amount_uzs,
+            "payment_method": o.payment_method,
+            "receipt_url": o.receipt_url,
+            "note": o.note,
+            "status": o.status,
+            "admin_notes": o.admin_notes,
+            "created_at": o.created_at.isoformat() if o.created_at else None,
+            "reviewed_at": o.reviewed_at.isoformat() if o.reviewed_at else None
+        }
+        for o in orders
+    ]
+
+
+@router.post("/coin-orders/{order_id}/approve")
+async def approve_coin_order(
+    order_id: int,
+    admin_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from app.bot.bot import send_bot_push_notification
+    res = await db.execute(select(CoinOrder).where(CoinOrder.id == order_id))
+    order = res.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    if order.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Заявка уже обработана (статус: {order.status})")
+
+    user_res = await db.execute(select(User).where(User.id == order.user_id))
+    buyer = user_res.scalars().first()
+    if not buyer:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    # Credit coins
+    buyer.wallet_coins += order.amount_coins
+    order.status = "approved"
+    order.reviewed_at = datetime.now(timezone.utc)
+    order.admin_notes = f"Подтверждено директором #{admin_user.id} ({admin_user.first_name})"
+
+    # Log transaction
+    tx = Transaction(
+        user_id=buyer.id,
+        type="topup",
+        amount_coins=order.amount_coins,
+        description=f"Пополнение баланса #{order.id} на {order.amount_coins:,} монет ({order.amount_uzs:,.0f} сум) подтверждено"
+    )
+    db.add(tx)
+
+    # Log audit
+    audit = AdminAuditLog(
+        admin_id=admin_user.id,
+        action="approve_coin_order",
+        target_type="coin_order",
+        target_id=order.id,
+        details={"amount_coins": order.amount_coins, "buyer_id": buyer.id}
+    )
+    db.add(audit)
+
+    await db.commit()
+
+    # Send telegram notification
+    if buyer.telegram_id:
+        await send_bot_push_notification(
+            telegram_id=buyer.telegram_id,
+            text=(
+                f"✅ <b>Оплата подтверждена!</b>\n\n"
+                f"Вам начислено: <b>+{order.amount_coins:,} 🪙</b>\n"
+                f"Текущий баланс: <b>{buyer.wallet_coins:,} 🪙</b>\n\n"
+                f"<i>Спасибо за поддержку платформы Venstogram!</i>"
+            ),
+            button_text="👛 Открыть Кошелек",
+            start_param="tab_profile"
+        )
+
+    return {
+        "status": "ok",
+        "order_id": order.id,
+        "message": f"Заявка #{order.id} подтверждена! Пользователю начислено {order.amount_coins:,} монет."
+    }
+
+
+@router.post("/coin-orders/{order_id}/reject")
+async def reject_coin_order(
+    order_id: int,
+    req: dict = {},
+    admin_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from app.bot.bot import send_bot_push_notification
+    res = await db.execute(select(CoinOrder).where(CoinOrder.id == order_id))
+    order = res.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    if order.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Заявка уже обработана (статус: {order.status})")
+
+    reason = req.get("reason", "Оплата не поступила или чек недействителен")
+    order.status = "rejected"
+    order.reviewed_at = datetime.now(timezone.utc)
+    order.admin_notes = reason
+
+    user_res = await db.execute(select(User).where(User.id == order.user_id))
+    buyer = user_res.scalars().first()
+
+    audit = AdminAuditLog(
+        admin_id=admin_user.id,
+        action="reject_coin_order",
+        target_type="coin_order",
+        target_id=order.id,
+        details={"reason": reason}
+    )
+    db.add(audit)
+
+    await db.commit()
+
+    if buyer and buyer.telegram_id:
+        await send_bot_push_notification(
+            telegram_id=buyer.telegram_id,
+            text=(
+                f"❌ <b>Заявка на монеты отклонена</b>\n\n"
+                f"Заявка #{order.id} на {order.amount_coins:,} монет не подтверждена.\n"
+                f"<b>Причина:</b> {reason}\n\n"
+                f"Если произошла ошибка, свяжитесь с поддержкой: @yuksak_it"
+            ),
+            button_text="🛠️ Поддержка",
+            start_param=""
+        )
+
+    return {"status": "ok", "order_id": order.id, "message": f"Заявка #{order.id} отклонена"}
+
 
 
 

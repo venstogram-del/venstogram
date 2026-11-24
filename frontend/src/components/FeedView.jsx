@@ -4,12 +4,20 @@ import { SoundEngine } from "../sound.js";
 import { Api } from "../api.js";
 
 export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
+  const isVideoMedia = (url, mediaType) => {
+    if (mediaType === "video") return true;
+    if (!url) return false;
+    const clean = url.split("?")[0].toLowerCase();
+    return clean.endsWith(".mp4") || clean.endsWith(".webm") || clean.endsWith(".mov") || clean.endsWith(".m4v") || clean.endsWith(".ogg") || clean.includes("/video");
+  };
+
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(null);
   const [comments, setComments] = useState([]);
   const [newCommentText, setNewCommentText] = useState("");
   const [loadingComments, setLoadingComments] = useState(false);
   const [animatingHeartPostId, setAnimatingHeartPostId] = useState(null);
   const [inspectPost, setInspectPost] = useState(null);
+  const [shareItem, setShareItem] = useState(null);
   const [ads, setAds] = useState([]);
   const commentInputRef = useRef(null);
 
@@ -145,17 +153,8 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
   };
 
   const handleShare = (post) => {
-    triggerHaptic("selection");
-    try {
-      if (window.Telegram?.WebApp?.switchInlineQuery) {
-        window.Telegram.WebApp.switchInlineQuery(
-          `Посмотри этот пост в Venstogram: @${post.author.username} - "${post.caption.slice(0, 50)}..."`
-        );
-      } else {
-        navigator.clipboard.writeText(window.location.href);
-        alert("Ссылка на публикацию скопирована!");
-      }
-    } catch (e) {}
+    triggerHaptic("light");
+    setShareItem(post);
   };
 
   return (
@@ -229,12 +228,24 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
             }}
           >
             {post.media_urls && post.media_urls[0] ? (
-              <img
-                src={post.media_urls[0]}
-                alt="Post content"
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
+              isVideoMedia(post.media_urls[0], post.media_type) ? (
+                <div className="w-full h-full bg-black flex items-center justify-center">
+                  <video
+                    src={post.media_urls[0]}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              ) : (
+                <img
+                  src={post.media_urls[0]}
+                  alt="Post content"
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              )
             ) : (
               <div className="w-full h-full flex items-center justify-center text-slate-500">
                 <span>Медиа недоступно</span>
@@ -465,6 +476,15 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
             setPosts((prev) => prev.filter((p) => p.id !== deletedId));
             setInspectPost(null);
           }}
+        />
+      )}
+      {/* Multi-Friend Share Modal */}
+      {shareItem && (
+        <ShareModal
+          item={shareItem}
+          type="post"
+          onClose={() => setShareItem(null)}
+          t={t}
         />
       )}
     </div>

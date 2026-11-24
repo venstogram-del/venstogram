@@ -17,7 +17,14 @@ def clean_name(raw: str) -> str:
     s = s.lower()
     return re.sub(r"[^a-z0-9_]", "", s)
 
-TOP_SHORT_NAMES = {"ali", "amir", "aziz", "umar", "said", "bobur", "islom", "temur", "davlat", "malik", "sulton", "bilol", "yusuf"}
+FEMALE_NAMES_RAW = """
+Aziza, Oysha, Aqida, Aliya, Amina, Amira, Anbar, Anor, Anora, Asal, Asaloy, Asila, Asma, Atirgul, Afifa, Barno, Barchin, Barchinoy, Bahor, Bahora, Begoyim, Bibigul, Bibisora, Bibixadicha, Bonu, Bo‘ston, Vazira, Vasila, Visola, Gavhar, Gavharoy, Gulbahor, Gulbadan, Guljamol, Guljahon, Gulzira, Gulzoda, Guli, Gulira’no, Gulnoz, Gulnoza, Gulnora, Gulruh, Gulruhsor, Gulsanam, Gulsara, Gulchehra, Gulshan, Gulshoda, Go‘zal, Go‘zaloy, Damira, Dilafruz, Dilbar, Dildora, Dilnoz, Dilnoza, Dilnura, Dilorom, Dilrabo, Dilruh, Dilsora, Dilfuza, Dilya, Dinara, Diyora, Durdona, Jamila, Jasmina, Jonsuluv, Zamira, Zarina, Zarifa, Zahro, Zebiniso, Zebo, Ziyoda, Zilola, Zinnat, Zoira, Zokira, Zulayho, Zulfiya, Zulxumor, Zumrad, Zuhra, Ibodat, Iroda, Ifora, Iqboloy, Imona, Kamila, Kamola, Karima, Kibriyo, Komila, Kumush, Kumushoy, Qurbonoy, Laziza, Laylo, Latifa, Latofat, Leysan, Lola, Lolaxon, Lutfiya, Mavjuda, Mavluda, Madina, Maysara, Malika, Mamlakat, Manzura, Marvarid, Marg‘uba, Marjona, Marhabo, Maryam, Mastura, Matluba, Maftuna, Mahbuba, Mahliyo, Mahmuda, Mahfuza, Mehribon, Mehriniso, Mehrinoz, Mohigul, Mohidil, Mohinur, Mohira, Mohichehra, Muazzam, Muattar, Mubina, Muzayyana, Muqaddas, Mukarram, Munavvar, Munira, Munis, Munisa, Muslima, Muhayyo, Muxlisa, Mushtariy, Navbahor, Navro‘za, Nadira, Najiba, Nazira, Nazokat, Nazmina, Naima, Nargiza, Nasiba, Nafisa, Ne’matxon, Nigina, Nigora, Nilufar, Niso, Nodira, Nozima, Nozli, Noila, Nurxon, Nuriya, Obida, Odina, Odinaxon, Ozoda, Oygul, Oydin, Oyjamol, Oyniso, Oysara, Oyshaxon, Oliya, Olmaxon, Omina, Orasta, Orzigul, Orifa, Osiyo, Ominaxon, Parizod, Parizoda, Parvina, Pokiza, Rabia, Ravshanoy, Ra’no, Rahima, Raxshona, Rayhon, Rayhona, Regina, Risolat, Robiya, Roziya, Ruxsora, Ruxshona, Ruqiya, Sabina, Sabohat, Sabrina, Sadoqat, Saida, Sayyora, Salima, Salomat, Samira, Sanam, Saodat, Sara, Sarvinoz, Sevara, Sevinch, Sitora, Sobira, Sojida, Soliha, Sora, Sug‘diyona, Surayyo, Tabassum, Tanzila, Tojiniso, To‘maris, Tursunoy, To‘tixon, O‘g‘iloy, O‘lmasxon, Umida, Usmona, Fazilat, Farida, Farishta, Farzona, Farog‘at, Fotima, Feruza, Firuza, Fozila, Habiba, Xadicha, Xayriniso, Halima, Hamida, Hanifa, Xosiyat, Hilola, Hojar, Xolida, Hulkar, Xumor, Xumora, Hurriyat, Xurshida, Husnida, Husnora, Charos, Chinor, Cho‘lponoy, Shabnam, Shahlo, Shahnoza, Shahrizoda, Shahriniso, Shahsanam, Shirin, Shirinoy, Shodiyona, Shoira, Shohida, Shohista, Shohsanam, Shukrona, Shukufa, E’zoza, Elnora, Yulduz, Yulduzoy, Yasmina
+"""
+
+TOP_SHORT_NAMES = {
+    "ali", "amir", "aziz", "umar", "said", "bobur", "islom", "temur", "davlat", "malik", "sulton", "bilol", "yusuf",
+    "asal", "guli", "lola", "bonu", "zebo", "dilya", "sora", "niso", "aziza", "madina", "malika", "rayhon", "yulduz"
+}
 
 async def init_models():
     async with engine.begin() as conn:
@@ -63,8 +70,9 @@ async def seed_demo_data():
                 )
                 session.add(nl)
 
-        # 3. Seed Uzbek names ($500+)
-        raw_list = [clean_name(n) for n in NAMES_RAW.split(",") if clean_name(n)]
+        # 3. Seed Uzbek male & female names ($500+)
+        combined_raw = NAMES_RAW + "," + FEMALE_NAMES_RAW
+        raw_list = [clean_name(n) for n in combined_raw.split(",") if clean_name(n)]
         seen = set()
         names = []
         for n in raw_list:

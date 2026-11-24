@@ -9,6 +9,7 @@ const files = [
   'telegram.js',
   'sound.js',
   'api.js',
+  'components/ShareModal.jsx',
   'components/PostModal.jsx',
   'components/Header.jsx',
   'components/BottomNav.jsx',

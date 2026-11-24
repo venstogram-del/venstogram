@@ -37,38 +37,66 @@ async def verify_pin(
 
 @router.post("/topup")
 async def topup_balance(
-    req: TopUpRequest,
+    req: dict,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Simulates / triggers local payment gateway (Click, Payme, Uzum) or Telegram Stars.
-    Credits Vensto Coins to user wallet.
+    Submits a coin purchase request. Coins are credited ONLY after Director confirmation in Admin Panel!
     """
-    if req.amount_coins <= 0:
+    from app.models.entities import CoinOrder
+    from app.bot.bot import send_bot_push_notification
+
+    try:
+        amount_coins = int(req.get("amount_coins", 500))
+    except (ValueError, TypeError):
+        amount_coins = 500
+
+    if amount_coins <= 0:
         raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
 
-    total_uzs = req.amount_coins * settings.COIN_PRICE_UZS
-    
-    current_user.wallet_coins += req.amount_coins
-    
-    tx = Transaction(
+    payment_method = str(req.get("payment_method", "card"))
+    receipt_url = str(req.get("receipt_url", "") or "")
+    note = str(req.get("note", "") or "")
+
+    total_uzs = amount_coins * settings.COIN_PRICE_UZS
+
+    order = CoinOrder(
         user_id=current_user.id,
-        type="deposit",
-        amount_coins=req.amount_coins,
+        amount_coins=amount_coins,
         amount_uzs=total_uzs,
-        payment_method=req.payment_method,
-        status="completed",
-        description=f"Пополнение баланса через {req.payment_method.upper()} (+{req.amount_coins} монет)"
+        payment_method=payment_method,
+        receipt_url=receipt_url,
+        note=note,
+        status="pending"
     )
-    db.add(tx)
+    db.add(order)
     await db.commit()
+    await db.refresh(order)
+
+    # Notify Founder Director about new coin purchase request
+    for admin_tg_id in settings.ADMIN_TELEGRAM_IDS:
+        await send_bot_push_notification(
+            telegram_id=admin_tg_id,
+            text=(
+                f"💰 <b>НОВАЯ ЗАЯВКА НА ПОКУПКУ МОНЕТ!</b>\n\n"
+                f"• Пользователь: <b>{current_user.first_name}</b> (@{current_user.username})\n"
+                f"• Telegram ID: <code>{current_user.telegram_id}</code>\n"
+                f"• Заказ: <b>+{amount_coins:,} 🪙 ({total_uzs:,.0f} сум)</b>\n"
+                f"• Способ: {payment_method.upper()}\n"
+                f"• ID заявки: #{order.id}\n\n"
+                f"<i>Проверьте поступление средств и подтвердите в Админ-панели!</i>"
+            ),
+            button_text="🛡️ Открыть Админ-панель",
+            start_param="tab_admin"
+        )
 
     return {
-        "status": "ok",
-        "new_coins": current_user.wallet_coins,
+        "status": "pending",
+        "order_id": order.id,
+        "amount_coins": amount_coins,
         "amount_uzs": total_uzs,
-        "message": f"Баланс успешно пополнен на {req.amount_coins} Vensto Coins"
+        "message": "Заявка на покупку монет отправлена! Монеты будут зачислены сразу после проверки оплаты Администрацией."
     }
 
 

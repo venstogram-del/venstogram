@@ -8,7 +8,8 @@ export function AdminView({ user, t }) {
   const [reports, setReports] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [activeSubTab, setActiveSubTab] = useState("orders"); // orders, users, director, moderator, it
+  const [coinOrders, setCoinOrders] = useState([]);
+  const [activeSubTab, setActiveSubTab] = useState("orders"); // orders, coin_orders, users, director, moderator, it
   
   // Receipt modal preview
   const [previewReceiptUrl, setPreviewReceiptUrl] = useState(null);
@@ -51,6 +52,7 @@ export function AdminView({ user, t }) {
   useEffect(() => {
     loadOverview();
     loadOrders();
+    loadCoinOrders();
     loadReports();
     loadAuditLogs();
     loadPolicies();
@@ -76,6 +78,32 @@ export function AdminView({ user, t }) {
       const data = await Api.get("/admin/username-orders");
       setOrders(data || []);
     } catch (e) {}
+  };
+
+  const loadCoinOrders = async () => {
+    try {
+      const data = await Api.get("/admin/coin-orders?status=pending");
+      setCoinOrders(data || []);
+    } catch (e) {}
+  };
+
+  const handleCoinOrderAction = async (orderId, action) => {
+    let reason = "";
+    if (action === "reject") {
+      reason = prompt("Укажите причину отклонения заявки:", "Оплата не поступила или чек недействителен");
+      if (reason === null) return;
+    }
+    triggerHaptic(action === "approve" ? "heavy" : "medium");
+    if (action === "approve") SoundEngine.playFanfare();
+
+    try {
+      const res = await Api.post(`/admin/coin-orders/${orderId}/${action}`, { reason });
+      alert(res.message);
+      loadCoinOrders();
+      loadOverview();
+    } catch (err) {
+      alert("Ошибка: " + err.message);
+    }
   };
 
   const loadReports = async () => {
@@ -477,6 +505,24 @@ export function AdminView({ user, t }) {
         <button
           onClick={() => {
             triggerHaptic("light");
+            setActiveSubTab("coin_orders");
+            loadCoinOrders();
+          }}
+          className={`py-2 px-3 rounded-xl whitespace-nowrap transition-all flex items-center space-x-1 ${
+            activeSubTab === "coin_orders" ? "bg-emerald-500 text-slate-950 font-black shadow-md" : "text-slate-400"
+          }`}
+        >
+          <span>💰 Заявки на монеты</span>
+          {coinOrders.length > 0 && (
+            <span className="bg-rose-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
+              {coinOrders.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => {
+            triggerHaptic("light");
             setActiveSubTab("users");
           }}
           className={`py-2 px-3 rounded-xl whitespace-nowrap transition-all ${
@@ -661,6 +707,115 @@ export function AdminView({ user, t }) {
                     className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs py-2.5 rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center space-x-1"
                   >
                     <span>✓ Одобрить и передать</span>
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Coin Orders Management Tab */}
+      {activeSubTab === "coin_orders" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-bold text-slate-300">
+              Заявки на покупку монет: {coinOrders.length}
+            </span>
+            <button
+              onClick={loadCoinOrders}
+              className="text-[11px] text-pink-400 font-bold hover:underline"
+            >
+              🔄 Обновить
+            </button>
+          </div>
+
+          {coinOrders.length === 0 ? (
+            <div className="bg-slate-900/60 p-8 rounded-3xl border border-slate-800 text-center text-slate-400 text-xs">
+              <span className="text-3xl block mb-2">🎉</span>
+              Все заявки на покупку монет проверены и обработаны! Новых заявок нет.
+            </div>
+          ) : (
+            coinOrders.map((ord) => (
+              <div
+                key={ord.id}
+                className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-3xl p-4 space-y-3 shadow-lg transition-all"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-base font-black text-white">
+                        +{ord.amount_coins?.toLocaleString()} 🪙
+                      </span>
+                      <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                        {ord.amount_uzs?.toLocaleString()} сум
+                      </span>
+                      <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full uppercase font-bold">
+                        {ord.payment_method}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 block mt-0.5">
+                      Пользователь: <b className="text-pink-400">@{ord.user?.username}</b> ({ord.user?.first_name} {ord.user?.last_name || ""})
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      Telegram ID: {ord.user?.telegram_id}
+                    </span>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-[10px] bg-amber-950 text-amber-400 border border-amber-700/50 px-2 py-1 rounded-lg font-bold">
+                      В ожидании проверки
+                    </span>
+                    <span className="text-[10px] text-slate-500 block mt-1">
+                      {ord.created_at ? new Date(ord.created_at).toLocaleTimeString() : ""}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Receipt Preview if available */}
+                {ord.receipt_url && (
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-300 flex items-center space-x-1">
+                      <span>🧾</span>
+                      <span>Чек об оплате:</span>
+                    </span>
+                    <div
+                      onClick={() => setPreviewReceiptUrl(ord.receipt_url)}
+                      className="cursor-pointer group relative rounded-xl overflow-hidden bg-black h-36 flex items-center justify-center border border-slate-700 hover:border-emerald-500 transition-colors"
+                    >
+                      <img
+                        src={ord.receipt_url}
+                        alt="Чек"
+                        className="h-full w-full object-contain group-hover:scale-105 transition-transform"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs text-white font-bold transition-opacity">
+                        🔍 Нажмите для увеличения
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {ord.note && (
+                  <div className="text-[11px] text-slate-300 bg-slate-950/60 p-2 rounded-xl">
+                    <span className="text-slate-400 font-semibold">Примечание: </span>
+                    {ord.note}
+                  </div>
+                )}
+
+                {/* Action Buttons: Approve / Reject */}
+                <div className="flex space-x-2 pt-1">
+                  <button
+                    onClick={() => handleCoinOrderAction(ord.id, "reject")}
+                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-rose-400 font-bold text-xs py-2.5 rounded-xl border border-slate-700 transition-all"
+                  >
+                    ✕ Отклонить
+                  </button>
+
+                  <button
+                    onClick={() => handleCoinOrderAction(ord.id, "approve")}
+                    className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs py-2.5 rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center space-x-1"
+                  >
+                    <span>✓ Начислить {ord.amount_coins?.toLocaleString()} 🪙</span>
                   </button>
                 </div>
               </div>

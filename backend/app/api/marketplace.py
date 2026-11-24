@@ -12,8 +12,8 @@ router = APIRouter(prefix="/marketplace", tags=["Usernames & Verified Badge"])
 
 VERIFIED_PRICES = {
     1: {"months": 1, "coins": 1000, "price_sum": 100000, "discount_pct": 0, "label": "1 месяц — 1 000 🪙 (100 000 сум)"},
-    3: {"months": 3, "coins": 2850, "price_sum": 285000, "discount_pct": 5, "label": "3 месяца — 2 850 🪙 (-5% скидка)"},
-    12: {"months": 12, "coins": 10200, "price_sum": 1020000, "discount_pct": 15, "label": "1 год — 10 200 🪙 (-15% скидка)"}
+    3: {"months": 3, "coins": 2490, "price_sum": 249000, "discount_pct": 17, "label": "3 месяца — 2 490 🪙 (-17% скидка)"},
+    12: {"months": 12, "coins": 8040, "price_sum": 804000, "discount_pct": 33, "label": "1 год — 8 040 🪙 (-33% скидка)"}
 }
 
 @router.get("/policy/username-terms")

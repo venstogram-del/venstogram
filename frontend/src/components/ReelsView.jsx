@@ -5,12 +5,13 @@ import { Api } from "../api.js";
 
 export function ReelsView({ reels = [], setReels, t, user }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [commentsReelId, setCommentsReelId] = useState(null);
   const [reelComments, setReelComments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [deletingReel, setDeletingReel] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const touchStartY = useRef(0);
   const reelCommentInputRef = useRef(null);
@@ -100,15 +101,7 @@ export function ReelsView({ reels = [], setReels, t, user }) {
   const handleShare = () => {
     if (!currentReel) return;
     triggerHaptic("light");
-    try {
-      if (window.Telegram?.WebApp?.switchInlineQuery) {
-        window.Telegram.WebApp.switchInlineQuery(
-          `Смотри этот крутой Reel в Venstogram: @${currentReel.author.username} - "${currentReel.caption}"`
-        );
-      } else {
-        alert("Ссылка на Reel скопирована!");
-      }
-    } catch (e) {}
+    setShareModalOpen(true);
   };
 
   const openComments = async () => {
@@ -441,6 +434,15 @@ export function ReelsView({ reels = [], setReels, t, user }) {
             </form>
           </div>
         </div>
+      )}
+      {/* Multi-Friend Share Modal */}
+      {shareModalOpen && currentReel && (
+        <ShareModal
+          item={currentReel}
+          type="reel"
+          onClose={() => setShareModalOpen(false)}
+          t={t}
+        />
       )}
     </div>
   );

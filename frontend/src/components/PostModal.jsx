@@ -4,6 +4,13 @@ import { SoundEngine } from "../sound.js";
 import { Api } from "../api.js";
 
 export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDeleted }) {
+  const isVideoMedia = (url, mediaType) => {
+    if (mediaType === "video") return true;
+    if (!url) return false;
+    const clean = url.split("?")[0].toLowerCase();
+    return clean.endsWith(".mp4") || clean.endsWith(".webm") || clean.endsWith(".mov") || clean.endsWith(".m4v") || clean.endsWith(".ogg") || clean.includes("/video");
+  };
+
   const [currentPost, setCurrentPost] = useState(post);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
@@ -205,14 +212,25 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
 
         {/* Media Container */}
         <div className="bg-black max-h-72 sm:max-h-80 flex items-center justify-center overflow-hidden relative">
-          <img
-            src={
-              (currentPost.media_urls && currentPost.media_urls[0]) ||
-              "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800"
-            }
-            alt="Post media"
-            className="w-full h-full object-contain"
-          />
+          {isVideoMedia(currentPost.media_urls?.[0], currentPost.media_type) ? (
+            <video
+              src={currentPost.media_urls?.[0]}
+              controls
+              autoPlay
+              playsInline
+              preload="metadata"
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <img
+              src={
+                (currentPost.media_urls && currentPost.media_urls[0]) ||
+                "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800"
+              }
+              alt="Post media"
+              className="w-full h-full object-contain"
+            />
+          )}
         </div>
 
         {/* Action Bar (Like, Comment, Share, Save) */}

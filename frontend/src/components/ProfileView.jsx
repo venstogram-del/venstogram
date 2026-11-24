@@ -1015,8 +1015,8 @@ export function ProfileView({
               <div className="space-y-2">
                 {[
                   { months: 1, coins: 1000, sum: "100 000 сум", discount: null, label: "1 месяц" },
-                  { months: 3, coins: 2850, sum: "285 000 сум", discount: "-5% скидка", label: "3 месяца" },
-                  { months: 12, coins: 10200, sum: "1 020 000 сум", discount: "-15% скидка", label: "1 год (12 мес.)" }
+                  { months: 3, coins: 2490, sum: "249 000 сум", discount: "-17% скидка", label: "3 месяца" },
+                  { months: 12, coins: 8040, sum: "804 000 сум", discount: "-33% скидка", label: "1 год (12 мес.)" }
                 ].map((p) => (
                   <div
                     key={p.months}

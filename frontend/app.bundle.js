@@ -698,6 +698,188 @@ class RealtimeSocket {
   }
 }
 
+// --- File: components/ShareModal.jsx ---
+
+function ShareModal({
+  item,
+  type = "reel",
+  onClose,
+  t
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dialogs, setDialogs] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [sending, setSending] = useState(false);
+  const [successSent, setSuccessSent] = useState(false);
+  useEffect(() => {
+    loadRecentDialogs();
+  }, []);
+  const loadRecentDialogs = async () => {
+    try {
+      const res = await Api.get("/chat/dialogs");
+      if (Array.isArray(res)) {
+        // Res may contain partner objects
+        const users = res.map(d => d.partner || d.user || d).filter(Boolean);
+        setDialogs(users);
+      }
+    } catch (e) {
+      console.warn("Could not load dialogs", e);
+    }
+  };
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await Api.get(`/users/search?q=${encodeURIComponent(q)}`);
+        setSearchResults(res || []);
+      } catch (e) {
+        setSearchResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  const toggleSelectUser = id => {
+    triggerHaptic("selection");
+    setSelectedUserIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const handleSendToSelected = async () => {
+    if (selectedUserIds.length === 0) return;
+    setSending(true);
+    triggerHaptic("medium");
+    const mediaUrl = item?.video_url || item?.media_urls && item.media_urls[0] || "";
+    const title = item?.caption || (type === "reel" ? "Reel в Venstogram" : "Публикация в Venstogram");
+    const shareText = `🎬 Смотри ${type === "reel" ? "Reel" : "пост"}: "${title}"`;
+    let sentCount = 0;
+    try {
+      for (const recipientId of selectedUserIds) {
+        try {
+          await Api.post("/chat/send", {
+            recipient_id: recipientId,
+            content: shareText,
+            media_url: mediaUrl,
+            media_type: type === "reel" ? "video" : "post",
+            shared_entity_id: item?.id
+          });
+          sentCount++;
+        } catch (e) {
+          console.warn(`Failed to send to user ${recipientId}`, e);
+        }
+      }
+      SoundEngine.playFanfare();
+      triggerHaptic("success");
+      setSuccessSent(true);
+      setTimeout(() => {
+        onClose();
+      }, 1400);
+    } catch (err) {
+      alert("Ошибка отправки: " + err.message);
+    } finally {
+      setSending(false);
+    }
+  };
+  const handleTelegramShare = () => {
+    triggerHaptic("light");
+    const mediaTitle = item?.caption || "Смотри видео в Venstogram";
+    const shareUrl = `https://t.me/venstogrambot?startapp=${type}_${item?.id || 1}`;
+    const fullText = `🔥 ${mediaTitle}\n\nСмотри эксклюзивно в Venstogram:`;
+    const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(fullText)}`;
+    if (window.Telegram?.WebApp?.openTelegramLink) {
+      window.Telegram.WebApp.openTelegramLink(tgUrl);
+    } else {
+      window.open(tgUrl, "_blank");
+    }
+    onClose();
+  };
+  const displayedUsers = searchQuery.trim() ? searchResults : dialogs;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col justify-end"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-900 border-t border-slate-800 rounded-t-3xl p-4 max-h-[85vh] flex flex-col animate-in slide-in-from-bottom duration-200"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between pb-3 border-b border-slate-800"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xl"
+  }, "\u2708\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-black text-white"
+  }, type === "reel" ? "Поделиться видео" : "Поделиться публикацией"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[10px] text-slate-400"
+  }, "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0434\u043D\u043E\u0433\u043E \u0438\u043B\u0438 \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u0438\u0445 \u0434\u0440\u0443\u0437\u0435\u0439"))), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "w-7 h-7 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold text-xs"
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "mt-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "absolute left-3 top-2.5 text-slate-500 text-xs"
+  }, "\uD83D\uDD0D"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    placeholder: "\u041F\u043E\u0438\u0441\u043A \u0434\u0440\u0443\u0437\u0435\u0439 \u043F\u043E \u043D\u0438\u043A\u043D\u0435\u0439\u043C\u0443 \u0438\u043B\u0438 \u0438\u043C\u0435\u043D\u0438...",
+    value: searchQuery,
+    onChange: e => setSearchQuery(e.target.value),
+    className: "w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500 transition"
+  }), searchQuery && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSearchQuery(""),
+    className: "absolute right-3 top-2 text-slate-400 hover:text-white text-xs"
+  }, "\u2715"))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-2.5"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleTelegramShare,
+    className: "w-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-300 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCF1"), /*#__PURE__*/React.createElement("span", null, "\u041F\u043E\u0434\u0435\u043B\u0438\u0442\u044C\u0441\u044F \u0432 Telegram (\u0432\u044B\u0431\u0440\u0430\u0442\u044C \u0447\u0430\u0442\u044B)"))), selectedUserIds.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "mt-2 bg-pink-500/10 border border-pink-500/30 rounded-xl px-3 py-1.5 flex items-center justify-between text-xs"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-pink-300 font-semibold text-[11px]"
+  }, "\u0412\u044B\u0431\u0440\u0430\u043D\u043E \u0434\u0440\u0443\u0437\u0435\u0439: ", /*#__PURE__*/React.createElement("b", {
+    className: "text-white"
+  }, selectedUserIds.length)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSelectedUserIds([]),
+    className: "text-[10px] text-slate-400 hover:text-white underline"
+  }, "\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C")), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 overflow-y-auto space-y-1.5 my-3 pr-1 max-h-56"
+  }, displayedUsers.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "text-center py-6 text-slate-500 text-xs"
+  }, searchQuery.trim() ? "Пользователи не найдены" : "Начните вводить имя в поиске выше, чтобы найти друзей") : displayedUsers.map(u => {
+    const isSelected = selectedUserIds.includes(u.id);
+    return /*#__PURE__*/React.createElement("div", {
+      key: u.id,
+      onClick: () => toggleSelectUser(u.id),
+      className: `p-2 rounded-xl flex items-center justify-between cursor-pointer transition border ${isSelected ? "bg-sky-950/40 border-sky-500/50" : "bg-slate-950/40 border-slate-800/60 hover:bg-slate-800/40"}`
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center space-x-2.5"
+    }, /*#__PURE__*/React.createElement("img", {
+      src: u.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+      alt: u.username,
+      className: "w-8 h-8 rounded-full object-cover border border-slate-700"
+    }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center space-x-1"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-xs font-bold text-white"
+    }, u.first_name || u.username), u.is_verified && /*#__PURE__*/React.createElement("span", {
+      className: "text-sky-400 text-[10px]"
+    }, "\u2713")), /*#__PURE__*/React.createElement("span", {
+      className: "text-[10px] text-slate-400"
+    }, "@", u.username))), /*#__PURE__*/React.createElement("div", {
+      className: `w-5 h-5 rounded-full border flex items-center justify-center transition ${isSelected ? "bg-sky-500 border-sky-400 text-slate-950 font-black text-xs" : "border-slate-600 bg-slate-900"}`
+    }, isSelected ? "✓" : ""));
+  })), /*#__PURE__*/React.createElement("div", null, successSent ? /*#__PURE__*/React.createElement("div", {
+    className: "w-full bg-emerald-600 text-white font-black py-2.5 rounded-xl text-xs text-center shadow-lg"
+  }, "\u2713 \u041E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E \u0434\u0440\u0443\u0437\u044C\u044F\u043C!") : /*#__PURE__*/React.createElement("button", {
+    onClick: handleSendToSelected,
+    disabled: selectedUserIds.length === 0 || sending,
+    className: `w-full py-2.5 rounded-xl text-xs font-black shadow-lg transition flex items-center justify-center space-x-2 ${selectedUserIds.length > 0 && !sending ? "bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white shadow-pink-600/30 active:scale-98" : "bg-slate-800 text-slate-500 cursor-not-allowed"}`
+  }, /*#__PURE__*/React.createElement("span", null, sending ? "Отправка..." : "Отправить"), selectedUserIds.length > 0 && !sending && /*#__PURE__*/React.createElement("span", {
+    className: "bg-white/20 px-1.5 py-0.5 rounded-full text-[10px]"
+  }, selectedUserIds.length)))));
+}
+
 // --- File: components/PostModal.jsx ---
 
 function PostModal({
@@ -707,6 +889,12 @@ function PostModal({
   onPostUpdated,
   onPostDeleted
 }) {
+  const isVideoMedia = (url, mediaType) => {
+    if (mediaType === "video") return true;
+    if (!url) return false;
+    const clean = url.split("?")[0].toLowerCase();
+    return clean.endsWith(".mp4") || clean.endsWith(".webm") || clean.endsWith(".mov") || clean.endsWith(".m4v") || clean.endsWith(".ogg") || clean.includes("/video");
+  };
   const [currentPost, setCurrentPost] = useState(post);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
@@ -874,7 +1062,14 @@ function PostModal({
     className: "text-slate-400 hover:text-white p-1 text-base font-bold"
   }, "\u2715"))), /*#__PURE__*/React.createElement("div", {
     className: "bg-black max-h-72 sm:max-h-80 flex items-center justify-center overflow-hidden relative"
-  }, /*#__PURE__*/React.createElement("img", {
+  }, isVideoMedia(currentPost.media_urls?.[0], currentPost.media_type) ? /*#__PURE__*/React.createElement("video", {
+    src: currentPost.media_urls?.[0],
+    controls: true,
+    autoPlay: true,
+    playsInline: true,
+    preload: "metadata",
+    className: "w-full h-full object-contain"
+  }) : /*#__PURE__*/React.createElement("img", {
     src: currentPost.media_urls && currentPost.media_urls[0] || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800",
     alt: "Post media",
     className: "w-full h-full object-contain"
@@ -1285,7 +1480,43 @@ function StoriesBar({
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [uploadingStory, setUploadingStory] = useState(false);
+  const [storyMuted, setStoryMuted] = useState(false);
   const progressTimerRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const isVideoStory = (url, mediaType) => {
+    if (mediaType === "video") return true;
+    if (!url) return false;
+    const clean = url.split("?")[0].toLowerCase();
+    return clean.endsWith(".mp4") || clean.endsWith(".webm") || clean.endsWith(".mov") || clean.endsWith(".m4v") || clean.endsWith(".ogg") || clean.includes("/video");
+  };
+  const handleStoryFileSelect = async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingStory(true);
+    triggerHaptic("medium");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const uploadRes = await Api.post("/upload", formData);
+      const isVideo = file.type.startsWith("video");
+      await Api.post("/stories", {
+        media_url: uploadRes.url,
+        media_type: isVideo ? "video" : "image",
+        caption: ""
+      });
+      SoundEngine.playFanfare();
+      triggerHaptic("success");
+      alert(isVideo ? "Видео-история успешно опубликована!" : "Фото-история успешно опубликована!");
+      if (onStoryCreated) onStoryCreated();
+    } catch (err) {
+      triggerHaptic("error");
+      alert("Ошибка загрузки истории: " + (err.message || "Не удалось загрузить файл"));
+    } finally {
+      setUploadingStory(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   // Story playback timer
   useEffect(() => {
@@ -1352,14 +1583,25 @@ function StoriesBar({
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "bg-slate-950/60 border-b border-slate-900 py-3 px-4 flex items-center space-x-3 overflow-x-auto no-scrollbar"
   }, /*#__PURE__*/React.createElement("div", {
+    onClick: () => {
+      if (!uploadingStory) fileInputRef.current?.click();
+    },
     className: "flex flex-col items-center flex-shrink-0 cursor-pointer"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    ref: fileInputRef,
+    accept: "image/*,video/*",
+    onChange: handleStoryFileSelect,
+    className: "hidden"
+  }), /*#__PURE__*/React.createElement("div", {
     className: "relative"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-16 h-16 rounded-full p-[2px] bg-slate-800 flex items-center justify-center"
+    className: `w-16 h-16 rounded-full p-[2px] bg-slate-800 flex items-center justify-center ${uploadingStory ? "animate-spin border-pink-500 border-2" : ""}`
   }, /*#__PURE__*/React.createElement("div", {
     className: "w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-slate-300"
-  }, /*#__PURE__*/React.createElement("svg", {
+  }, uploadingStory ? /*#__PURE__*/React.createElement("span", {
+    className: "text-xs"
+  }, "\u23F3") : /*#__PURE__*/React.createElement("svg", {
     className: "w-7 h-7",
     fill: "none",
     stroke: "currentColor",
@@ -1373,7 +1615,7 @@ function StoriesBar({
     className: "absolute bottom-0 right-0 w-5 h-5 bg-pink-500 rounded-full border-2 border-slate-950 flex items-center justify-center text-white text-xs font-bold"
   }, "+")), /*#__PURE__*/React.createElement("span", {
     className: "text-[11px] text-slate-400 mt-1 max-w-[64px] truncate"
-  }, "\u0412\u0430\u0448\u0430 \u0438\u0441\u0442\u043E\u0440\u0438\u044F")), storiesGroups.map((group, idx) => {
+  }, uploadingStory ? "Загрузка..." : "Ваша история")), storiesGroups.map((group, idx) => {
     const hasUnseen = group.has_unseen;
     return /*#__PURE__*/React.createElement("div", {
       key: idx,
@@ -1411,16 +1653,28 @@ function StoriesBar({
     className: "text-xs font-bold drop-shadow"
   }, activeViewerGroup.user.first_name), activeViewerGroup.user.is_verified && /*#__PURE__*/React.createElement("span", {
     className: "text-blue-400 text-xs"
-  }, "\u2713")), /*#__PURE__*/React.createElement("button", {
+  }, "\u2713")), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2"
+  }, isVideoStory(activeViewerGroup.stories[currentStoryIndex]?.media_url, activeViewerGroup.stories[currentStoryIndex]?.media_type) && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setStoryMuted(!storyMuted),
+    className: "px-2 py-0.5 rounded-full bg-black/50 text-white text-[11px] font-bold"
+  }, storyMuted ? "🔇" : "🔊"), /*#__PURE__*/React.createElement("button", {
     onClick: closeStoryViewer,
     className: "p-1 rounded-full bg-black/40 text-white/80 hover:text-white"
-  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+  }, "\u2715"))), /*#__PURE__*/React.createElement("div", {
     className: "w-full h-full relative flex items-center justify-center bg-black",
     onMouseDown: () => setIsPaused(true),
     onMouseUp: () => setIsPaused(false),
     onTouchStart: () => setIsPaused(true),
     onTouchEnd: () => setIsPaused(false)
-  }, /*#__PURE__*/React.createElement("img", {
+  }, isVideoStory(activeViewerGroup.stories[currentStoryIndex]?.media_url, activeViewerGroup.stories[currentStoryIndex]?.media_type) ? /*#__PURE__*/React.createElement("video", {
+    src: activeViewerGroup.stories[currentStoryIndex]?.media_url,
+    className: "w-full h-full object-contain",
+    autoPlay: true,
+    playsInline: true,
+    loop: true,
+    muted: storyMuted
+  }) : /*#__PURE__*/React.createElement("img", {
     src: activeViewerGroup.stories[currentStoryIndex]?.media_url,
     className: "w-full h-full object-contain",
     alt: "Story"
@@ -1458,12 +1712,19 @@ function FeedView({
   onOpenProfile,
   user
 }) {
+  const isVideoMedia = (url, mediaType) => {
+    if (mediaType === "video") return true;
+    if (!url) return false;
+    const clean = url.split("?")[0].toLowerCase();
+    return clean.endsWith(".mp4") || clean.endsWith(".webm") || clean.endsWith(".mov") || clean.endsWith(".m4v") || clean.endsWith(".ogg") || clean.includes("/video");
+  };
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(null);
   const [comments, setComments] = useState([]);
   const [newCommentText, setNewCommentText] = useState("");
   const [loadingComments, setLoadingComments] = useState(false);
   const [animatingHeartPostId, setAnimatingHeartPostId] = useState(null);
   const [inspectPost, setInspectPost] = useState(null);
+  const [shareItem, setShareItem] = useState(null);
   const [ads, setAds] = useState([]);
   const commentInputRef = useRef(null);
   useEffect(() => {
@@ -1576,15 +1837,8 @@ function FeedView({
     }, 50);
   };
   const handleShare = post => {
-    triggerHaptic("selection");
-    try {
-      if (window.Telegram?.WebApp?.switchInlineQuery) {
-        window.Telegram.WebApp.switchInlineQuery(`Посмотри этот пост в Venstogram: @${post.author.username} - "${post.caption.slice(0, 50)}..."`);
-      } else {
-        navigator.clipboard.writeText(window.location.href);
-        alert("Ссылка на публикацию скопирована!");
-      }
-    } catch (e) {}
+    triggerHaptic("light");
+    setShareItem(post);
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "space-y-4 pb-20"
@@ -1648,7 +1902,15 @@ function FeedView({
       e.stopPropagation();
       handleDoubleTap(post);
     }
-  }, post.media_urls && post.media_urls[0] ? /*#__PURE__*/React.createElement("img", {
+  }, post.media_urls && post.media_urls[0] ? isVideoMedia(post.media_urls[0], post.media_type) ? /*#__PURE__*/React.createElement("div", {
+    className: "w-full h-full bg-black flex items-center justify-center"
+  }, /*#__PURE__*/React.createElement("video", {
+    src: post.media_urls[0],
+    controls: true,
+    playsInline: true,
+    preload: "metadata",
+    className: "w-full h-full object-contain"
+  })) : /*#__PURE__*/React.createElement("img", {
     src: post.media_urls[0],
     alt: "Post content",
     className: "w-full h-full object-cover",
@@ -1822,6 +2084,11 @@ function FeedView({
       setPosts(prev => prev.filter(p => p.id !== deletedId));
       setInspectPost(null);
     }
+  }), shareItem && /*#__PURE__*/React.createElement(ShareModal, {
+    item: shareItem,
+    type: "post",
+    onClose: () => setShareItem(null),
+    t: t
   }));
 }
 
@@ -2012,12 +2279,13 @@ function ReelsView({
   user
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [commentsReelId, setCommentsReelId] = useState(null);
   const [reelComments, setReelComments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [deletingReel, setDeletingReel] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   const touchStartY = useRef(0);
   const reelCommentInputRef = useRef(null);
   const currentReel = reels[currentIndex];
@@ -2089,13 +2357,7 @@ function ReelsView({
   const handleShare = () => {
     if (!currentReel) return;
     triggerHaptic("light");
-    try {
-      if (window.Telegram?.WebApp?.switchInlineQuery) {
-        window.Telegram.WebApp.switchInlineQuery(`Смотри этот крутой Reel в Venstogram: @${currentReel.author.username} - "${currentReel.caption}"`);
-      } else {
-        alert("Ссылка на Reel скопирована!");
-      }
-    } catch (e) {}
+    setShareModalOpen(true);
   };
   const openComments = async () => {
     if (!currentReel) return;
@@ -2382,7 +2644,12 @@ function ReelsView({
   }), /*#__PURE__*/React.createElement("button", {
     type: "submit",
     className: "bg-pink-600 text-white px-4 py-2 rounded-full text-xs font-bold"
-  }, t.post)))));
+  }, t.post)))), shareModalOpen && currentReel && /*#__PURE__*/React.createElement(ShareModal, {
+    item: currentReel,
+    type: "reel",
+    onClose: () => setShareModalOpen(false),
+    t: t
+  }));
 }
 
 // --- File: components/ChatView.jsx ---
@@ -3757,6 +4024,11 @@ function WalletModal({
   const [paymentMethod, setPaymentMethod] = useState("click"); // click, payme, uzum, stars
   const [copiedCard, setCopiedCard] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptPreview, setReceiptPreview] = useState("");
+  const [orderNote, setOrderNote] = useState("");
+  const [submittingOrder, setSubmittingOrder] = useState(false);
+  const [submittedOrder, setSubmittedOrder] = useState(null);
   useEffect(() => {
     // If biometric enabled, auto prompt
     if (!isUnlocked && user.biometric_enabled) {
@@ -3790,23 +4062,42 @@ function WalletModal({
       setTransactions(res);
     } catch (e) {}
   };
+  const handleReceiptChange = e => {
+    const file = e.target.files?.[0];
+    if (file) {
+      triggerHaptic("light");
+      setReceiptFile(file);
+      setReceiptPreview(URL.createObjectURL(file));
+    }
+  };
   const handleTopUp = async () => {
+    setSubmittingOrder(true);
     triggerHaptic("medium");
-    SoundEngine.playFanfare();
     try {
+      let uploadedReceiptUrl = "";
+      if (receiptFile) {
+        const formData = new FormData();
+        formData.append("file", receiptFile);
+        const uploadRes = await Api.post("/upload", formData);
+        uploadedReceiptUrl = uploadRes.url || "";
+      }
       const res = await Api.post("/wallet/topup", {
         amount_coins: topupAmount,
-        payment_method: paymentMethod
+        payment_method: paymentMethod,
+        receipt_url: uploadedReceiptUrl,
+        note: orderNote.trim()
       });
-      alert(res.message);
-      onUpdateUser({
-        ...user,
-        wallet_coins: res.new_coins
-      });
-      setActiveTab("history");
-      loadTransactions();
+      SoundEngine.playFanfare();
+      triggerHaptic("success");
+      setSubmittedOrder(res);
+      setReceiptFile(null);
+      setReceiptPreview("");
+      setOrderNote("");
     } catch (err) {
-      alert(err.message);
+      triggerHaptic("error");
+      alert(err.message || "Ошибка отправки заявки");
+    } finally {
+      setSubmittingOrder(false);
     }
   };
   return /*#__PURE__*/React.createElement("div", {
@@ -3952,10 +4243,58 @@ function WalletModal({
     key: m.id,
     onClick: () => setPaymentMethod(m.id),
     className: `p-2.5 rounded-xl text-xs font-bold border text-left ${paymentMethod === m.id ? "bg-blue-600/30 border-blue-500 text-blue-300 ring-1 ring-blue-500" : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"}`
-  }, m.label))), /*#__PURE__*/React.createElement("button", {
+  }, m.label))), submittedOrder ? /*#__PURE__*/React.createElement("div", {
+    className: "bg-emerald-950/40 border border-emerald-500/40 p-4 rounded-2xl text-center space-y-2 mt-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-3xl block"
+  }, "\u23F3"), /*#__PURE__*/React.createElement("h4", {
+    className: "text-sm font-black text-emerald-300"
+  }, "\u0417\u0430\u044F\u0432\u043A\u0430 #", submittedOrder.order_id, " \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430!"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-300 leading-relaxed"
+  }, "\u0417\u0430\u044F\u0432\u043A\u0430 \u043D\u0430 ", /*#__PURE__*/React.createElement("b", null, "+", submittedOrder.amount_coins?.toLocaleString(), " \uD83E\uDE99"), " (", submittedOrder.amount_uzs?.toLocaleString(), " \u0441\u0443\u043C) \u043F\u0435\u0440\u0435\u0434\u0430\u043D\u0430 \u043D\u0430 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u041E\u0441\u043D\u043E\u0432\u0430\u0442\u0435\u043B\u044E \u043F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u044B."), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-400"
+  }, "\u041C\u043E\u043D\u0435\u0442\u044B \u043F\u043E\u0441\u0442\u0443\u043F\u044F\u0442 \u043D\u0430 \u0432\u0430\u0448 \u0431\u0430\u043B\u0430\u043D\u0441 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u0447\u0435\u043A\u0430 \u0414\u0438\u0440\u0435\u043A\u0442\u043E\u0440\u043E\u043C."), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSubmittedOrder(null),
+    className: "mt-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded-xl text-xs shadow-md"
+  }, "\u041F\u043E\u043D\u044F\u0442\u043D\u043E")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2 mt-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] font-bold text-slate-300"
+  }, "\u0427\u0435\u043A / \u0421\u043A\u0440\u0438\u043D\u0448\u043E\u0442 \u043F\u0435\u0440\u0435\u0432\u043E\u0434\u0430:"), /*#__PURE__*/React.createElement("label", {
+    className: "text-[10px] bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold px-2.5 py-1 rounded-lg cursor-pointer border border-slate-700 transition"
+  }, /*#__PURE__*/React.createElement("span", null, receiptFile ? "✓ Чек прикреплен" : "📎 Прикрепить чек"), /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "image/*",
+    onChange: handleReceiptChange,
+    className: "hidden"
+  }))), receiptPreview && /*#__PURE__*/React.createElement("div", {
+    className: "relative w-20 h-20 rounded-lg overflow-hidden border border-slate-700"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: receiptPreview,
+    alt: "Receipt",
+    className: "w-full h-full object-cover"
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setReceiptFile(null);
+      setReceiptPreview("");
+    },
+    className: "absolute top-1 right-1 bg-black/70 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+  }, "\u2715")), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    placeholder: "\u041F\u0440\u0438\u043C\u0435\u0447\u0430\u043D\u0438\u0435 (\u0424\u0418\u041E \u043F\u043B\u0430\u0442\u0435\u043B\u044C\u0449\u0438\u043A\u0430 \u0438\u043B\u0438 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 4 \u0446\u0438\u0444\u0440\u044B \u043A\u0430\u0440\u0442\u044B)",
+    value: orderNote,
+    onChange: e => setOrderNote(e.target.value),
+    className: "w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-amber-500"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-start space-x-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDEE1\uFE0F"), /*#__PURE__*/React.createElement("span", null, "\u0414\u043B\u044F \u0437\u0430\u0449\u0438\u0442\u044B \u043E\u0442 \u043D\u0430\u043A\u0440\u0443\u0442\u043E\u043A \u043C\u043E\u043D\u0435\u0442\u044B \u043D\u0430\u0447\u0438\u0441\u043B\u044F\u044E\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E\u0441\u043B\u0435 \u0440\u0443\u0447\u043D\u043E\u0433\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F \u043F\u0435\u0440\u0435\u0432\u043E\u0434\u0430 \u0410\u0434\u043C\u0438\u043D\u0438\u0441\u0442\u0440\u0430\u0442\u043E\u0440\u043E\u043C.")), /*#__PURE__*/React.createElement("button", {
     onClick: handleTopUp,
-    className: "w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-emerald-600/30 transition-all mt-3"
-  }, "\u041E\u043F\u043B\u0430\u0442\u0438\u0442\u044C ", (topupAmount * 100).toLocaleString(), " UZS")), activeTab === "history" && /*#__PURE__*/React.createElement("div", {
+    disabled: submittingOrder,
+    className: "w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-emerald-600/30 transition-all mt-1"
+  }, submittingOrder ? "Отправка заявки..." : `Отправить заявку на ${(topupAmount * 100).toLocaleString()} UZS`))), activeTab === "history" && /*#__PURE__*/React.createElement("div", {
     className: "space-y-2 max-h-56 overflow-y-auto"
   }, transactions.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "text-center py-6 text-slate-500 text-xs"
@@ -5383,15 +5722,15 @@ function ProfileView({
     label: "1 месяц"
   }, {
     months: 3,
-    coins: 2850,
-    sum: "285 000 сум",
-    discount: "-5% скидка",
+    coins: 2490,
+    sum: "249 000 сум",
+    discount: "-17% скидка",
     label: "3 месяца"
   }, {
     months: 12,
-    coins: 10200,
-    sum: "1 020 000 сум",
-    discount: "-15% скидка",
+    coins: 8040,
+    sum: "804 000 сум",
+    discount: "-33% скидка",
     label: "1 год (12 мес.)"
   }].map(p => /*#__PURE__*/React.createElement("div", {
     key: p.months,
@@ -5601,7 +5940,8 @@ function AdminView({
   const [reports, setReports] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [activeSubTab, setActiveSubTab] = useState("orders"); // orders, users, director, moderator, it
+  const [coinOrders, setCoinOrders] = useState([]);
+  const [activeSubTab, setActiveSubTab] = useState("orders"); // orders, coin_orders, users, director, moderator, it
 
   // Receipt modal preview
   const [previewReceiptUrl, setPreviewReceiptUrl] = useState(null);
@@ -5643,6 +5983,7 @@ function AdminView({
   useEffect(() => {
     loadOverview();
     loadOrders();
+    loadCoinOrders();
     loadReports();
     loadAuditLogs();
     loadPolicies();
@@ -5665,6 +6006,31 @@ function AdminView({
       const data = await Api.get("/admin/username-orders");
       setOrders(data || []);
     } catch (e) {}
+  };
+  const loadCoinOrders = async () => {
+    try {
+      const data = await Api.get("/admin/coin-orders?status=pending");
+      setCoinOrders(data || []);
+    } catch (e) {}
+  };
+  const handleCoinOrderAction = async (orderId, action) => {
+    let reason = "";
+    if (action === "reject") {
+      reason = prompt("Укажите причину отклонения заявки:", "Оплата не поступила или чек недействителен");
+      if (reason === null) return;
+    }
+    triggerHaptic(action === "approve" ? "heavy" : "medium");
+    if (action === "approve") SoundEngine.playFanfare();
+    try {
+      const res = await Api.post(`/admin/coin-orders/${orderId}/${action}`, {
+        reason
+      });
+      alert(res.message);
+      loadCoinOrders();
+      loadOverview();
+    } catch (err) {
+      alert("Ошибка: " + err.message);
+    }
   };
   const loadReports = async () => {
     try {
@@ -6022,6 +6388,15 @@ function AdminView({
   }, orders.length)), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       triggerHaptic("light");
+      setActiveSubTab("coin_orders");
+      loadCoinOrders();
+    },
+    className: `py-2 px-3 rounded-xl whitespace-nowrap transition-all flex items-center space-x-1 ${activeSubTab === "coin_orders" ? "bg-emerald-500 text-slate-950 font-black shadow-md" : "text-slate-400"}`
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCB0 \u0417\u0430\u044F\u0432\u043A\u0438 \u043D\u0430 \u043C\u043E\u043D\u0435\u0442\u044B"), coinOrders.length > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "bg-rose-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black"
+  }, coinOrders.length)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      triggerHaptic("light");
       setActiveSubTab("users");
     },
     className: `py-2 px-3 rounded-xl whitespace-nowrap transition-all ${activeSubTab === "users" ? "bg-sky-500 text-slate-950 font-black shadow-md" : "text-slate-400"}`
@@ -6125,7 +6500,70 @@ function AdminView({
   }, "\u2715 \u041E\u0442\u043A\u043B\u043E\u043D\u0438\u0442\u044C"), /*#__PURE__*/React.createElement("button", {
     onClick: () => handleOrderAction(ord.id, "approve"),
     className: "flex-1 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs py-2.5 rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center space-x-1"
-  }, /*#__PURE__*/React.createElement("span", null, "\u2713 \u041E\u0434\u043E\u0431\u0440\u0438\u0442\u044C \u0438 \u043F\u0435\u0440\u0435\u0434\u0430\u0442\u044C")))))), activeSubTab === "users" && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, "\u2713 \u041E\u0434\u043E\u0431\u0440\u0438\u0442\u044C \u0438 \u043F\u0435\u0440\u0435\u0434\u0430\u0442\u044C")))))), activeSubTab === "coin_orders" && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between px-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-slate-300"
+  }, "\u0417\u0430\u044F\u0432\u043A\u0438 \u043D\u0430 \u043F\u043E\u043A\u0443\u043F\u043A\u0443 \u043C\u043E\u043D\u0435\u0442: ", coinOrders.length), /*#__PURE__*/React.createElement("button", {
+    onClick: loadCoinOrders,
+    className: "text-[11px] text-pink-400 font-bold hover:underline"
+  }, "\uD83D\uDD04 \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C")), coinOrders.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-900/60 p-8 rounded-3xl border border-slate-800 text-center text-slate-400 text-xs"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-3xl block mb-2"
+  }, "\uD83C\uDF89"), "\u0412\u0441\u0435 \u0437\u0430\u044F\u0432\u043A\u0438 \u043D\u0430 \u043F\u043E\u043A\u0443\u043F\u043A\u0443 \u043C\u043E\u043D\u0435\u0442 \u043F\u0440\u043E\u0432\u0435\u0440\u0435\u043D\u044B \u0438 \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u0430\u043D\u044B! \u041D\u043E\u0432\u044B\u0445 \u0437\u0430\u044F\u0432\u043E\u043A \u043D\u0435\u0442.") : coinOrders.map(ord => /*#__PURE__*/React.createElement("div", {
+    key: ord.id,
+    className: "bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-3xl p-4 space-y-3 shadow-lg transition-all"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-start justify-between"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-base font-black text-white"
+  }, "+", ord.amount_coins?.toLocaleString(), " \uD83E\uDE99"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold"
+  }, ord.amount_uzs?.toLocaleString(), " \u0441\u0443\u043C"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full uppercase font-bold"
+  }, ord.payment_method)), /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] text-slate-400 block mt-0.5"
+  }, "\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C: ", /*#__PURE__*/React.createElement("b", {
+    className: "text-pink-400"
+  }, "@", ord.user?.username), " (", ord.user?.first_name, " ", ord.user?.last_name || "", ")"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-500"
+  }, "Telegram ID: ", ord.user?.telegram_id)), /*#__PURE__*/React.createElement("div", {
+    className: "text-right"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] bg-amber-950 text-amber-400 border border-amber-700/50 px-2 py-1 rounded-lg font-bold"
+  }, "\u0412 \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u0438 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-500 block mt-1"
+  }, ord.created_at ? new Date(ord.created_at).toLocaleTimeString() : ""))), ord.receipt_url && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-1.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] font-bold text-slate-300 flex items-center space-x-1"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83E\uDDFE"), /*#__PURE__*/React.createElement("span", null, "\u0427\u0435\u043A \u043E\u0431 \u043E\u043F\u043B\u0430\u0442\u0435:")), /*#__PURE__*/React.createElement("div", {
+    onClick: () => setPreviewReceiptUrl(ord.receipt_url),
+    className: "cursor-pointer group relative rounded-xl overflow-hidden bg-black h-36 flex items-center justify-center border border-slate-700 hover:border-emerald-500 transition-colors"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: ord.receipt_url,
+    alt: "\u0427\u0435\u043A",
+    className: "h-full w-full object-contain group-hover:scale-105 transition-transform"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs text-white font-bold transition-opacity"
+  }, "\uD83D\uDD0D \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u0434\u043B\u044F \u0443\u0432\u0435\u043B\u0438\u0447\u0435\u043D\u0438\u044F"))), ord.note && /*#__PURE__*/React.createElement("div", {
+    className: "text-[11px] text-slate-300 bg-slate-950/60 p-2 rounded-xl"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 font-semibold"
+  }, "\u041F\u0440\u0438\u043C\u0435\u0447\u0430\u043D\u0438\u0435: "), ord.note), /*#__PURE__*/React.createElement("div", {
+    className: "flex space-x-2 pt-1"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => handleCoinOrderAction(ord.id, "reject"),
+    className: "flex-1 bg-slate-800 hover:bg-slate-700 text-rose-400 font-bold text-xs py-2.5 rounded-xl border border-slate-700 transition-all"
+  }, "\u2715 \u041E\u0442\u043A\u043B\u043E\u043D\u0438\u0442\u044C"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => handleCoinOrderAction(ord.id, "approve"),
+    className: "flex-1 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs py-2.5 rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center space-x-1"
+  }, /*#__PURE__*/React.createElement("span", null, "\u2713 \u041D\u0430\u0447\u0438\u0441\u043B\u0438\u0442\u044C ", ord.amount_coins?.toLocaleString(), " \uD83E\uDE99")))))), activeSubTab === "users" && /*#__PURE__*/React.createElement("div", {
     className: "space-y-3"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-slate-900 border border-slate-800 p-3.5 rounded-2xl space-y-2.5"
@@ -6767,13 +7205,28 @@ function CreatePostModal({
       const hashtags = (caption.match(/#[a-zа-яё0-9_]+/gi) || []).map(h => h.slice(1));
 
       // 3. Create post
+      const isVideo = selectedFile.type.startsWith("video");
       const postRes = await Api.post("/posts", {
         caption,
         media_urls: [uploadRes.url],
-        media_type: selectedFile.type.startsWith("video") ? "video" : "image",
+        media_type: isVideo ? "video" : "image",
         location,
         hashtags
       });
+
+      // 4. If video, automatically publish to Reels too for algorithmic discovery
+      if (isVideo) {
+        try {
+          await Api.post("/reels", {
+            video_url: uploadRes.url,
+            caption: caption,
+            audio_title: "Оригинальный звук",
+            thumbnail_url: ""
+          });
+        } catch (e) {
+          console.warn("Reel sync error", e);
+        }
+      }
       SoundEngine.playFanfare();
       alert(postRes.message);
       onPostCreated();
@@ -6813,8 +7266,15 @@ function CreatePostModal({
     onChange: handleFileChange,
     className: "hidden"
   })) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "relative w-full aspect-square rounded-2xl overflow-hidden bg-black mb-2"
-  }, /*#__PURE__*/React.createElement("img", {
+    className: "relative w-full aspect-square rounded-2xl overflow-hidden bg-black mb-2 flex items-center justify-center"
+  }, selectedFile?.type.startsWith("video") ? /*#__PURE__*/React.createElement("video", {
+    src: previewUrl,
+    controls: true,
+    autoPlay: true,
+    muted: true,
+    playsInline: true,
+    className: "w-full h-full object-contain"
+  }) : /*#__PURE__*/React.createElement("img", {
     src: previewUrl,
     alt: "Preview",
     className: `w-full h-full object-cover transition-all ${filters.find(f => f.id === activeFilter)?.class || ""}`

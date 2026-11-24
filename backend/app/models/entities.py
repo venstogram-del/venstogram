@@ -343,6 +343,24 @@ class Transaction(Base):
     user = relationship("User", back_populates="transactions")
 
 
+class CoinOrder(Base):
+    __tablename__ = "coin_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    amount_coins = Column(Integer, nullable=False)
+    amount_uzs = Column(Float, nullable=False)
+    payment_method = Column(String(32), default="card") # card, payme, click, uzum
+    receipt_url = Column(String(512), nullable=True) # Screenshot / Receipt
+    note = Column(String(256), nullable=True)
+    status = Column(String(32), default="pending") # pending, approved, rejected
+    admin_notes = Column(String(256), nullable=True)
+    created_at = Column(DateTime, default=utcnow, index=True)
+    reviewed_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+
+
 class ContentReport(Base):
     __tablename__ = "content_reports"
 
