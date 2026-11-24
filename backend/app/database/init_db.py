@@ -1,7 +1,23 @@
 import asyncio
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timezone, timedelta
+from sqlalchemy import select, func
 from app.database.session import engine, Base, AsyncSessionLocal
-from app.models.entities import User
+from app.models.entities import User, UsernameListing
+
+NAMES_RAW = """
+Abbos, Abduaziz, Abduvali, Abduvohid, Abdug‘affor, Abdujalil, Abdukarim, Abduqodir, Abdulaziz, Abdulla, Abdulhamid, Abdumalik, Abdumannon, Abdumurod, Abdunosir, Abdurasul, Abdurauf, Abdurahmon, Abdurashid, Abdusalom, Abdusattor, Abduhakim, Abduhalil, Abror, Avaz, Avazbek, A’zam, Azamat, Aziz, Azizbek, Akbar, Akmal, Akram, Ali, Alisher, Alpomish, Amir, Amirbek, Amirxon, Anvar, Arslon, Asad, Asadbek, Asilbek, Asliddin, Asror, Atabek, Ahmad, Ahror, Bobur, Badriddin, Bahrom, Baxtiyor, Bahodir, Bekzod, Bekmurod, Bekpo‘lat, Bektemir, Bektosh, Bekxon, Behzod, Behruz, Bilol, Botir, Bunyod, Burhon, Vali, Valijon, Vahob, Vohid, G‘ayrat, G‘anisher, G‘iyos, G‘iyosiddin, G‘ulom, Davron, Davlat, Daler, Dilmurod, Dilshod, Doniyor, Doston, Dostonbek, Javohir, Jalol, Jaloliddin, Jamshid, Jasur, Jasurbek, Jahongir, Jobir, Jo‘rabek, Zafar, Zafarbek, Ziyovuddin, Zikrullo, Zoir, Zokir, Zuhriddin, Zufar, Ibrohim, Iqbol, Ikrom, Ilhom, Ilyos, Imom, Iskandar, Islom, Islombek, Ismoil, Isfandiyor, Ixtiyor, Yigitali, Yo‘ldosh, Kamol, Kamoliddin, Karim, Komil, Komron, Komronbek, Quvonch, Quvonchbek, Qudrat, Qurbon, Laziz, Lazizbek, Latif, Lochin, Lochinbek, Lutfullo, Mavlon, Madamin, Maqsud, Malik, Mansur, Ma’ruf, Mahmud, Mashrab, Mirza, Mirzo, Mirzohid, Mirkamol, Mironshoh, Mirsaid, Mirfayz, Muzaffar, Muqim, Mo‘min, Munis, Murod, Murodbek, Murtazo, Muslim, Mustafo, Muhammad, Muhammadali, Muhammadamin, Muhammadziyo, Muhammadislom, Muhammadkarim, Muhammadsodiq, Muhammadumar, Muhammadyusuf, Muxtor, Muhiddin, Nabi, Navro‘z, Najmiddin, Nazar, Nazir, Naim, Narimon, Nasim, Nasrullo, Ne’mat, Nizom, Nizomiddin, Nodir, Nodirbek, Nozim, Nosir, Nu’mon, Nuriddin, Nurmuhammad, Nurbek, Nursulton, Obid, Odil, Odilbek, Ozod, Ozodbek, Oybek, Olim, Olimjon, Olloyor, Omad, Omon, Orif, Ortiq, Otabek, Oxun, Polvon, Parviz, Po‘lat, Ravshan, Rajab, Raim, Ramazon, Rasul, Rauf, Rahmat, Rahmatillo, Rahmon, Rashid, Rizo, Ro‘zimurod, Rustam, Rufat, Sabur, Sadriddin, Said, Saidamir, Saidakbar, Saidkamol, Sayfiddin, Salohiddin, Samandar, Sami, Sanjar, Sarvar, Sardor, Sattor, Safar, Sirojiddin, Sobir, Sodiq, Solih, Sulaymon, Sulton, Sultonbek, Suhrob, Tavakkal, Tal’at, Temur, Temurbek, Tolib, Tohir, To‘lqin, To‘rabek, Tursun, To‘xtasin, Ubaydullo, O‘ktam, Ulug‘bek, Umar, Umarbek, Umid, Umidbek, Usmon, O‘tkir, Fazliddin, Fayzullo, Farrux, Farhod, Fathullo, Firdavs, Fozil, Furqat, Habib, Habibullo, Haydar, Xayrullo, Hakim, Xalil, Hamza, Hamid, Hamidullo, Hasan, Hikmat, Hikmatillo, Hojiakbar, Xolmurod, Xondamir, Xudoyor, Xurshid, Husan, Husniddin, Chori, Chingiz, Shavkat, Shamsiddin, Sharif, Shahboz, Shahzod, Shahriyor, Shahrux, Sherali, Sherzod, Shermuhammad, Shirinbek, Shodiyor, Shokir, Shomansur, Shohjahon, Shohrux, Shohruz, Shukrullo, Shuhrat, Elbek, Eldor, Elyor, Elmurod, Elnur, Ergash, Erkin, Eson, Ehson, Yunus, Yusuf, Yoqub, Yahyo, Yashin
+"""
+
+def clean_name(raw: str) -> str:
+    s = raw.strip()
+    s = s.replace("o‘", "o").replace("O‘", "o").replace("o'", "o").replace("O'", "o").replace("o’", "o").replace("O’", "o")
+    s = s.replace("g‘", "g").replace("G‘", "g").replace("g'", "g").replace("G'", "g").replace("g’", "g").replace("G’", "g")
+    s = s.replace("‘", "").replace("’", "").replace("'", "").replace("`", "")
+    s = s.lower()
+    return re.sub(r"[^a-z0-9_]", "", s)
+
+TOP_SHORT_NAMES = {"ali", "amir", "aziz", "umar", "said", "bobur", "islom", "temur", "davlat", "malik", "sulton", "bilol", "yusuf"}
 
 async def init_models():
     async with engine.begin() as conn:
@@ -9,8 +25,81 @@ async def init_models():
     print("[Database] All tables successfully created or verified.")
 
 async def seed_demo_data():
-    """No fake users or fake demo content."""
-    pass
+    """Seeds Founder Director account and marketplace official listings."""
+    async with AsyncSessionLocal() as session:
+        # 1. Ensure Founder Director exists
+        res = await session.execute(select(User).where((User.telegram_id == 1477103854) | (User.role == "director")))
+        director = res.scalars().first()
+        if not director:
+            director = User(
+                telegram_id=1477103854,
+                username="oqyolai",
+                first_name="Abdulazizbek",
+                last_name="Director",
+                role="director",
+                is_verified=True,
+                wallet_coins=100000,
+                language_code="ru"
+            )
+            session.add(director)
+            await session.flush()
+
+        director_id = director.id
+
+        # 2. Ensure @uzbekiston and @uzbekistan are reserved
+        for un in ["uzbekiston", "uzbekistan"]:
+            chk = await session.execute(select(UsernameListing).where(UsernameListing.username == un))
+            if not chk.scalars().first():
+                nl = UsernameListing(
+                    username=un,
+                    seller_id=director_id,
+                    category="exclusive",
+                    price_usd=999999,
+                    price_uzs=999999999.0,
+                    current_price_coins=999999,
+                    buyout_price_coins=999999,
+                    is_sold=False,
+                    expires_at=datetime.now(timezone.utc) + timedelta(days=3650)
+                )
+                session.add(nl)
+
+        # 3. Seed Uzbek names ($500+)
+        raw_list = [clean_name(n) for n in NAMES_RAW.split(",") if clean_name(n)]
+        seen = set()
+        names = []
+        for n in raw_list:
+            if n and n not in seen:
+                seen.add(n)
+                names.append(n)
+
+        for name in names:
+            chk = await session.execute(select(UsernameListing).where(UsernameListing.username == name))
+            listing = chk.scalars().first()
+            price_usd = 1000 if name in TOP_SHORT_NAMES else (750 if len(name) <= 4 else 500)
+            price_uzs = float(price_usd * 12800)
+            buyout_coins = int(price_usd * 10)
+
+            if not listing:
+                nl = UsernameListing(
+                    username=name,
+                    seller_id=director_id,
+                    category="uzbek_names",
+                    price_usd=price_usd,
+                    price_uzs=price_uzs,
+                    current_price_coins=500,
+                    buyout_price_coins=buyout_coins,
+                    is_sold=False,
+                    expires_at=datetime.now(timezone.utc) + timedelta(days=3650)
+                )
+                session.add(nl)
+            else:
+                listing.price_usd = max(listing.price_usd or 500, price_usd)
+                listing.price_uzs = max(listing.price_uzs or 6500000.0, price_uzs)
+                listing.category = "uzbek_names"
+                listing.seller_id = director_id
+
+        await session.commit()
+        print(f"[Database] Verified {len(names)} Uzbek name marketplace listings (from $500) and Founder reserves.")
 
 if __name__ == "__main__":
     asyncio.run(init_models())
