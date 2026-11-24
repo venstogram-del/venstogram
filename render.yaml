@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: venstogram-platform
+    name: venstogram
     runtime: python
     plan: free
     region: frankfurt

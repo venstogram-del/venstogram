@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     ADMIN_TELEGRAM_IDS: list = [1477103854, 8787674425]
     OFFICIAL_EMAIL: str = "venstogram@gmail.com"
     
-    UPLOAD_DIR: str = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
+    UPLOAD_DIR: str = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads"))
 
     class Config:
         env_file = ".env"

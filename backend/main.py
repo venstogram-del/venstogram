@@ -83,7 +83,7 @@ os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 # Frontend Mini App static mount
-frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+frontend_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend"))
 os.makedirs(frontend_dir, exist_ok=True)
 app.mount("/app", StaticFiles(directory=frontend_dir, html=True), name="frontend")
 

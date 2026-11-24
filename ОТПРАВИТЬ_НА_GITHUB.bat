@@ -1,40 +1,22 @@
 @echo off
-chcp 65001 >nul
-title Отправка проекта на GitHub
-color 0a
-
 cd /d "%~dp0"
-
 echo ========================================================================
-echo          🚀 ОТПРАВКА VENSTOGRAM НА GITHUB (venstogram-del/venstogram)
+echo          UPLOADING VENSTOGRAM TO GITHUB (venstogram-del/venstogram)
 echo ========================================================================
 echo.
-echo Сейчас Git выполнит отправку файлов в репозиторий:
-echo https://github.com/venstogram-del/venstogram
+echo Please confirm authorization in the browser if prompted...
 echo.
-echo Если откроется окно браузера - просто нажмите "Authorize Git Credential Manager",
-echo чтобы подтвердить вход под аккаунтом venstogram-del.
-echo.
-echo ------------------------------------------------------------------------
-echo Отправка...
-echo ------------------------------------------------------------------------
-
 git push -u origin main
-
 echo.
 if %errorlevel% equ 0 (
-    color 0a
     echo ========================================================================
-    echo  УСПЕХ! Проект успешно загружен на GitHub:
+    echo  SUCCESS! Files successfully uploaded to:
     echo  https://github.com/venstogram-del/venstogram
     echo ========================================================================
 ) else (
-    color 0c
     echo ========================================================================
-    echo  Произошла ошибка при отправке. Проверьте подключение и авторизацию.
+    echo  ERROR: Push failed with code %errorlevel%.
     echo ========================================================================
 )
-
 echo.
-echo Нажмите любую клавишу для закрытия этого окна...
-pause >nul
+pause

@@ -1,6 +1,9 @@
 import os
 import sys
 import importlib.util
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Add backend directory to sys.path so that 'app.core.config' and other submodules resolve
 root_dir = os.path.dirname(os.path.abspath(__file__))
