@@ -3,7 +3,7 @@ import { triggerHaptic } from "../telegram.js";
 import { Api } from "../api.js";
 import { FollowListModal } from "./FollowListModal.jsx";
 
-const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E";
+var DEFAULT_AVATAR = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E";
 
 export function UserProfileModal({
   userId,
@@ -183,11 +183,15 @@ export function UserProfileModal({
               <p className="text-xs text-pink-400 font-bold">
                 @{profile?.username}
               </p>
-              {profile?.bio && (
+              {profile?.bio ? (
                 <p className="text-xs text-slate-300 mt-1.5 whitespace-pre-line leading-relaxed">
-                  {profile?.bio}
+                  {profile.bio}
                 </p>
-              )}
+              ) : (profile?.role === "director" || profile?.username === "oqyolai") ? (
+                <p className="text-xs text-amber-300 font-bold mt-1.5 leading-relaxed">
+                  👑 Основатель платформы Venstogram
+                </p>
+              ) : null}
               {profile?.telegram_channel && (
                 <button
                   onClick={() => handleOpenChannel(profile.telegram_channel)}

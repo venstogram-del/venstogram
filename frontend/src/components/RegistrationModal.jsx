@@ -3,7 +3,100 @@ import { triggerHaptic } from "../telegram.js";
 import { SoundEngine } from "../sound.js";
 import { Api } from "../api.js";
 
-export function RegistrationModal({ user, onComplete }) {
+const regTexts = {
+  uz_latn: {
+    welcomeTitle: "Venstogram-ga xush kelibsiz",
+    welcomeSubtitle: "Shaxsiy profilingizni yaratish va postlarni chiqarish uchun ma'lumotlarni to'ldiring",
+    step1: "1-Qadam: Shaxsiy ma'lumotlar",
+    firstName: "Ism",
+    lastName: "Familiya",
+    birthYear: "Tug'ilgan yil",
+    birthYearPlaceholder: "Masalan: 2002",
+    step2: "2-Qadam: Foydalanuvchi nomi",
+    chooseUsername: "O'zingizga @username tanlang",
+    checking: "Tekshirilmoqda...",
+    available: "ro'yxatdan o'tish uchun bo'sh",
+    taken: "Bu username band. Boshqasini tanlang yoki quyidagilardan birini bosing",
+    suggestionsTitle: "Bo'sh raqamli variantlar (tanlash uchun bosing):",
+    step3: "3-Qadam: Email va xavfsizlik (ixtiyoriy)",
+    emailPlaceholder: "Email manzilingiz: name@gmail.com",
+    getCode: "Kodni olish",
+    codeSentTo: "6-raqamli xavfsizlik kodi yuborildi:",
+    enterCode: "Xatdagi 6 ta raqamni kiriting",
+    featuresTitle: "Profil ochilgach sizga ochiladi:",
+    featuresList: "📸 Lenta va Stories • 🎬 Reels • 💬 Xabarlar",
+    submitBtn: "🚀 Ro'yxatdan o'tish va boshlash",
+    submitting: "Profil yaratilmoqda...",
+    errFirstName: "Iltimos, ismingizni kiriting",
+    errBirthYear: "Iltimos, haqiqiy tug'ilgan yilingizni kiriting",
+    errUsername: "Username kamida 3 ta belgidan iborat bo'lishi kerak",
+    errEmail: "To'g'ri email manzilini kiriting",
+    errVerifyCode: "Xatdagi tasdiqlash kodi noto'g'ri"
+  },
+  ru: {
+    welcomeTitle: "Добро пожаловать в Venstogram",
+    welcomeSubtitle: "Заполните данные для создания личного профиля и начала публикаций",
+    step1: "Шаг 1: Личные данные",
+    firstName: "Имя",
+    lastName: "Фамилия",
+    birthYear: "Год рождения",
+    birthYearPlaceholder: "Например: 2002",
+    step2: "Шаг 2: Создание аккаунта",
+    chooseUsername: "Придумайте ваш @никнейм",
+    checking: "Проверка...",
+    available: "доступен для регистрации",
+    taken: "Этот никнейм занят. Выберите другой или нажмите вариант ниже",
+    suggestionsTitle: "Свободные варианты с цифрами (нажмите для выбора):",
+    step3: "Шаг 3: Email и безопасность (по желанию)",
+    emailPlaceholder: "Ваша почта: name@gmail.com",
+    getCode: "Получить код",
+    codeSentTo: "6-значный код отправлен на",
+    enterCode: "Введите 6 цифр из письма",
+    featuresTitle: "После создания аккаунта вам откроются:",
+    featuresList: "📸 Лента и Stories • 🎬 Reels • 💬 Личные сообщения",
+    submitBtn: "🚀 Создать аккаунт и войти",
+    submitting: "Создание аккаунта...",
+    errFirstName: "Пожалуйста, введите ваше имя",
+    errBirthYear: "Пожалуйста, укажите реальный год рождения",
+    errUsername: "Никнейм должен быть от 3 символов (латиница, цифры и _)",
+    errEmail: "Укажите корректный адрес электронной почты",
+    errVerifyCode: "Неверный код подтверждения из письма"
+  },
+  en: {
+    welcomeTitle: "Welcome to Venstogram",
+    welcomeSubtitle: "Fill in your details to create your personal profile and start posting",
+    step1: "Step 1: Personal info",
+    firstName: "First name",
+    lastName: "Last name",
+    birthYear: "Birth year",
+    birthYearPlaceholder: "E.g.: 2002",
+    step2: "Step 2: Create account",
+    chooseUsername: "Choose your @username",
+    checking: "Checking...",
+    available: "available for registration",
+    taken: "This username is taken. Choose another or click a suggestion below",
+    suggestionsTitle: "Available suggestions (tap to select):",
+    step3: "Step 3: Email & security (optional)",
+    emailPlaceholder: "Your email: name@gmail.com",
+    getCode: "Get code",
+    codeSentTo: "6-digit security code sent to",
+    enterCode: "Enter the 6 digits from email",
+    featuresTitle: "Features unlocked after creating profile:",
+    featuresList: "📸 Feed & Stories • 🎬 Reels • 💬 Direct Messages",
+    submitBtn: "🚀 Create Profile & Start",
+    submitting: "Creating profile...",
+    errFirstName: "Please enter your first name",
+    errBirthYear: "Please enter your valid birth year",
+    errUsername: "Username must be at least 3 characters",
+    errEmail: "Please enter a valid email address",
+    errVerifyCode: "Invalid email verification code"
+  }
+};
+
+export function RegistrationModal({ user, onComplete, lang = "uz_latn", onLanguageChange }) {
+  const [currentLang, setCurrentLang] = useState(lang || "uz_latn");
+  const tr = regTexts[currentLang] || regTexts.uz_latn;
+
   const [firstName, setFirstName] = useState(user?.first_name || "");
   const [lastName, setLastName] = useState(user?.last_name || "");
   const [birthYear, setBirthYear] = useState(user?.birth_year || "");
@@ -12,7 +105,7 @@ export function RegistrationModal({ user, onComplete }) {
   const [codeSent, setCodeSent] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [codeTimer, setCodeTimer] = useState(0);
-  
+
   // Initial username candidate
   const initialUsername = (user?.username && !user.username.startsWith("user_"))
     ? user.username
@@ -38,7 +131,7 @@ export function RegistrationModal({ user, onComplete }) {
   const handleSendCode = async () => {
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes("@")) {
-      setErrorMsg("Укажите корректный адрес электронной почты");
+      setErrorMsg(tr.errEmail);
       triggerHaptic("error");
       return;
     }
@@ -49,7 +142,7 @@ export function RegistrationModal({ user, onComplete }) {
       const res = await Api.post("/auth/send-code", {
         email: cleanEmail,
         username: username.trim().toLowerCase().replace(/^@/, "") || `u_${Date.now()}`,
-        first_name: firstName.trim() || "Пользователь",
+        first_name: firstName.trim() || "User",
         last_name: lastName.trim() || "",
         password: "VenstoPassword2026!",
         birth_year: parseInt(birthYear) || 2000
@@ -61,7 +154,7 @@ export function RegistrationModal({ user, onComplete }) {
       }
       triggerHaptic("success");
     } catch (e) {
-      setErrorMsg(e.message || "Не удалось отправить код на почту");
+      setErrorMsg(e.message || "Email error");
       triggerHaptic("error");
     } finally {
       setSendingCode(false);
@@ -80,7 +173,7 @@ export function RegistrationModal({ user, onComplete }) {
 
     if (trimmed.length < 3) {
       setAvailable(false);
-      setStatusMsg("Минимум 3 символа (латиница, цифры и _)");
+      setStatusMsg(tr.errUsername);
       setSuggestions([]);
       return;
     }
@@ -90,11 +183,11 @@ export function RegistrationModal({ user, onComplete }) {
       try {
         const res = await Api.get(`/users/check-username?username=${encodeURIComponent(trimmed)}`);
         setAvailable(res.available);
-        setStatusMsg(res.message);
+        setStatusMsg(res.available ? tr.available : tr.taken);
         setSuggestions(res.suggestions || []);
       } catch (err) {
         setAvailable(true);
-        setStatusMsg(`@${trimmed} доступен для регистрации`);
+        setStatusMsg(tr.available);
         setSuggestions([]);
       } finally {
         setChecking(false);
@@ -102,7 +195,7 @@ export function RegistrationModal({ user, onComplete }) {
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [username]);
+  }, [username, currentLang]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -110,7 +203,7 @@ export function RegistrationModal({ user, onComplete }) {
 
     const trimmedFirst = firstName.trim();
     if (!trimmedFirst) {
-      setErrorMsg("Пожалуйста, введите ваше имя");
+      setErrorMsg(tr.errFirstName);
       triggerHaptic("error");
       return;
     }
@@ -118,20 +211,20 @@ export function RegistrationModal({ user, onComplete }) {
     const bYear = parseInt(birthYear);
     const currentYear = new Date().getFullYear();
     if (!birthYear || isNaN(bYear) || bYear < 1940 || bYear > currentYear - 6) {
-      setErrorMsg(`Пожалуйста, укажите реальный год рождения (от 1940 до ${currentYear - 6})`);
+      setErrorMsg(`${tr.errBirthYear} (1940 - ${currentYear - 6})`);
       triggerHaptic("error");
       return;
     }
 
     const trimmedUser = username.trim().toLowerCase().replace(/^@/, "");
     if (!trimmedUser || trimmedUser.length < 3) {
-      setErrorMsg("Никнейм должен быть от 3 символов (только латиница, цифры и _)");
+      setErrorMsg(tr.errUsername);
       triggerHaptic("error");
       return;
     }
 
     if (available === false) {
-      setErrorMsg("Этот никнейм занят. Выберите другой или нажмите на предложенный вариант ниже");
+      setErrorMsg(tr.taken);
       triggerHaptic("error");
       return;
     }
@@ -147,7 +240,7 @@ export function RegistrationModal({ user, onComplete }) {
             code: emailCode.trim()
           });
         } catch (vErr) {
-          setErrorMsg(vErr.message || "Неверный код подтверждения из письма");
+          setErrorMsg(vErr.message || tr.errVerifyCode);
           setSaving(false);
           triggerHaptic("error");
           return;
@@ -168,6 +261,7 @@ export function RegistrationModal({ user, onComplete }) {
 
       try {
         localStorage.setItem(`vensto_account_created_${user?.id || 1}`, "true");
+        localStorage.setItem("vensto_lang", currentLang);
       } catch (e) {}
 
       SoundEngine.playFanfare();
@@ -184,7 +278,7 @@ export function RegistrationModal({ user, onComplete }) {
         });
       }
     } catch (err) {
-      setErrorMsg(err.message || "Ошибка регистрации. Попробуйте еще раз.");
+      setErrorMsg(err.message || "Xatolik yuz berdi. Qayta urinib ko'ring.");
       triggerHaptic("error");
     } finally {
       setSaving(false);
@@ -195,6 +289,32 @@ export function RegistrationModal({ user, onComplete }) {
     <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-4 sm:p-6 overflow-y-auto">
       <div className="w-full max-w-md mx-auto space-y-4 my-auto py-4">
         
+        {/* Language switch selector */}
+        <div className="flex items-center justify-center space-x-2 pb-1">
+          {[
+            { code: "uz_latn", label: "🇺🇿 O'zbek" },
+            { code: "ru", label: "🇷🇺 Русский" },
+            { code: "en", label: "🇬🇧 English" }
+          ].map((l) => (
+            <button
+              key={l.code}
+              type="button"
+              onClick={() => {
+                triggerHaptic("selection");
+                setCurrentLang(l.code);
+                if (onLanguageChange) onLanguageChange(l.code);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                currentLang === l.code
+                  ? "bg-pink-600 text-white shadow-md shadow-pink-600/30 ring-1 ring-white/20"
+                  : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+              }`}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+
         {/* Brand Header */}
         <div className="text-center space-y-2">
           <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 flex items-center justify-center mx-auto shadow-2xl shadow-pink-500/40">
@@ -202,10 +322,10 @@ export function RegistrationModal({ user, onComplete }) {
           </div>
           <div>
             <h1 className="text-xl font-black bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
-              Добро пожаловать в Venstogram
+              {tr.welcomeTitle}
             </h1>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              Заполните данные для создания личного профиля и начала публикаций
+              {tr.welcomeSubtitle}
             </p>
           </div>
         </div>
@@ -220,20 +340,20 @@ export function RegistrationModal({ user, onComplete }) {
           {/* Step 1: Personal Information */}
           <div className="border-b border-slate-800/80 pb-3">
             <span className="text-[10px] text-pink-400 uppercase tracking-wider font-extrabold block mb-2">
-              Шаг 1: Личные данные
+              {tr.step1}
             </span>
             <div className="grid grid-cols-2 gap-2.5">
               {/* First Name */}
               <div>
                 <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                  Имя <span className="text-pink-400">*</span>
+                  {tr.firstName} <span className="text-pink-400">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="Азизбек"
+                  placeholder="Azizbek"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition"
                 />
               </div>
@@ -241,13 +361,13 @@ export function RegistrationModal({ user, onComplete }) {
               {/* Last Name */}
               <div>
                 <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                  Фамилия
+                  {tr.lastName}
                 </label>
                 <input
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  placeholder="Каримов"
+                  placeholder="Karimov"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition"
                 />
               </div>
@@ -256,7 +376,7 @@ export function RegistrationModal({ user, onComplete }) {
             {/* Birth Year */}
             <div className="mt-2.5">
               <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                Год рождения <span className="text-pink-400">*</span>
+                {tr.birthYear} <span className="text-pink-400">*</span>
               </label>
               <input
                 type="number"
@@ -265,7 +385,7 @@ export function RegistrationModal({ user, onComplete }) {
                 max={new Date().getFullYear() - 6}
                 value={birthYear}
                 onChange={(e) => setBirthYear(e.target.value)}
-                placeholder="Например: 2002"
+                placeholder={tr.birthYearPlaceholder}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition font-mono"
               />
             </div>
@@ -274,11 +394,11 @@ export function RegistrationModal({ user, onComplete }) {
           {/* Step 2: Account Creation & Nickname */}
           <div>
             <span className="text-[10px] text-amber-400 uppercase tracking-wider font-extrabold block mb-2">
-              Шаг 2: Создание аккаунта
+              {tr.step2}
             </span>
             <label className="text-[11px] font-bold text-slate-300 flex items-center justify-between mb-1">
-              <span>Придумайте ваш @никнейм <span className="text-pink-400">*</span></span>
-              {checking && <span className="text-[10px] text-slate-400 animate-pulse">Проверка...</span>}
+              <span>{tr.chooseUsername} <span className="text-pink-400">*</span></span>
+              {checking && <span className="text-[10px] text-slate-400 animate-pulse">{tr.checking}</span>}
             </label>
             <div className="relative">
               <span className="absolute left-3.5 top-2.5 text-slate-400 text-xs font-mono font-bold">@</span>
@@ -287,7 +407,7 @@ export function RegistrationModal({ user, onComplete }) {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-                placeholder="ваш_никнейм"
+                placeholder="username"
                 className={`w-full bg-slate-950 border rounded-xl pl-8 pr-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none transition ${
                   available === true
                     ? "border-emerald-500 focus:border-emerald-400 shadow-sm shadow-emerald-500/20"
@@ -309,7 +429,7 @@ export function RegistrationModal({ user, onComplete }) {
             {suggestions && suggestions.length > 0 && (
               <div className="mt-2.5 bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800 space-y-1.5">
                 <span className="text-[10px] text-slate-400 block font-semibold">
-                  Свободные варианты с цифрами (нажмите для выбора):
+                  {tr.suggestionsTitle}
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {suggestions.map((sug) => (
@@ -334,7 +454,7 @@ export function RegistrationModal({ user, onComplete }) {
           {/* Step 3: Email Security & Code */}
           <div className="border-t border-slate-800/80 pt-3">
             <span className="text-[10px] text-sky-400 uppercase tracking-wider font-extrabold block mb-1">
-              Шаг 3: Email и безопасность (по желанию)
+              {tr.step3}
             </span>
             <div className="space-y-2">
               <div className="flex space-x-2">
@@ -342,7 +462,7 @@ export function RegistrationModal({ user, onComplete }) {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Ваша почта: name@gmail.com"
+                  placeholder={tr.emailPlaceholder}
                   className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition"
                 />
                 <button
@@ -351,21 +471,21 @@ export function RegistrationModal({ user, onComplete }) {
                   disabled={sendingCode || codeTimer > 0 || !email.includes("@")}
                   className="bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-bold text-xs px-3 py-2 rounded-xl transition shrink-0"
                 >
-                  {sendingCode ? "..." : codeTimer > 0 ? `${codeTimer}с` : "Получить код"}
+                  {sendingCode ? "..." : codeTimer > 0 ? `${codeTimer}s` : tr.getCode}
                 </button>
               </div>
 
               {codeSent && (
                 <div className="space-y-1 animate-in fade-in">
                   <span className="text-[10px] text-emerald-400 block font-semibold">
-                    ✓ 6-значный код отправлен на {email}
+                    ✓ {tr.codeSentTo} {email}
                   </span>
                   <input
                     type="text"
                     maxLength={6}
                     value={emailCode}
                     onChange={(e) => setEmailCode(e.target.value.replace(/[^0-9]/g, ""))}
-                    placeholder="Введите 6 цифр из письма"
+                    placeholder={tr.enterCode}
                     className="w-full bg-slate-950 border border-emerald-500/60 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none font-mono text-center tracking-widest text-sm"
                   />
                 </div>
@@ -375,13 +495,9 @@ export function RegistrationModal({ user, onComplete }) {
 
           {/* Feature highlights unlock */}
           <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80 text-[10px] text-slate-400 space-y-1">
-            <span className="text-white font-bold block">После создания аккаунта вам откроются:</span>
+            <span className="text-white font-bold block">{tr.featuresTitle}</span>
             <div className="flex items-center space-x-2">
-              <span>📸 Лента и Stories</span>
-              <span>•</span>
-              <span>🎬 Reels</span>
-              <span>•</span>
-              <span>💬 Личные сообщения</span>
+              <span>{tr.featuresList}</span>
             </div>
           </div>
 
@@ -395,7 +511,7 @@ export function RegistrationModal({ user, onComplete }) {
                 : "bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:from-pink-400 hover:to-amber-400 text-white shadow-pink-500/30 active:scale-98"
             }`}
           >
-            <span>{saving ? "Создание аккаунта..." : "🚀 Создать аккаунт и войти"}</span>
+            <span>{saving ? tr.submitting : tr.submitBtn}</span>
           </button>
         </form>
       </div>

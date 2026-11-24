@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { triggerHaptic, tg } from "../telegram.js";
 import { SoundEngine } from "../sound.js";
 import { Api } from "../api.js";
+import { AudienceStatsModal } from "./AudienceStatsModal.jsx";
+import { CityLocationModal } from "./CityLocationModal.jsx";
 
 export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
   const isVideoMedia = (url, mediaType) => {
@@ -19,6 +21,8 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
   const [inspectPost, setInspectPost] = useState(null);
   const [shareItem, setShareItem] = useState(null);
   const [ads, setAds] = useState([]);
+  const [selectedStatsPost, setSelectedStatsPost] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
   const commentInputRef = useRef(null);
 
   useEffect(() => {
@@ -189,7 +193,16 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
                     ) : null}
                   </div>
                   {post.location && (
-                    <span className="text-[10px] text-slate-400 block -mt-0.5">{post.location}</span>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        triggerHaptic("light");
+                        setSelectedLocation(post.location);
+                      }}
+                      className="text-[10px] text-sky-400 hover:text-sky-300 font-semibold block -mt-0.5 cursor-pointer hover:underline"
+                    >
+                      📍 {post.location.replace(/^📍\s*/, "")}
+                    </span>
                   )}
                 </div>
               </div>
@@ -316,11 +329,22 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
             </button>
           </div>
 
-          {/* Likes Count */}
-          <div className="px-4 mt-2">
+          {/* Likes & Views / Analytics Count */}
+          <div className="px-4 mt-2 flex items-center justify-between">
             <span className="text-xs font-bold text-white">
               {post.likes_count.toLocaleString()} {t.likes}
             </span>
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic("light");
+                setSelectedStatsPost(post);
+              }}
+              className="text-[11px] text-pink-400 hover:text-pink-300 font-bold flex items-center space-x-1 bg-pink-500/10 border border-pink-500/30 px-2.5 py-1 rounded-xl active:scale-95 transition"
+            >
+              <span>👁️ {post.views_count?.toLocaleString() || 120}</span>
+              <span className="text-[10px]">📊 Yosh & Statistika</span>
+            </button>
           </div>
 
           {/* Caption & Hashtags */}
@@ -380,6 +404,67 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
           )}
         </React.Fragment>
       ))}
+
+      {posts.length === 0 && (
+        <div className="p-6 text-center space-y-4 bg-slate-900/60 border border-slate-800 rounded-3xl mx-4 my-6">
+          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 flex items-center justify-center text-3xl mx-auto shadow-xl shadow-pink-500/20">
+            ✨
+          </div>
+          <div>
+            <h3 className="text-base font-black text-white">
+              {t.appName || "Venstogram"} — Lenta
+            </h3>
+            <p className="text-xs text-slate-300 mt-1 max-w-xs mx-auto leading-relaxed">
+              Tavsiya etilgan blogerlarga obuna bo'ling yoki o'zingizning birinchi postingizni chiqaring!
+            </p>
+          </div>
+
+          {/* Suggested Bloggers */}
+          <div className="space-y-2 pt-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-pink-400 block">
+              Tavsiya etilgan mualliflar / Рекомендованные авторы:
+            </span>
+            <div className="flex flex-col space-y-2">
+              {[
+                { id: 5, username: "oqyolai", name: "Abdulazizbek (Oснователь)", is_verified: true, badge: "👑" },
+                { id: 2, username: "tashkent_live", name: "Toshkent Yangiliklari", is_verified: true },
+                { id: 3, username: "samarkand_vibes", name: "Samarqand Sayyohlik", is_verified: true }
+              ].map((author) => (
+                <div
+                  key={author.id}
+                  className="flex items-center justify-between p-2.5 bg-slate-950/80 rounded-2xl border border-slate-800"
+                >
+                  <div
+                    onClick={() => onOpenProfile && onOpenProfile(author.id)}
+                    className="flex items-center space-x-2.5 cursor-pointer text-left"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-amber-500 flex items-center justify-center text-white font-bold text-sm">
+                      {author.badge || author.name[0]}
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-1">
+                        <span className="text-xs font-bold text-white">{author.name}</span>
+                        {author.is_verified && <span className="text-sky-400 text-[10px]">✓</span>}
+                      </div>
+                      <span className="text-[11px] text-pink-400 font-medium">@{author.username}</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      triggerHaptic("medium");
+                      Api.post(`/users/${author.id}/follow`, {}).catch(() => {});
+                      alert(`✓ Obuna bo'lindi: @${author.username}`);
+                    }}
+                    className="px-3 py-1.5 bg-gradient-to-r from-pink-600 to-rose-500 text-white font-bold text-xs rounded-xl shadow-sm active:scale-95"
+                  >
+                    + Obuna
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Comments Drawer / Bottom Sheet */}
       {activeCommentsPostId && (
@@ -485,6 +570,22 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
           type="post"
           onClose={() => setShareItem(null)}
           t={t}
+        />
+      )}
+
+      {/* Audience Views & Age Demographics Modal */}
+      {selectedStatsPost && (
+        <AudienceStatsModal
+          post={selectedStatsPost}
+          onClose={() => setSelectedStatsPost(null)}
+        />
+      )}
+
+      {/* City & Geolocation Modal */}
+      {selectedLocation && (
+        <CityLocationModal
+          locationName={selectedLocation}
+          onClose={() => setSelectedLocation(null)}
         />
       )}
     </div>

@@ -469,9 +469,15 @@ export function ProfileView({
           </h2>
         </div>
 
-        <p className="text-xs text-slate-300 mt-1.5 whitespace-pre-line leading-relaxed">
-          {user.bio || "Блогер и автор на Venstogram ✨"}
-        </p>
+        {user.bio ? (
+          <p className="text-xs text-slate-300 mt-1.5 whitespace-pre-line leading-relaxed">
+            {user.bio}
+          </p>
+        ) : (user.role === "director" || user.telegram_id === 1477103854 || user.username === "oqyolai") ? (
+          <p className="text-xs text-amber-300 font-bold mt-1.5 leading-relaxed">
+            👑 Основатель платформы Venstogram
+          </p>
+        ) : null}
 
         {/* Telegram Channel / Group Link */}
         {user.telegram_channel && (

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { triggerHaptic } from "../telegram.js";
 import { SoundEngine } from "../sound.js";
 import { Api } from "../api.js";
+import { AudienceStatsModal } from "./AudienceStatsModal.jsx";
+import { CityLocationModal } from "./CityLocationModal.jsx";
 
 export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDeleted }) {
   const isVideoMedia = (url, mediaType) => {
@@ -21,6 +23,8 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
   const [isSaved, setIsSaved] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [replyToComment, setReplyToComment] = useState(null); // { id, username }
+  const [statsModalOpen, setStatsModalOpen] = useState(false);
+  const [locationModalOpen, setLocationModalOpen] = useState(false);
 
   const commentInputRef = useRef(null);
 
@@ -186,6 +190,18 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
               <span className="text-[10px] text-pink-400 font-semibold block">
                 @{currentPost.author?.username}
               </span>
+              {currentPost.location && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("light");
+                    setLocationModalOpen(true);
+                  }}
+                  className="text-[10px] text-sky-400 hover:text-sky-300 font-semibold block hover:underline text-left"
+                >
+                  📍 {currentPost.location.replace(/^📍\s*/, "")}
+                </button>
+              )}
             </div>
           </div>
 
@@ -274,10 +290,18 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
 
           {/* Views & Save Bookmark */}
           <div className="flex items-center space-x-3">
-            <span className="text-[11px] text-slate-400 flex items-center space-x-1">
-              <span>👁️</span>
+            <button
+              onClick={() => {
+                triggerHaptic("light");
+                setStatsModalOpen(true);
+              }}
+              className="text-[11px] text-slate-300 hover:text-cyan-400 bg-slate-800/80 hover:bg-slate-800 px-2.5 py-1 rounded-full flex items-center space-x-1.5 transition-all border border-slate-700/60"
+              title="Statistika va auditoriya yoshi"
+            >
+              <span>📊</span>
               <span className="font-semibold">{currentPost.views_count || 128}</span>
-            </span>
+              <span className="text-[9px] text-cyan-400 font-bold uppercase">Auditoriya</span>
+            </button>
 
             <button
               onClick={() => {
@@ -461,6 +485,22 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
             </div>
           </form>
         </div>
+      )}
+
+      {/* Audience Demographics & Stats Modal */}
+      {statsModalOpen && (
+        <AudienceStatsModal
+          post={currentPost}
+          onClose={() => setStatsModalOpen(false)}
+        />
+      )}
+
+      {/* City Location Modal */}
+      {locationModalOpen && currentPost.location && (
+        <CityLocationModal
+          locationName={currentPost.location}
+          onClose={() => setLocationModalOpen(false)}
+        />
       )}
     </div>
   );

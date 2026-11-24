@@ -4,6 +4,8 @@ import { triggerHaptic } from "../telegram.js";
 export function Header({
   user,
   t,
+  lang,
+  onLanguageChange,
   onOpenCreate,
   onOpenChat
 }) {
@@ -23,6 +25,12 @@ export function Header({
     }
   };
 
+  const getLangLabel = (code) => {
+    if (code === "uz_latn") return "UZ";
+    if (code === "en") return "EN";
+    return "RU";
+  };
+
   return (
     <header className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 px-4 py-2.5 flex items-center justify-between">
       {/* Brand logo */}
@@ -38,8 +46,22 @@ export function Header({
         </div>
       </div>
 
-      {/* Right Action Bar: Clean and Minimalist */}
-      <div className="flex items-center space-x-2.5">
+      {/* Right Action Bar */}
+      <div className="flex items-center space-x-2">
+        {/* Fast Language Toggle */}
+        <button
+          onClick={() => {
+            triggerHaptic("selection");
+            const next = lang === "uz_latn" ? "ru" : (lang === "ru" ? "en" : "uz_latn");
+            if (onLanguageChange) onLanguageChange(next);
+          }}
+          className="px-2 py-1 text-[11px] font-black bg-slate-900 hover:bg-slate-800 text-pink-400 rounded-xl border border-slate-800 transition-colors flex items-center space-x-1"
+          title="Tilni almashtirish / Сменить язык"
+        >
+          <span>🌐</span>
+          <span>{getLangLabel(lang)}</span>
+        </button>
+
         {/* Create Post Icon */}
         <button
           onClick={() => {
@@ -69,29 +91,33 @@ export function Header({
           <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse" />
         </button>
 
-        {/* Three Dots Menu for Support */}
+        {/* Three Dots Menu for Support and Settings */}
         <button
           onClick={() => {
             triggerHaptic("light");
             setSupportOpen(true);
           }}
           className="p-1.5 text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-colors flex items-center justify-center"
-          title="Служба техподдержки"
+          title="Настройки и поддержка"
         >
           <span className="text-sm font-black tracking-widest leading-none px-0.5 text-slate-300 hover:text-white">⋯</span>
         </button>
       </div>
 
-      {/* Support Three Dots Modal */}
+      {/* Support & Settings Three Dots Modal */}
       {supportOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 pt-16 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm space-y-4 shadow-2xl relative">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center space-x-2">
-                <span className="text-xl">🛠️</span>
+                <span className="text-xl">⚙️</span>
                 <div>
-                  <h3 className="text-sm font-black text-white">Служба техподдержки</h3>
-                  <p className="text-[10px] text-slate-400">Помощь 24/7 по любым вопросам</p>
+                  <h3 className="text-sm font-black text-white">
+                    {lang === "uz_latn" ? "Sozlamalar va Yordam" : (lang === "en" ? "Settings & Support" : "Настройки и поддержка")}
+                  </h3>
+                  <p className="text-[10px] text-slate-400">
+                    {lang === "uz_latn" ? "Tilni tanlash va 24/7 yordam" : (lang === "en" ? "Language selection & 24/7 support" : "Выбор языка и помощь 24/7")}
+                  </p>
                 </div>
               </div>
               <button
@@ -100,6 +126,35 @@ export function Header({
               >
                 ✕
               </button>
+            </div>
+
+            {/* Language Selector */}
+            <div className="space-y-2 border-b border-slate-800 pb-3">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                {lang === "uz_latn" ? "Tilni tanlash / Язык" : "Выбор языка / Language"}
+              </span>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { code: "uz_latn", label: "🇺🇿 O'zbek" },
+                  { code: "ru", label: "🇷🇺 Русский" },
+                  { code: "en", label: "🇬🇧 English" }
+                ].map((item) => (
+                  <button
+                    key={item.code}
+                    onClick={() => {
+                      triggerHaptic("selection");
+                      if (onLanguageChange) onLanguageChange(item.code);
+                    }}
+                    className={`py-2 px-1 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1 ${
+                      lang === item.code
+                        ? "bg-pink-600 text-white shadow-md shadow-pink-600/30"
+                        : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2.5 text-xs">

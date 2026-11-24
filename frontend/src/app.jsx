@@ -383,6 +383,8 @@ export function App() {
     return (
       <RegistrationModal
         user={user}
+        lang={lang}
+        onLanguageChange={handleLanguageChange}
         onComplete={(updatedUser) => {
           setUser(updatedUser);
           setIsRegistered(true);
@@ -406,6 +408,8 @@ export function App() {
       <Header
         user={user}
         t={t}
+        lang={lang}
+        onLanguageChange={handleLanguageChange}
         onOpenCreate={() => setCreatePostOpen(true)}
         onOpenChat={() => setChatOpen(true)}
       />

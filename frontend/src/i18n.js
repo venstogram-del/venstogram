@@ -261,8 +261,9 @@ export function getInitialLanguage() {
 
   const tgLang = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code;
   if (tgLang) {
-    if (tgLang.startsWith("uz")) return "uz_latn";
     if (tgLang.startsWith("ru")) return "ru";
+    if (tgLang.startsWith("en")) return "en";
+    if (tgLang.startsWith("uz")) return "uz_latn";
   }
-  return "ru";
+  return "uz_latn";
 }

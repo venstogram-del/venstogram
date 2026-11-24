@@ -137,6 +137,61 @@ async def seed_demo_data():
         await session.commit()
         print(f"[Database] Verified {len(names)} Uzbek name marketplace listings (from $500) and Founder reserves.")
 
+        # 4. Seed initial Posts and Reels so feed and reels are never empty
+        from app.models.entities import Post, Reel
+        from sqlalchemy import func
+        post_count = (await session.execute(select(func.count(Post.id)))).scalar() or 0
+        if post_count == 0:
+            p1 = Post(
+                user_id=director_id,
+                caption="Xush kelibsiz Venstogram platformasiga! 🚀 Bu yerda siz o'z videolaringiz va suratlaringizni joylashtirishingiz mumkin. Hammaga omad va yuqori qamrovlar!",
+                media_urls=["https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080"],
+                media_type="photo",
+                location="Toshkent, O'zbekiston",
+                likes_count=1240,
+                views_count=5820,
+                comments_count=48
+            )
+            p2 = Post(
+                user_id=director_id,
+                caption="Samarqand Registon maydoni kechki chiroqlar bilan. Go'zallik! ✨ #Samarkand #Uzbekistan #Venstogram",
+                media_urls=["https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1080"],
+                media_type="photo",
+                location="Samarqand, O'zbekiston",
+                likes_count=890,
+                views_count=3400,
+                comments_count=19
+            )
+            session.add_all([p1, p2])
+
+        reel_count = (await session.execute(select(func.count(Reel.id)))).scalar() or 0
+        if reel_count == 0:
+            r1 = Reel(
+                user_id=director_id,
+                video_url="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+                thumbnail_url="https://images.unsplash.com/photo-1536240478700-b869070f9279?w=600",
+                caption="Toshkent shahar manzaralari va yangi Venstogram Reels! 🔥 Tomosha qiling va o'z videolaringizni yuklang!",
+                audio_title="Original Sound - Venstogram",
+                audio_author="Venstogram Official",
+                likes_count=3200,
+                views_count=18400,
+                comments_count=85
+            )
+            r2 = Reel(
+                user_id=director_id,
+                video_url="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+                thumbnail_url="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600",
+                caption="Tog'lar va go'zal tabiat. Har kuni yangi sarguzashtlar! 🏔️✨",
+                audio_title="Chill Beats - Lo-Fi Tashkent",
+                audio_author="Uzbek Sound",
+                likes_count=1950,
+                views_count=12800,
+                comments_count=42
+            )
+            session.add_all([r1, r2])
+
+        await session.commit()
+
 if __name__ == "__main__":
     asyncio.run(init_models())
     asyncio.run(seed_demo_data())
