@@ -4283,6 +4283,9 @@ function ProfileView({
   const [selectedPost, setSelectedPost] = useState(null);
 
   // Edit profile states
+  const [editUsername, setEditUsername] = useState(user?.username || "");
+  const [usernameStatus, setUsernameStatus] = useState(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
   const [editFirstName, setEditFirstName] = useState(user?.first_name || "");
   const [editLastName, setEditLastName] = useState(user?.last_name || "");
   const [editBio, setEditBio] = useState(user?.bio || "");
@@ -4290,6 +4293,42 @@ function ProfileView({
   const [editTelegramChannel, setEditTelegramChannel] = useState(user?.telegram_channel || "");
   const [editWebsite, setEditWebsite] = useState(user?.website || "");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  useEffect(() => {
+    if (user?.username) {
+      setEditUsername(user.username);
+    }
+  }, [user?.username]);
+
+  // Live username availability check with suggestions
+  useEffect(() => {
+    if (!isEditing) return;
+    const trimmed = (editUsername || "").trim().replace(/^@/, "").toLowerCase();
+    if (!trimmed || trimmed.length < 3) {
+      setUsernameStatus(null);
+      return;
+    }
+    if (user?.username && trimmed === user.username.toLowerCase()) {
+      setUsernameStatus({
+        available: true,
+        is_current: true,
+        message: "Ваш текущий никнейм",
+        suggestions: []
+      });
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setCheckingUsername(true);
+      try {
+        const res = await Api.get(`/users/check-username?username=${encodeURIComponent(trimmed)}`);
+        setUsernameStatus(res);
+      } catch (err) {
+        console.warn("check-username error", err);
+      } finally {
+        setCheckingUsername(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [editUsername, isEditing, user?.username]);
 
   // PIN code state
   const [newPin, setNewPin] = useState("");
@@ -4419,8 +4458,14 @@ function ProfileView({
   const handleSaveProfile = async e => {
     e.preventDefault();
     triggerHaptic("medium");
+    const cleanUsername = (editUsername || "").trim().replace(/^@/, "").toLowerCase();
+    if (cleanUsername && usernameStatus && !usernameStatus.available && !usernameStatus.is_current) {
+      alert("Пожалуйста, выберите свободный никнейм перед сохранением!");
+      return;
+    }
     try {
       const updated = await Api.patch("/auth/me", {
+        username: cleanUsername || undefined,
         first_name: editFirstName,
         last_name: editLastName,
         bio: editBio,
@@ -4430,6 +4475,7 @@ function ProfileView({
       });
       onUpdateUser({
         ...user,
+        username: updated.username || cleanUsername || user.username,
         first_name: updated.first_name,
         last_name: updated.last_name,
         bio: updated.bio,
@@ -4516,10 +4562,18 @@ function ProfileView({
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between pb-1"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-1.5"
+    className: "flex items-center space-x-1.5 flex-wrap"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-base font-black text-white"
-  }, "@", user.username), user.badge_type === "gold_founder" ? /*#__PURE__*/React.createElement("span", {
+  }, "@", user.username), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      triggerHaptic("light");
+      setEditUsername(user?.username || "");
+      setIsEditing(true);
+    },
+    className: "text-[10px] bg-slate-800 hover:bg-slate-700 text-pink-400 hover:text-pink-300 font-bold px-2 py-0.5 rounded-lg border border-pink-500/30 transition flex items-center space-x-1",
+    title: "\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u043D\u0438\u043A\u043D\u0435\u0439\u043C"
+  }, /*#__PURE__*/React.createElement("span", null, "\u270F\uFE0F"), /*#__PURE__*/React.createElement("span", null, "\u0421\u043C\u0435\u043D\u0438\u0442\u044C")), user.badge_type === "gold_founder" ? /*#__PURE__*/React.createElement("span", {
     className: "text-amber-400 font-bold text-sm",
     title: "\u0417\u043E\u043B\u043E\u0442\u0430\u044F \u0413\u0430\u043B\u043E\u0447\u043A\u0430 \u041E\u0441\u043D\u043E\u0432\u0430\u0442\u0435\u043B\u044F"
   }, "\uD83D\uDC51") : user.is_verified ? /*#__PURE__*/React.createElement("span", {
@@ -4536,7 +4590,24 @@ function ProfileView({
     title: "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 (Sozlamalar)"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-base font-black tracking-widest leading-none"
-  }, "\u22EF"))), /*#__PURE__*/React.createElement("div", {
+  }, "\u22EF"))), user.username?.startsWith("user_") && /*#__PURE__*/React.createElement("div", {
+    onClick: () => {
+      triggerHaptic("medium");
+      setEditUsername("");
+      setIsEditing(true);
+    },
+    className: "cursor-pointer bg-gradient-to-r from-pink-600/25 via-purple-600/25 to-pink-600/25 border border-pink-500/50 hover:border-pink-400 rounded-2xl p-3 flex items-center justify-between text-xs text-pink-200 transition shadow-lg shadow-pink-600/10 active:scale-98"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xl"
+  }, "\u2728"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "font-black text-white block text-xs"
+  }, "\u041F\u0440\u0438\u0434\u0443\u043C\u0430\u0439\u0442\u0435 \u0441\u0432\u043E\u0439 \u043D\u0438\u043A\u043D\u0435\u0439\u043C!"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-pink-300/80"
+  }, "\u0417\u0430\u043C\u0435\u043D\u0438\u0442\u0435 \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u044B\u0439 @", user.username, " \u043D\u0430 \u043A\u0440\u0430\u0441\u0438\u0432\u043E\u0435 \u0438\u043C\u044F"))), /*#__PURE__*/React.createElement("span", {
+    className: "bg-gradient-to-r from-pink-600 to-rose-500 text-white font-bold px-3 py-1.5 rounded-xl text-[11px] shadow-md shadow-pink-600/30 whitespace-nowrap"
+  }, "\u0412\u044B\u0431\u0440\u0430\u0442\u044C \u21B5")), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "relative group cursor-pointer",
@@ -5009,7 +5080,54 @@ function ProfileView({
     type: "button",
     onClick: handleDeleteAvatar,
     className: "bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 text-xs font-bold px-3 py-1.5 rounded-xl border border-rose-800 flex items-center space-x-1"
-  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDDD1\uFE0F"), /*#__PURE__*/React.createElement("span", null, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0430\u0432\u0430\u0442\u0430\u0440\u043A\u0443")))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDDD1\uFE0F"), /*#__PURE__*/React.createElement("span", null, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0430\u0432\u0430\u0442\u0430\u0440\u043A\u0443")))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950/70 border border-slate-800/80 rounded-2xl p-3 space-y-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-[11px] font-bold text-white flex items-center space-x-1"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDC8E \u0423\u043D\u0438\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u043D\u0438\u043A\u043D\u0435\u0439\u043C (@username)")), checkingUsername ? /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400 flex items-center space-x-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-2.5 h-2.5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin inline-block"
+  }), /*#__PURE__*/React.createElement("span", null, "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430...")) : usernameStatus?.available ? /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center space-x-1"
+  }, /*#__PURE__*/React.createElement("span", null, "\u2713"), /*#__PURE__*/React.createElement("span", null, usernameStatus.is_current ? "Ваш ник" : "Свободен!")) : usernameStatus && !usernameStatus.available ? /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] font-bold text-rose-400 bg-rose-950/50 px-2 py-0.5 rounded-full border border-rose-500/30"
+  }, "\u2715 \u0417\u0430\u043D\u044F\u0442") : null), /*#__PURE__*/React.createElement("div", {
+    className: "relative flex items-center"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "absolute left-3 text-slate-500 text-xs font-mono font-bold select-none"
+  }, "@"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: editUsername,
+    onChange: e => {
+      const val = e.target.value.replace(/^@/, "").replace(/[^a-zA-Z0-9_]/g, "");
+      setEditUsername(val);
+    },
+    placeholder: "\u043F\u0440\u0438\u0434\u0443\u043C\u0430\u0439\u0442\u0435_\u043D\u0438\u043A\u043D\u0435\u0439\u043C",
+    className: "w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-7 pr-3 py-2 text-xs font-mono text-white outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+  })), usernameStatus && !usernameStatus.available && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-1.5 pt-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] text-rose-300 block"
+  }, usernameStatus.message), usernameStatus.suggestions && usernameStatus.suggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-1 pt-0.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-amber-300 font-bold block"
+  }, "\uD83D\uDC47 \u041D\u0430\u0436\u043C\u0438\u0442\u0435, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0431\u0440\u0430\u0442\u044C \u0441\u0432\u043E\u0431\u043E\u0434\u043D\u044B\u0439 \u0432\u0430\u0440\u0438\u0430\u043D\u0442 \u0441 \u0446\u0438\u0444\u0440\u043E\u0439:"), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-1.5"
+  }, usernameStatus.suggestions.map(sug => /*#__PURE__*/React.createElement("button", {
+    key: sug,
+    type: "button",
+    onClick: () => {
+      triggerHaptic("medium");
+      setEditUsername(sug);
+    },
+    className: "bg-pink-600/20 hover:bg-pink-600/40 border border-pink-500/40 hover:border-pink-400 text-pink-300 hover:text-white px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition flex items-center space-x-1 active:scale-95"
+  }, /*#__PURE__*/React.createElement("span", null, "@", sug), /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px] text-pink-400 bg-pink-500/20 px-1 rounded"
+  }, "\u0432\u044B\u0431\u0440\u0430\u0442\u044C \u21B5"))))))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "text-[11px] text-slate-400 block mb-1"
   }, "\u0418\u043C\u044F"), /*#__PURE__*/React.createElement("input", {
     type: "text",

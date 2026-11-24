@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from datetime import datetime, timezone, timedelta
 import random
+import re
 from app.database.session import get_db
 from app.core.security import validate_telegram_init_data, create_access_token, hash_password, verify_password
 from app.models.entities import User, UsernameListing
@@ -182,6 +183,48 @@ async def update_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    if req.username is not None:
+        new_username = req.username.strip().lower()
+        if new_username.startswith("@"):
+            new_username = new_username[1:]
+
+        if not re.match(r"^[a-zA-Z0-9_]{3,32}$", new_username):
+            raise HTTPException(
+                status_code=400,
+                detail="Никнейм может содержать только латинские буквы, цифры и символ подчеркивания _ (от 3 до 32 символов)."
+            )
+
+        if not current_user.username or current_user.username.lower() != new_username:
+            u_res = await db.execute(
+                select(User.id).where(func.lower(User.username) == new_username, User.id != current_user.id)
+            )
+            if u_res.scalars().first() is not None:
+                suggestions = []
+                for sfx in ["1", "2", "3", "7", "_1", "77", "99"]:
+                    cand = f"{new_username}{sfx}"[:32]
+                    cu = await db.execute(select(User.id).where(func.lower(User.username) == cand))
+                    cm = await db.execute(select(UsernameListing.id).where(func.lower(UsernameListing.username) == cand, UsernameListing.is_sold == False))
+                    if cu.scalars().first() is None and cm.scalars().first() is None:
+                        suggestions.append(cand)
+                    if len(suggestions) >= 3:
+                        break
+                sug_str = ", ".join(f"@{s}" for s in suggestions)
+                msg = f"Никнейм @{new_username} уже занят."
+                if suggestions:
+                    msg += f" Свободные варианты: {sug_str}"
+                raise HTTPException(status_code=400, detail=msg)
+
+            m_res = await db.execute(
+                select(UsernameListing.id).where(
+                    func.lower(UsernameListing.username) == new_username,
+                    UsernameListing.is_sold == False
+                )
+            )
+            if m_res.scalars().first() is not None:
+                raise HTTPException(status_code=400, detail=f"Никнейм @{new_username} зарезервирован на бирже юзернеймов.")
+
+            current_user.username = new_username
+
     if req.bio is not None:
         current_user.bio = req.bio
     if req.avatar_url is not None:

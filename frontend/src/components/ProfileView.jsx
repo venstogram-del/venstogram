@@ -29,6 +29,9 @@ export function ProfileView({
   const [selectedPost, setSelectedPost] = useState(null);
 
   // Edit profile states
+  const [editUsername, setEditUsername] = useState(user?.username || "");
+  const [usernameStatus, setUsernameStatus] = useState(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
   const [editFirstName, setEditFirstName] = useState(user?.first_name || "");
   const [editLastName, setEditLastName] = useState(user?.last_name || "");
   const [editBio, setEditBio] = useState(user?.bio || "");
@@ -36,6 +39,38 @@ export function ProfileView({
   const [editTelegramChannel, setEditTelegramChannel] = useState(user?.telegram_channel || "");
   const [editWebsite, setEditWebsite] = useState(user?.website || "");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  useEffect(() => {
+    if (user?.username) {
+      setEditUsername(user.username);
+    }
+  }, [user?.username]);
+
+  // Live username availability check with suggestions
+  useEffect(() => {
+    if (!isEditing) return;
+    const trimmed = (editUsername || "").trim().replace(/^@/, "").toLowerCase();
+    if (!trimmed || trimmed.length < 3) {
+      setUsernameStatus(null);
+      return;
+    }
+    if (user?.username && trimmed === user.username.toLowerCase()) {
+      setUsernameStatus({ available: true, is_current: true, message: "Ваш текущий никнейм", suggestions: [] });
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setCheckingUsername(true);
+      try {
+        const res = await Api.get(`/users/check-username?username=${encodeURIComponent(trimmed)}`);
+        setUsernameStatus(res);
+      } catch (err) {
+        console.warn("check-username error", err);
+      } finally {
+        setCheckingUsername(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [editUsername, isEditing, user?.username]);
 
   // PIN code state
   const [newPin, setNewPin] = useState("");
@@ -185,8 +220,16 @@ export function ProfileView({
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     triggerHaptic("medium");
+
+    const cleanUsername = (editUsername || "").trim().replace(/^@/, "").toLowerCase();
+    if (cleanUsername && usernameStatus && !usernameStatus.available && !usernameStatus.is_current) {
+      alert("Пожалуйста, выберите свободный никнейм перед сохранением!");
+      return;
+    }
+
     try {
       const updated = await Api.patch("/auth/me", {
+        username: cleanUsername || undefined,
         first_name: editFirstName,
         last_name: editLastName,
         bio: editBio,
@@ -197,6 +240,7 @@ export function ProfileView({
 
       onUpdateUser({
         ...user,
+        username: updated.username || cleanUsername || user.username,
         first_name: updated.first_name,
         last_name: updated.last_name,
         bio: updated.bio,
@@ -288,8 +332,20 @@ export function ProfileView({
     <div className="p-4 space-y-4 pb-24">
       {/* Top Profile Bar with Username and Three-Dots Menu */}
       <div className="flex items-center justify-between pb-1">
-        <div className="flex items-center space-x-1.5">
+        <div className="flex items-center space-x-1.5 flex-wrap">
           <span className="text-base font-black text-white">@{user.username}</span>
+          <button
+            onClick={() => {
+              triggerHaptic("light");
+              setEditUsername(user?.username || "");
+              setIsEditing(true);
+            }}
+            className="text-[10px] bg-slate-800 hover:bg-slate-700 text-pink-400 hover:text-pink-300 font-bold px-2 py-0.5 rounded-lg border border-pink-500/30 transition flex items-center space-x-1"
+            title="Сменить никнейм"
+          >
+            <span>✏️</span>
+            <span>Сменить</span>
+          </button>
           {user.badge_type === "gold_founder" ? (
             <span className="text-amber-400 font-bold text-sm" title="Золотая Галочка Основателя">👑</span>
           ) : user.is_verified ? (
@@ -314,6 +370,29 @@ export function ProfileView({
           <span className="text-base font-black tracking-widest leading-none">⋯</span>
         </button>
       </div>
+
+      {/* Suggestion banner if username is standard user_XXXXXX */}
+      {user.username?.startsWith("user_") && (
+        <div
+          onClick={() => {
+            triggerHaptic("medium");
+            setEditUsername("");
+            setIsEditing(true);
+          }}
+          className="cursor-pointer bg-gradient-to-r from-pink-600/25 via-purple-600/25 to-pink-600/25 border border-pink-500/50 hover:border-pink-400 rounded-2xl p-3 flex items-center justify-between text-xs text-pink-200 transition shadow-lg shadow-pink-600/10 active:scale-98"
+        >
+          <div className="flex items-center space-x-2.5">
+            <span className="text-xl">✨</span>
+            <div>
+              <span className="font-black text-white block text-xs">Придумайте свой никнейм!</span>
+              <span className="text-[10px] text-pink-300/80">Замените стандартный @{user.username} на красивое имя</span>
+            </div>
+          </div>
+          <span className="bg-gradient-to-r from-pink-600 to-rose-500 text-white font-bold px-3 py-1.5 rounded-xl text-[11px] shadow-md shadow-pink-600/30 whitespace-nowrap">
+            Выбрать ↵
+          </span>
+        </div>
+      )}
 
       {/* Profile Header: Avatar & Stats */}
       <div className="flex items-center space-x-4">
@@ -996,6 +1075,76 @@ export function ProfileView({
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* Username Selection & Live Availability Check */}
+            <div className="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-white flex items-center space-x-1">
+                  <span>💎 Уникальный никнейм (@username)</span>
+                </label>
+                {checkingUsername ? (
+                  <span className="text-[10px] text-slate-400 flex items-center space-x-1">
+                    <span className="w-2.5 h-2.5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin inline-block" />
+                    <span>Проверка...</span>
+                  </span>
+                ) : usernameStatus?.available ? (
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center space-x-1">
+                    <span>✓</span>
+                    <span>{usernameStatus.is_current ? "Ваш ник" : "Свободен!"}</span>
+                  </span>
+                ) : usernameStatus && !usernameStatus.available ? (
+                  <span className="text-[10px] font-bold text-rose-400 bg-rose-950/50 px-2 py-0.5 rounded-full border border-rose-500/30">
+                    ✕ Занят
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-slate-500 text-xs font-mono font-bold select-none">@</span>
+                <input
+                  type="text"
+                  value={editUsername}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/^@/, "").replace(/[^a-zA-Z0-9_]/g, "");
+                    setEditUsername(val);
+                  }}
+                  placeholder="придумайте_никнейм"
+                  className="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-7 pr-3 py-2 text-xs font-mono text-white outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                />
+              </div>
+
+              {/* Status text or live suggestions when username is taken */}
+              {usernameStatus && !usernameStatus.available && (
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[11px] text-rose-300 block">
+                    {usernameStatus.message}
+                  </span>
+                  {usernameStatus.suggestions && usernameStatus.suggestions.length > 0 && (
+                    <div className="space-y-1 pt-0.5">
+                      <span className="text-[10px] text-amber-300 font-bold block">
+                        👇 Нажмите, чтобы выбрать свободный вариант с цифрой:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {usernameStatus.suggestions.map((sug) => (
+                          <button
+                            key={sug}
+                            type="button"
+                            onClick={() => {
+                              triggerHaptic("medium");
+                              setEditUsername(sug);
+                            }}
+                            className="bg-pink-600/20 hover:bg-pink-600/40 border border-pink-500/40 hover:border-pink-400 text-pink-300 hover:text-white px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition flex items-center space-x-1 active:scale-95"
+                          >
+                            <span>@{sug}</span>
+                            <span className="text-[9px] text-pink-400 bg-pink-500/20 px-1 rounded">выбрать ↵</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>

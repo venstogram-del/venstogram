@@ -1,12 +1,87 @@
+import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func, and_
 from typing import List, Optional
 from app.database.session import get_db
-from app.models.entities import User, Follow, Post, Reel
+from app.models.entities import User, Follow, Post, Reel, UsernameListing
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/users", tags=["Users & Search"])
+
+@router.get("/check-username")
+async def check_username(
+    username: str = Query(..., min_length=1, max_length=64),
+    current_user: Optional[User] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    cleaned = username.strip().lower()
+    if cleaned.startswith("@"):
+        cleaned = cleaned[1:]
+
+    if not re.match(r"^[a-zA-Z0-9_]{3,32}$", cleaned):
+        return {
+            "available": False,
+            "username": cleaned,
+            "message": "Никнейм должен быть от 3 до 32 символов (латинские буквы, цифры и _)",
+            "is_current": False,
+            "suggestions": []
+        }
+
+    if current_user and current_user.username and current_user.username.lower() == cleaned:
+        return {
+            "available": True,
+            "username": cleaned,
+            "message": "Это ваш текущий никнейм ✓",
+            "is_current": True,
+            "suggestions": []
+        }
+
+    # Check users table
+    u_stmt = select(User.id).where(func.lower(User.username) == cleaned)
+    if current_user:
+        u_stmt = u_stmt.where(User.id != current_user.id)
+    u_res = await db.execute(u_stmt)
+    is_taken_user = u_res.scalars().first() is not None
+
+    # Check marketplace listings
+    m_res = await db.execute(
+        select(UsernameListing.id).where(
+            func.lower(UsernameListing.username) == cleaned,
+            UsernameListing.is_sold == False
+        )
+    )
+    is_taken_market = m_res.scalars().first() is not None
+
+    if not is_taken_user and not is_taken_market:
+        return {
+            "available": True,
+            "username": cleaned,
+            "message": f"Никнейм @{cleaned} свободен! ✓",
+            "is_current": False,
+            "suggestions": []
+        }
+
+    # Generate suggestions if taken:
+    # e.g. instagram -> instagram1, instagram2, instagram_1, instagram77
+    candidate_suffixes = ["1", "2", "3", "7", "_1", "77", "99", "_uz"]
+    suggestions = []
+    for sfx in candidate_suffixes:
+        cand = f"{cleaned}{sfx}"[:32]
+        cu = await db.execute(select(User.id).where(func.lower(User.username) == cand))
+        cm = await db.execute(select(UsernameListing.id).where(func.lower(UsernameListing.username) == cand, UsernameListing.is_sold == False))
+        if cu.scalars().first() is None and cm.scalars().first() is None:
+            suggestions.append(cand)
+        if len(suggestions) >= 4:
+            break
+
+    return {
+        "available": False,
+        "username": cleaned,
+        "message": f"Никнейм @{cleaned} уже занят. Свободные варианты с цифрой:",
+        "is_current": False,
+        "suggestions": suggestions
+    }
 
 @router.get("/search")
 async def search_users(

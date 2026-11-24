@@ -47,6 +47,7 @@ class ResetPasswordRequest(BaseModel):
 
 # --- User ---
 class UserProfileUpdate(BaseModel):
+    username: Optional[str] = None
     bio: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
