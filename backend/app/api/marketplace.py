@@ -46,8 +46,11 @@ async def get_username_listings(
         .where(UsernameListing.is_sold == False)
     )
     if category != "all":
-        query = query.where(UsernameListing.category == category)
-    query = query.order_by(UsernameListing.price_usd.asc(), UsernameListing.created_at.desc())
+        if category in ("vip_brands", "ultra_rare"):
+            query = query.where(UsernameListing.category.in_(["vip_brands", "ultra_rare"]))
+        else:
+            query = query.where(UsernameListing.category == category)
+    query = query.order_by(UsernameListing.price_usd.desc(), UsernameListing.created_at.desc())
     
     res = await db.execute(query)
     listings = res.scalars().all()

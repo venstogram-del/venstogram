@@ -27,9 +27,21 @@ TOP_SHORT_NAMES = {
 }
 
 async def init_models():
+    from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("[Database] All tables successfully created or verified.")
+        # Auto-migrate newly added columns for users table
+        for col_sql in [
+            "ALTER TABLE users ADD COLUMN is_registered BOOLEAN DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN birth_year INTEGER",
+            "ALTER TABLE users ADD COLUMN birth_date VARCHAR(32)",
+            "ALTER TABLE users ADD COLUMN badge_type VARCHAR(32) DEFAULT 'blue'"
+        ]:
+            try:
+                await conn.execute(text(col_sql))
+            except Exception:
+                pass
+    print("[Database] All tables and columns successfully verified.")
 
 async def seed_demo_data():
     """Seeds Founder Director account and marketplace official listings."""
@@ -53,22 +65,34 @@ async def seed_demo_data():
 
         director_id = director.id
 
-        # 2. Ensure @uzbekiston and @uzbekistan are reserved
-        for un in ["uzbekiston", "uzbekistan"]:
+        # 2. Ensure @uzbekiston, @uzbekistan and 2-letter ultra-rare @ou ($30,000) are listed
+        for un, cat, pr_usd in [
+            ("ou", "ultra_rare", 30000),
+            ("uzbekiston", "exclusive", 999999),
+            ("uzbekistan", "exclusive", 999999)
+        ]:
             chk = await session.execute(select(UsernameListing).where(UsernameListing.username == un))
-            if not chk.scalars().first():
+            existing = chk.scalars().first()
+            pr_uzs = float(pr_usd * 13000)
+            if not existing:
                 nl = UsernameListing(
                     username=un,
                     seller_id=director_id,
-                    category="exclusive",
-                    price_usd=999999,
-                    price_uzs=999999999.0,
-                    current_price_coins=999999,
-                    buyout_price_coins=999999,
+                    category=cat,
+                    price_usd=pr_usd,
+                    price_uzs=pr_uzs,
+                    current_price_coins=pr_usd * 10,
+                    buyout_price_coins=pr_usd * 10,
                     is_sold=False,
                     expires_at=datetime.now(timezone.utc) + timedelta(days=3650)
                 )
                 session.add(nl)
+            else:
+                existing.price_usd = pr_usd
+                existing.price_uzs = pr_uzs
+                existing.category = cat
+                existing.seller_id = director_id
+                existing.is_sold = False
 
         # 3. Seed Uzbek male & female names ($500+)
         combined_raw = NAMES_RAW + "," + FEMALE_NAMES_RAW

@@ -3695,6 +3695,9 @@ function MarketplaceView({
       id: "all",
       label: "🌟 Все"
     }, {
+      id: "ultra_rare",
+      label: "💎 Эксклюзив & 2-значные ($30,000)"
+    }, {
       id: "uzbek_names",
       label: "🇺🇿 Узбекские имена ($500)"
     }, {
@@ -3732,7 +3735,9 @@ function MarketplaceView({
         className: "flex items-center space-x-2"
       }, /*#__PURE__*/React.createElement("span", {
         className: "text-xl font-black text-white tracking-tight"
-      }, "@", item.username), item.category === "vip_brands" && /*#__PURE__*/React.createElement("span", {
+      }, "@", item.username), (item.category === "ultra_rare" || item.username === "ou") && /*#__PURE__*/React.createElement("span", {
+        className: "text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40"
+      }, "\uD83D\uDC8E 2-\u0417\u041D\u0410\u0427\u041D\u042B\u0419 \u0420\u0415\u0414\u041A\u0418\u0419 ($30,000)"), item.category === "vip_brands" && /*#__PURE__*/React.createElement("span", {
         className: "text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40"
       }, "\uD83D\uDC51 VIP BRAND"), item.category === "uzbek_cities" && /*#__PURE__*/React.createElement("span", {
         className: "text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40"

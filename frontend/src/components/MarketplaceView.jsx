@@ -208,6 +208,7 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
               <div className="flex space-x-2 overflow-x-auto pb-1 no-scrollbar">
                 {[
                   { id: "all", label: "🌟 Все" },
+                  { id: "ultra_rare", label: "💎 Эксклюзив & 2-значные ($30,000)" },
                   { id: "uzbek_names", label: "🇺🇿 Узбекские имена ($500)" },
                   { id: "vip_brands", label: "👑 VIP Бренды ($10k-$20k)" },
                   { id: "uzbek_cities", label: "🏛️ Города ($10k)" }
@@ -255,6 +256,11 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                         <div>
                           <div className="flex items-center space-x-2">
                             <span className="text-xl font-black text-white tracking-tight">@{item.username}</span>
+                            {(item.category === "ultra_rare" || item.username === "ou") && (
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                                💎 2-ЗНАЧНЫЙ РЕДКИЙ ($30,000)
+                              </span>
+                            )}
                             {item.category === "vip_brands" && (
                               <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
                                 👑 VIP BRAND
