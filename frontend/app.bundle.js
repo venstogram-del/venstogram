@@ -2414,46 +2414,11 @@ function ChatView({
       if (res && res.length > 0) {
         setDialogs(res);
       } else {
-        setDialogs([{
-          partner: {
-            id: 2,
-            username: "shoxrux_live",
-            first_name: "Shoxrux",
-            last_name: "",
-            avatar_url: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
-            is_verified: true,
-            last_active: new Date().toISOString()
-          },
-          last_message: {
-            content: "Ассалому алейкум! Посмотрел ваши новые рилсы, супер проект! 🔥",
-            media_type: "text",
-            is_read: true,
-            is_mine: false,
-            created_at: new Date(Date.now() - 300000).toISOString()
-          },
-          unread_count: 1
-        }, {
-          partner: {
-            id: 3,
-            username: "madina_star",
-            first_name: "Madina",
-            last_name: "",
-            avatar_url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
-            is_verified: true,
-            last_active: new Date().toISOString()
-          },
-          last_message: {
-            content: "Привет! Хочу подключить синюю галочку верификации для своего блога 💎",
-            media_type: "text",
-            is_read: true,
-            is_mine: false,
-            created_at: new Date(Date.now() - 3600000).toISOString()
-          },
-          unread_count: 0
-        }]);
+        setDialogs([]);
       }
     } catch (e) {
       console.warn("loadDialogs error", e);
+      setDialogs([]);
     }
   };
   const openDialog = async partner => {
