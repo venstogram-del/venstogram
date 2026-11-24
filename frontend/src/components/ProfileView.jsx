@@ -5,6 +5,7 @@ import { Api } from "../api.js";
 import { PostModal } from "./PostModal.jsx";
 import { EmailAuthModal } from "./EmailAuthModal.jsx";
 import { FounderQuestModal } from "./FounderQuestModal.jsx";
+import { FollowListModal } from "./FollowListModal.jsx";
 
 export function ProfileView({
   user,
@@ -14,7 +15,8 @@ export function ProfileView({
   dataSaver,
   onToggleDataSaver,
   onOpenWallet,
-  onUpdateUser
+  onUpdateUser,
+  onOpenProfile
 }) {
   const [activeTab, setActiveTab] = useState("posts"); // posts, reels, saved
   const [isEditing, setIsEditing] = useState(false);
@@ -34,9 +36,21 @@ export function ProfileView({
   const [pushEnabled, setPushEnabled] = useState(
     (typeof localStorage !== "undefined" && localStorage.getItem("vensto_push_notifications") !== "false")
   );
+  const [followModal, setFollowModal] = useState(null); // { type: "followers" | "following", userId, title }
 
   // Selected Post Viewer
   const [selectedPost, setSelectedPost] = useState(null);
+
+  // Sync latest user stats from server
+  useEffect(() => {
+    if (user?.id) {
+      Api.get("/auth/me").then((fresh) => {
+        if (fresh && onUpdateUser) {
+          onUpdateUser((prev) => ({ ...prev, ...fresh }));
+        }
+      }).catch(() => {});
+    }
+  }, [user?.id]);
 
   // Edit profile states
   const [editUsername, setEditUsername] = useState(user?.username || "");
@@ -424,13 +438,25 @@ export function ProfileView({
             <span className="text-base font-black text-white block">{userPosts.length + userReels.length}</span>
             <span className="text-[11px] text-slate-400">Публикаций</span>
           </div>
-          <div>
+          <div
+            onClick={() => {
+              triggerHaptic("light");
+              setFollowModal({ type: "followers", userId: user.id, title: "Мои подписчики" });
+            }}
+            className="cursor-pointer active:scale-95 transition hover:opacity-80"
+          >
             <span className="text-base font-black text-white block">{user.followers_count || 0}</span>
-            <span className="text-[11px] text-slate-400">Подписчиков</span>
+            <span className="text-[11px] text-pink-400 font-bold hover:underline">Подписчиков</span>
           </div>
-          <div>
+          <div
+            onClick={() => {
+              triggerHaptic("light");
+              setFollowModal({ type: "following", userId: user.id, title: "Мои подписки" });
+            }}
+            className="cursor-pointer active:scale-95 transition hover:opacity-80"
+          >
             <span className="text-base font-black text-white block">{user.following_count || 0}</span>
-            <span className="text-[11px] text-slate-400">Подписок</span>
+            <span className="text-[11px] text-pink-400 font-bold hover:underline">Подписок</span>
           </div>
         </div>
       </div>
@@ -520,23 +546,6 @@ export function ProfileView({
             <span>{user.website}</span>
           </a>
         )}
-
-        {/* Tech Support Quick Contact Bar */}
-        <div className="mt-2.5 bg-slate-900/60 border border-slate-800 rounded-2xl p-2.5 flex items-center justify-between text-xs text-slate-300">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm">🛠️</span>
-            <div>
-              <span className="text-[11px] font-bold text-white block">Служба техподдержки:</span>
-              <span className="text-[10px] text-slate-400 font-mono">+998 50 777 51 52 • @yuksak_it</span>
-            </div>
-          </div>
-          <button
-            onClick={() => openTelegramChannel("@yuksak_it")}
-            className="bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold px-2.5 py-1 rounded-xl text-[10px] border border-slate-700 transition"
-          >
-            Связаться ↗
-          </button>
-        </div>
       </div>
 
       {/* Action Buttons Row */}
@@ -1655,6 +1664,26 @@ export function ProfileView({
           onClose={() => setFounderQuestModalOpen(false)}
           onUserUpdated={(u) => {
             if (onUpdateUser) onUpdateUser(u);
+          }}
+        />
+      )}
+
+      {/* Follow / Following List Modal */}
+      {followModal && (
+        <FollowListModal
+          userId={followModal.userId}
+          type={followModal.type}
+          title={followModal.title}
+          currentUser={user}
+          onClose={() => setFollowModal(null)}
+          onOpenProfile={(targetId) => {
+            if (onOpenProfile) onOpenProfile(targetId);
+          }}
+          onFollowChanged={async () => {
+            try {
+              const fresh = await Api.get("/auth/me");
+              if (fresh && onUpdateUser) onUpdateUser((prev) => ({ ...prev, ...fresh }));
+            } catch (e) {}
           }}
         />
       )}

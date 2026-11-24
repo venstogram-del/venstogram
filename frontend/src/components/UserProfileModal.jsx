@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { triggerHaptic } from "../telegram.js";
 import { Api } from "../api.js";
+import { FollowListModal } from "./FollowListModal.jsx";
 
 const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E";
 
@@ -10,6 +11,7 @@ export function UserProfileModal({
   onClose,
   onOpenChat,
   onSelectPost,
+  onOpenProfile,
   t
 }) {
   const [profile, setProfile] = useState(null);
@@ -20,6 +22,7 @@ export function UserProfileModal({
   const [isFollowing, setIsFollowing] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [followModal, setFollowModal] = useState(null); // { type, userId, title }
 
   useEffect(() => {
     if (userId) {
@@ -203,13 +206,25 @@ export function UserProfileModal({
               <span className="block text-sm font-black text-white">{posts.length}</span>
               <span className="text-[10px] text-slate-400 font-medium">Посты</span>
             </div>
-            <div>
+            <div
+              onClick={() => {
+                triggerHaptic("light");
+                setFollowModal({ type: "followers", userId, title: `Подписчики @${profile?.username}` });
+              }}
+              className="cursor-pointer active:scale-95 transition hover:opacity-80"
+            >
               <span className="block text-sm font-black text-white">{followersCount}</span>
-              <span className="text-[10px] text-slate-400 font-medium">Подписчики</span>
+              <span className="text-[10px] text-pink-400 font-bold hover:underline">Подписчики</span>
             </div>
-            <div>
+            <div
+              onClick={() => {
+                triggerHaptic("light");
+                setFollowModal({ type: "following", userId, title: `Подписки @${profile?.username}` });
+              }}
+              className="cursor-pointer active:scale-95 transition hover:opacity-80"
+            >
               <span className="block text-sm font-black text-white">{profile?.following_count || 0}</span>
-              <span className="text-[10px] text-slate-400 font-medium">Подписки</span>
+              <span className="text-[10px] text-pink-400 font-bold hover:underline">Подписки</span>
             </div>
             <div>
               <span className="block text-sm font-black text-pink-400">❤️ {totalLikes}</span>
@@ -386,6 +401,30 @@ export function UserProfileModal({
             </div>
           )}
         </div>
+      )}
+
+      {/* Follow / Following List Modal */}
+      {followModal && (
+        <FollowListModal
+          userId={followModal.userId}
+          type={followModal.type}
+          title={followModal.title}
+          currentUser={currentUser}
+          onClose={() => setFollowModal(null)}
+          onOpenProfile={(targetId) => {
+            if (onOpenProfile) onOpenProfile(targetId);
+            onClose();
+          }}
+          onFollowChanged={async () => {
+            try {
+              const prof = await Api.get(`/users/${userId}/profile`);
+              if (prof) {
+                setFollowersCount(prof.followers_count || 0);
+                setIsFollowing(Boolean(prof.is_following));
+              }
+            } catch (e) {}
+          }}
+        />
       )}
     </div>
   );

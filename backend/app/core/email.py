@@ -10,7 +10,6 @@ from app.core.config import settings
 def _build_email_html(code: str, username: str = "", purpose: str = "регистрации") -> str:
     purpose_title = "Код подтверждения" if purpose == "registration" else "Сброс пароля"
     action_text = "подтверждения регистрации аккаунта" if purpose == "registration" else "восстановления доступа к аккаунту"
-    user_greeting = f"Привет, @{username}!" if username else "Здравствуйте!"
     
     return f"""<!DOCTYPE html>
 <html lang="ru">
@@ -42,8 +41,8 @@ def _build_email_html(code: str, username: str = "", purpose: str = "регис�
           <!-- Message Body -->
           <tr>
             <td style="padding: 16px 0 24px 0; border-top: 1px solid #1e293b; border-bottom: 1px solid #1e293b;">
-              <p style="margin: 0 0 12px 0; font-size: 16px; font-weight: 700; color: #ffffff;">
-                {user_greeting}
+              <p style="margin: 0 0 12px 0; font-size: 17px; font-weight: 800; color: #ffffff; letter-spacing: -0.2px;">
+                От команды Venstogram
               </p>
               <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #cbd5e1;">
                 Вы получили это письмо для {action_text} в приложении <b>Venstogram</b>. Используйте следующий 6-значный код безопасности:
@@ -72,7 +71,7 @@ def _build_email_html(code: str, username: str = "", purpose: str = "регис�
               </div>
               <p style="margin: 20px 0 0 0; font-size: 11px; line-height: 1.5; color: #64748b; text-align: center;">
                 Если вы не совершали этот запрос, просто проигнорируйте данное письмо.<br>
-                Служба заботы Venstogram: {settings.SUPPORT_TELEGRAM} • {settings.SUPPORT_PHONE}
+                © 2026 Venstogram Security Team. Все права защищены.
               </p>
             </td>
           </tr>
@@ -125,7 +124,7 @@ async def send_verification_email(
     """
     clean_email = to_email.strip().lower()
     subject = f"Ваш код подтверждения Venstogram: {code}" if purpose == "registration" else f"Код для сброса пароля Venstogram: {code}"
-    plain_body = f"Здравствуйте!\n\nВаш 6-значный код безопасности Venstogram: {code}\nКод действителен 15 минут. Никому не сообщайте этот код."
+    plain_body = f"Здравствуйте!\n\nОт команды Venstogram:\nВаш 6-значный код безопасности: {code}\nКод действителен 15 минут. Никому не сообщайте этот код."
     html_body = _build_email_html(code, username, purpose)
 
     print(f"\n[EMAIL DISPATCHER] Sending {purpose} security code {code} to {clean_email} via SMTP ({settings.SMTP_HOST}:{settings.SMTP_PORT})...")

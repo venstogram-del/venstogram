@@ -15,8 +15,23 @@ async def websocket_live_endpoint(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    user_id = int(payload["sub"])
-    await ws_manager.connect_user(user_id, websocket)
+    telegram_id = int(payload["sub"])
+    db_user_id = None
+    try:
+        from app.database.session import AsyncSessionLocal
+        from app.models.entities import User
+        from sqlalchemy import select
+        async with AsyncSessionLocal() as db:
+            res = await db.execute(select(User.id).where(User.telegram_id == telegram_id))
+            db_user_id = res.scalars().first()
+    except Exception as e:
+        print("[WS Connect DB lookup note]", e)
+
+    await ws_manager.connect_user(telegram_id, websocket)
+    if db_user_id and db_user_id != telegram_id:
+        await ws_manager.connect_user(db_user_id, websocket)
+
+    user_id = db_user_id or telegram_id
 
     try:
         while True:
@@ -77,6 +92,10 @@ async def websocket_live_endpoint(
                     )
 
     except WebSocketDisconnect:
-        ws_manager.disconnect_user(user_id, websocket)
+        ws_manager.disconnect_user(telegram_id, websocket)
+        if db_user_id and db_user_id != telegram_id:
+            ws_manager.disconnect_user(db_user_id, websocket)
     except Exception as e:
-        ws_manager.disconnect_user(user_id, websocket)
+        ws_manager.disconnect_user(telegram_id, websocket)
+        if db_user_id and db_user_id != telegram_id:
+            ws_manager.disconnect_user(db_user_id, websocket)

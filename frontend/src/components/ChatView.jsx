@@ -3,7 +3,7 @@ import { triggerHaptic } from "../telegram.js";
 import { SoundEngine } from "../sound.js";
 import { Api } from "../api.js";
 
-export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
+export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingCallAccept, onClearPendingCall }) {
   const [dialogs, setDialogs] = useState([]);
   const [activePartner, setActivePartner] = useState(activeUser || null);
   const [messages, setMessages] = useState([]);
@@ -57,6 +57,16 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
       openDialog(activeUser);
     }
   }, [activeUser]);
+
+  useEffect(() => {
+    if (pendingCallAccept) {
+      if (pendingCallAccept.caller) {
+        setActivePartner(pendingCallAccept.caller);
+      }
+      handleAcceptIncomingCall(pendingCallAccept);
+      if (onClearPendingCall) onClearPendingCall();
+    }
+  }, [pendingCallAccept]);
 
   // Periodic refresh for dialogs so chatting friends never disappear
   useEffect(() => {
@@ -653,6 +663,16 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
   // Real WebRTC & Signaling Call System
   const startCall = async (isVideo = true) => {
     if (!activePartner) return;
+
+    // Protection: Nobody can call the Founder, but Founder can call anyone!
+    const isPartnerFounder = activePartner.role === "director" || activePartner.username === "director" || activePartner.username === "oqyolai";
+    const isCallerFounder = user?.role === "director" || user?.telegram_id === 1477103854;
+
+    if (isPartnerFounder && !isCallerFounder) {
+      alert("Звонки Основателю платформы ограничены настройками приватности. Вы можете отправить текстовое сообщение в личные сообщения.");
+      return;
+    }
+
     triggerHaptic("heavy");
     SoundEngine.playRingtone();
     setIsCallMinimized(false);
@@ -780,11 +800,11 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
     }, 1500);
   };
 
-  const handleAcceptIncomingCall = async () => {
-    if (!incomingCall) return;
+  const handleAcceptIncomingCall = async (customCall = null) => {
+    const callToAccept = customCall || incomingCall;
+    if (!callToAccept) return;
     triggerHaptic("heavy");
     SoundEngine.stopRingtone();
-    const callToAccept = incomingCall;
     setIncomingCall(null);
     const isVideo = callToAccept.call_type === "video";
     const partnerUser = callToAccept.caller;

@@ -274,12 +274,22 @@ async def handle_order_action(
 
         # 3. Send Bot Push to Buyer
         from app.bot.bot import send_bot_push_notification
+        from app.websocket.manager import ws_manager
         if order.buyer:
             await send_bot_push_notification(
                 telegram_id=order.buyer.telegram_id,
                 text=f"🎉 <b>ПОЗДРАВЛЯЕМ! ОПЛАТА ОДОБРЕНА!</b>\n\nАдминистратор подтвердил ваш чек за никнейм <b>@{order.username}</b>. Теперь этот юзернейм официально принадлежит вашему аккаунту!",
                 button_text="Открыть профиль"
             )
+            evt = {
+                "event": "nickname_approved",
+                "order_id": order.id,
+                "username": order.username,
+                "message": f"Основатель подтвердил покупку никнейма @{order.username}!"
+            }
+            await ws_manager.send_personal_message(order.buyer.id, evt)
+            if order.buyer.telegram_id:
+                await ws_manager.send_personal_message(order.buyer.telegram_id, evt)
     elif action == "reject":
         from app.bot.bot import send_bot_push_notification
         if order.buyer:
@@ -937,6 +947,19 @@ async def approve_coin_order(
             button_text="👛 Открыть Кошелек",
             start_param="tab_profile"
         )
+
+    # Real-time WebSocket delivery into Web App
+    from app.websocket.manager import ws_manager
+    coin_evt = {
+        "event": "coins_approved",
+        "order_id": order.id,
+        "amount_coins": order.amount_coins,
+        "new_balance": buyer.wallet_coins,
+        "message": f"Основатель подтвердил зачисление {order.amount_coins:,} Vensto Coins!"
+    }
+    await ws_manager.send_personal_message(buyer.id, coin_evt)
+    if buyer.telegram_id:
+        await ws_manager.send_personal_message(buyer.telegram_id, coin_evt)
 
     return {
         "status": "ok",

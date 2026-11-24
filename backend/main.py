@@ -128,16 +128,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Route alias: automatically rewrite /api/chat/* to /api/chats/* so all chat endpoints work seamlessly
+# Security and Route alias middleware
 @app.middleware("http")
-async def chat_alias_middleware(request: Request, call_next):
+async def security_and_alias_middleware(request: Request, call_next):
+    # Route alias: automatically rewrite /api/chat/* to /api/chats/* so all chat endpoints work seamlessly
     path = request.scope.get("path", "")
     if path.startswith("/api/chat/") and not path.startswith("/api/chats/"):
         request.scope["path"] = path.replace("/api/chat/", "/api/chats/", 1)
-    return await call_next(request)
 
-# Ensure uploads directory exists
-os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    # Protect against oversized payloads (max 64MB)
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > 67108864: # 64MB limit
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=413, content={"detail": "Payload too large. Maximum allowed size is 64MB."})
+
+    response = await call_next(request)
+
+    # Security Headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+    return response
 
 # Ensure uploads directory exists
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)

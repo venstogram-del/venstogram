@@ -338,6 +338,78 @@ async def toggle_follow(
     return {"status": "ok", "is_following": is_following, "followers_count": followers_count}
 
 
+@router.get("/{user_id}/followers")
+async def get_user_followers(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = (
+        select(User)
+        .join(Follow, Follow.follower_id == User.id)
+        .where(Follow.following_id == user_id)
+        .limit(100)
+    )
+    res = await db.execute(stmt)
+    followers = res.scalars().all()
+
+    following_stmt = select(Follow.following_id).where(
+        Follow.follower_id == current_user.id,
+        Follow.following_id.in_([u.id for u in followers] if followers else [0])
+    )
+    my_follows = set((await db.execute(following_stmt)).scalars().all())
+
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "first_name": u.first_name,
+            "last_name": u.last_name,
+            "avatar_url": u.avatar_url,
+            "is_verified": u.is_verified,
+            "is_following": u.id in my_follows,
+            "is_me": u.id == current_user.id
+        }
+        for u in followers
+    ]
+
+
+@router.get("/{user_id}/following")
+async def get_user_following(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = (
+        select(User)
+        .join(Follow, Follow.following_id == User.id)
+        .where(Follow.follower_id == user_id)
+        .limit(100)
+    )
+    res = await db.execute(stmt)
+    followings = res.scalars().all()
+
+    following_stmt = select(Follow.following_id).where(
+        Follow.follower_id == current_user.id,
+        Follow.following_id.in_([u.id for u in followings] if followings else [0])
+    )
+    my_follows = set((await db.execute(following_stmt)).scalars().all())
+
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "first_name": u.first_name,
+            "last_name": u.last_name,
+            "avatar_url": u.avatar_url,
+            "is_verified": u.is_verified,
+            "is_following": u.id in my_follows,
+            "is_me": u.id == current_user.id
+        }
+        for u in followings
+    ]
+
+
 # ============================================================================
 # Founder's League Challenge (Игра Основателя на Золотую Галочку и Никнейм)
 # ============================================================================
@@ -368,11 +440,11 @@ async def get_founder_quest(
     total_content = posts_count + reels_count
     total_views = post_views + reel_views
 
-    # Targets defined by Founder
-    TARGET_REFERRALS = 50
-    TARGET_FOLLOWERS = 500
-    TARGET_CONTENT = 10
-    TARGET_VIEWS = 5000
+    # Super Hard Targets defined by Founder
+    TARGET_REFERRALS = 1000
+    TARGET_FOLLOWERS = 30000
+    TARGET_CONTENT = 40
+    TARGET_VIEWS = 100000
 
     is_completed = (
         referrals_count >= TARGET_REFERRALS and
@@ -444,19 +516,24 @@ async def claim_founder_quest_reward(
     followers_count = (await db.execute(select(func.count(Follow.id)).where(Follow.following_id == current_user.id))).scalar() or 0
 
     posts_res = await db.execute(select(Post.views_count).where(Post.user_id == current_user.id))
-    post_views = sum(posts_res.scalars().all())
+    post_views_list = posts_res.scalars().all()
+    posts_count = len(post_views_list)
+    post_views = sum(post_views_list)
 
     reels_res = await db.execute(select(Reel.views_count).where(Reel.user_id == current_user.id))
-    reel_views = sum(reels_res.scalars().all())
+    reel_views_list = reels_res.scalars().all()
+    reels_count = len(reel_views_list)
+    reel_views = sum(reel_views_list)
 
+    total_content = posts_count + reels_count
     total_views = post_views + reel_views
 
     is_director = getattr(current_user, "role", "") == "director" or current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS
 
-    if not is_director and (referrals_count < 50 or followers_count < 500 or total_views < 5000):
+    if not is_director and (referrals_count < 1000 or followers_count < 30000 or total_content < 40 or total_views < 100000):
         raise HTTPException(
             status_code=400,
-            detail="Вы еще не выполнили все условия Испытания Основателя! Продолжайте привлекать друзей и создавать контент."
+            detail="Вы еще не выполнили все условия Испытания Основателя! Пригласите 1 000 друзей, наберите 30 000 подписчиков, опубликуйте 40 постов/рилсов и наберите 100 000 просмотров."
         )
 
     current_user.is_verified = True

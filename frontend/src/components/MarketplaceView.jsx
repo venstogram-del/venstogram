@@ -536,8 +536,8 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                 </div>
               </div>
 
-              <p className="text-[10px] text-slate-400 italic">
-                Оплатите точную сумму и прикрепите скриншот чека ниже. После подтверждения администратором заказ будет мгновенно активирован!
+              <p className="text-[10px] text-amber-200/90 font-medium bg-amber-950/40 border border-amber-500/30 p-2.5 rounded-xl leading-relaxed">
+                Оплатите точную сумму и прикрепите скриншот чека ниже. После подтверждения Основателем у вас сразу появится окно: нажимая кнопку, название вашего профиля сменится в один клик!
               </p>
             </div>
 

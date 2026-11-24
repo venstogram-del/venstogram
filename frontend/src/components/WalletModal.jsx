@@ -355,7 +355,7 @@ export function WalletModal({ user, t, onClose, onUpdateUser }) {
 
                     <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-start space-x-2">
                       <span>🛡️</span>
-                      <span>Для защиты от накруток монеты начисляются только после ручного подтверждения перевода Администратором.</span>
+                      <span>Оплатите точную сумму и прикрепите скриншот чека. После подтверждения перевода Основателем вам сразу придет окно с начислением монет в один клик!</span>
                     </div>
 
                     <button

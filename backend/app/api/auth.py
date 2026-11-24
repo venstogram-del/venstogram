@@ -158,7 +158,13 @@ async def dev_login(req: DevAuthRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/me")
-async def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from app.models.entities import Follow, Post, Reel
+    followers_count = (await db.execute(select(func.count(Follow.id)).where(Follow.following_id == current_user.id))).scalar() or 0
+    following_count = (await db.execute(select(func.count(Follow.id)).where(Follow.follower_id == current_user.id))).scalar() or 0
+    posts_count = (await db.execute(select(func.count(Post.id)).where(Post.user_id == current_user.id))).scalar() or 0
+    reels_count = (await db.execute(select(func.count(Reel.id)).where(Reel.user_id == current_user.id))).scalar() or 0
+
     return {
         "id": current_user.id,
         "telegram_id": current_user.telegram_id,
@@ -183,6 +189,10 @@ async def get_me(current_user: User = Depends(get_current_user)):
         "has_pin": bool(current_user.wallet_pin),
         "email": current_user.email,
         "is_email_verified": getattr(current_user, "is_email_verified", False),
+        "followers_count": followers_count,
+        "following_count": following_count,
+        "posts_count": posts_count,
+        "reels_count": reels_count,
         "warnings_count": getattr(current_user, "warnings_count", 0),
         "warnings_history": getattr(current_user, "warnings_history", []) or []
     }

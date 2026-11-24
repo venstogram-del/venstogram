@@ -27,7 +27,7 @@ export function FounderQuestModal({ user, onClose, onUserUpdated }) {
           followers_count: 0,
           posts_count: 0,
           views_count: 0,
-          targets: { referrals: 50, followers: 500, posts: 10, views: 5000 },
+          targets: { referrals: 1000, followers: 30000, posts: 40, views: 100000 },
           referral_link: `https://t.me/venstogrambot?start=ref_${user?.id || 1477103854}`,
           is_eligible: user?.role === "director",
           has_claimed: user?.badge_type === "gold_founder"
@@ -40,7 +40,7 @@ export function FounderQuestModal({ user, onClose, onUserUpdated }) {
         followers_count: 0,
         posts_count: 0,
         views_count: 0,
-        targets: { referrals: 50, followers: 500, posts: 10, views: 5000 },
+        targets: { referrals: 1000, followers: 30000, posts: 40, views: 100000 },
         referral_link: `https://t.me/venstogrambot?start=ref_${user?.id || 1477103854}`,
         is_eligible: user?.role === "director",
         has_claimed: user?.badge_type === "gold_founder"
@@ -89,7 +89,7 @@ export function FounderQuestModal({ user, onClose, onUserUpdated }) {
     }
   };
 
-  const targets = quest?.targets || { referrals: 50, followers: 500, posts: 10, views: 5000 };
+  const targets = quest?.targets || { referrals: 1000, followers: 30000, posts: 40, views: 100000 };
   const refs = quest?.referrals_count || 0;
   const followers = quest?.followers_count || 0;
   const posts = quest?.posts_count || 0;

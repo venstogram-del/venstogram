@@ -244,3 +244,77 @@ async def buy_verified(
         "verified_until": current_user.verified_until.isoformat(),
         "message": "Синяя галочка Venstogram Verified и 3x буст в рекомендациях успешно активированы!"
     }
+
+
+@router.get("/pending-claims")
+async def get_pending_claims(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Checks if current user has any approved nickname purchases ready to be applied.
+    """
+    from sqlalchemy import func
+    orders_res = await db.execute(
+        select(UsernameOrder)
+        .where(
+            UsernameOrder.buyer_id == current_user.id,
+            UsernameOrder.status == "approved"
+        )
+        .order_by(desc(UsernameOrder.reviewed_at))
+    )
+    approved_orders = orders_res.scalars().all()
+    unapplied_nicknames = [
+        {"order_id": o.id, "username": o.username}
+        for o in approved_orders
+        if current_user.username.lower() != o.username.lower()
+    ]
+
+    return {
+        "unapplied_nicknames": unapplied_nicknames
+    }
+
+
+@router.post("/apply-purchased-nickname")
+async def apply_purchased_nickname(
+    req: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from sqlalchemy import func
+    order_id = req.get("order_id")
+    raw_name = req.get("username", "")
+    username = raw_name.strip().lower().replace("@", "")
+
+    query = select(UsernameOrder).where(
+        UsernameOrder.buyer_id == current_user.id,
+        UsernameOrder.status == "approved"
+    )
+    if order_id:
+        query = query.where(UsernameOrder.id == int(order_id))
+    elif username:
+        query = query.where(func.lower(UsernameOrder.username) == username)
+
+    res = await db.execute(query)
+    order = res.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Подтвержденная заявка на этот никнейм не найдена")
+
+    # If another user holds it, release them
+    hold_res = await db.execute(select(User).where(func.lower(User.username) == order.username.lower(), User.id != current_user.id))
+    holder = hold_res.scalars().first()
+    if holder:
+        holder.username = f"user_{holder.telegram_id}"
+
+    current_user.username = order.username
+    current_user.is_verified = True
+    order.status = "completed"
+    await db.commit()
+    await db.refresh(current_user)
+
+    return {
+        "status": "ok",
+        "username": current_user.username,
+        "is_verified": current_user.is_verified,
+        "message": f"Поздравляем! Ваш никнейм успешно изменен на @{current_user.username}!"
+    }

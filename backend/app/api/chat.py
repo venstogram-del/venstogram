@@ -122,31 +122,31 @@ async def send_message(
     await db.commit()
     await db.refresh(msg)
 
-    # Deliver via WebSocket if active
+    # Deliver via WebSocket if active inside Web App
     from app.websocket.manager import ws_manager
-    delivered = await ws_manager.send_personal_message(
-        recipient.id,
-        {
-            "event": "new_message",
-            "message": {
-                "id": msg.id,
-                "sender_id": current_user.id,
-                "content": msg.content,
-                "media_url": msg.media_url,
-                "media_type": msg.media_type,
-                "created_at": msg.created_at.isoformat(),
-                "sender": {
-                    "id": current_user.id,
-                    "username": current_user.username,
-                    "first_name": current_user.first_name,
-                    "avatar_url": current_user.avatar_url
-                }
+    msg_event = {
+        "event": "new_message",
+        "message": {
+            "id": msg.id,
+            "sender_id": current_user.id,
+            "content": msg.content,
+            "media_url": msg.media_url,
+            "media_type": msg.media_type,
+            "created_at": msg.created_at.isoformat(),
+            "sender": {
+                "id": current_user.id,
+                "username": current_user.username,
+                "first_name": current_user.first_name,
+                "avatar_url": current_user.avatar_url
             }
         }
-    )
+    }
+    delivered = await ws_manager.send_personal_message(recipient.id, msg_event)
+    if not delivered and recipient.telegram_id:
+        delivered = await ws_manager.send_personal_message(recipient.telegram_id, msg_event)
 
-    # Fallback push to bot PM if user is not currently in Mini App
-    if not delivered:
+    # Fallback push to bot PM ONLY if user is completely offline / closed the Web App
+    if not delivered and recipient.telegram_id:
         from app.bot.bot import send_bot_push_notification
         preview = req.content[:100] if req.content else f"[{req.media_type}]"
         await send_bot_push_notification(
@@ -177,6 +177,16 @@ async def start_call(
     if not recipient:
         raise HTTPException(status_code=404, detail="Собеседник не найден")
 
+    # Protection: Nobody can call the Founder/Director, but Founder can call anyone!
+    is_recipient_founder = recipient.role == "director" or recipient.telegram_id in settings.ADMIN_TELEGRAM_IDS
+    is_caller_founder = current_user.role == "director" or current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS
+
+    if is_recipient_founder and not is_caller_founder:
+        raise HTTPException(
+            status_code=403,
+            detail="Звонки Основателю платформы ограничены настройками приватности. Вы можете отправить текстовое сообщение в личные сообщения."
+        )
+
     # Create new call session in ringing state
     call = CallSession(
         caller_id=current_user.id,
@@ -189,25 +199,25 @@ async def start_call(
     await db.commit()
     await db.refresh(call)
 
-    # Deliver incoming call to recipient via WebSocket
+    # Deliver incoming call to recipient via WebSocket in Web App
     from app.websocket.manager import ws_manager
-    delivered = await ws_manager.send_personal_message(
-        recipient.id,
-        {
-            "event": "incoming_call",
-            "call_id": call.id,
-            "call_type": call_type,
-            "caller": {
-                "id": current_user.id,
-                "username": current_user.username,
-                "first_name": current_user.first_name,
-                "avatar_url": current_user.avatar_url
-            }
+    call_payload = {
+        "event": "incoming_call",
+        "call_id": call.id,
+        "call_type": call_type,
+        "caller": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "first_name": current_user.first_name,
+            "avatar_url": current_user.avatar_url
         }
-    )
+    }
+    delivered = await ws_manager.send_personal_message(recipient.id, call_payload)
+    if not delivered and recipient.telegram_id:
+        delivered = await ws_manager.send_personal_message(recipient.telegram_id, call_payload)
 
-    # If recipient not actively connected, send Telegram push notification
-    if not delivered:
+    # If recipient not actively in Web App, send Telegram push notification
+    if not delivered and recipient.telegram_id:
         from app.bot.bot import send_bot_push_notification
         call_icon = "📹 Видеозвонок" if call_type == "video" else "📞 Аудиозвонок"
         await send_bot_push_notification(
