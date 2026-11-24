@@ -161,7 +161,9 @@ if dp is not None:
                 f"• 🪙 <b>Vensto Coins</b> — монеты платформы для буста видео и подарков в баттлах\n"
                 f"• 💎 <b>Маркетплейс редких @никнеймов</b> — продаются исключительно за официальную валюту (сум/доллар) с проверкой чека Администрацией\n"
                 f"• 👑 <b>Лига блогеров от Основателя (/quest)</b> — выполни супер-челлендж и получи Золотую Галочку и бесплатный никнейм!\n"
-                f"• 📧 <b>Официальная почта безопасности:</b> <code>venstogram@gmail.com</code>\n\n"
+                f"• 📞 <b>Служба техподдержки:</b> <code>+998 50 777 51 52</code>\n"
+                f"• 💬 <b>Telegram поддержки:</b> @yuksak_it\n"
+                f"• 📧 <b>Официальная почта:</b> <code>venstogram@gmail.com</code>\n\n"
                 f"⚖️ <b>Закон платформы (3 предупреждения / Страйка):</b>\n"
                 f"1-й страйк — Официальное предостережение от Дирекции\n"
                 f"2-й страйк — Понижение охватов и теневой бан\n"
@@ -295,9 +297,42 @@ if dp is not None:
             "/start — Главное меню и запуск приложения\n"
             "/post — Инструкция по быстрой публикации через бота\n"
             "/balance — Проверить свой баланс Vensto Coins\n"
+            "/support — Контакты службы технической поддержки\n"
             "/help — Показать эту справку\n\n"
-            "Для полного доступа к стримам и баттлам нажмите кнопку <b>«Открыть Venstogram App»</b> ниже.",
+            "🛠 <b>Служба техподдержки:</b>\n"
+            "• Телефон: <code>+998 50 777 51 52</code>\n"
+            "• Telegram: @yuksak_it (https://t.me/yuksak_it)\n\n"
+            "Для полного доступа к соцсети и баттлам нажмите кнопку <b>«Открыть Venstogram App»</b> ниже.",
             reply_markup=get_webapp_keyboard(),
+            parse_mode=ParseMode.HTML
+        )
+
+    @dp.message(Command("support", "contact"))
+    async def cmd_support(message: types.Message):
+        support_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="💬 Написать в Telegram (@yuksak_it)",
+                        url="https://t.me/yuksak_it"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="🚀 Открыть Venstogram App",
+                        web_app=WebAppInfo(url=settings.WEBAPP_URL)
+                    )
+                ]
+            ]
+        )
+        await message.answer(
+            "🛠 <b>Служба технической поддержки VENSTOGRAM:</b>\n\n"
+            "По любым вопросам работы приложения, оплаты монет, покупки никнеймов и техническим проблемам:\n\n"
+            "📞 <b>Телефон:</b> <code>+998 50 777 51 52</code>\n"
+            "💬 <b>Telegram:</b> @yuksak_it\n"
+            "📧 <b>Email:</b> <code>venstogram@gmail.com</code>\n\n"
+            "Нажмите кнопку ниже, чтобы перейти в чат со специалистом поддержки:",
+            reply_markup=support_kb,
             parse_mode=ParseMode.HTML
         )
 

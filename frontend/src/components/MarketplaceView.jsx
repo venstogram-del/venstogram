@@ -650,6 +650,14 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                   {submittingOrder ? "Отправка..." : "Отправить чек на проверку"}
                 </button>
               </div>
+
+              {/* Tech Support Notice in Checkout */}
+              <div className="text-center pt-1 text-[10px] text-slate-400">
+                <span>Вопросы по оплате? Техподдержка: </span>
+                <a href="tel:+998507775152" className="text-emerald-400 font-mono font-bold hover:underline">+998 50 777 51 52</a>
+                <span> • </span>
+                <a href="https://t.me/yuksak_it" target="_blank" rel="noreferrer" className="text-sky-400 font-mono font-bold hover:underline">@yuksak_it</a>
+              </div>
             </form>
           </div>
         </div>

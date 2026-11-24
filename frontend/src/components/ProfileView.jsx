@@ -518,6 +518,23 @@ export function ProfileView({
             <span>{user.website}</span>
           </a>
         )}
+
+        {/* Tech Support Quick Contact Bar */}
+        <div className="mt-2.5 bg-slate-900/60 border border-slate-800 rounded-2xl p-2.5 flex items-center justify-between text-xs text-slate-300">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm">🛠️</span>
+            <div>
+              <span className="text-[11px] font-bold text-white block">Служба техподдержки:</span>
+              <span className="text-[10px] text-slate-400 font-mono">+998 50 777 51 52 • @yuksak_it</span>
+            </div>
+          </div>
+          <button
+            onClick={() => openTelegramChannel("@yuksak_it")}
+            className="bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold px-2.5 py-1 rounded-xl text-[10px] border border-slate-700 transition"
+          >
+            Связаться ↗
+          </button>
+        </div>
       </div>
 
       {/* Action Buttons Row */}
@@ -829,6 +846,58 @@ export function ProfileView({
                 <span className="text-xs font-bold text-slate-300">Законы РУз и правила платформы</span>
               </div>
               <span className="text-slate-400 text-xs">Читать ↗</span>
+            </div>
+
+            {/* Tech Support Contact Card */}
+            <div className="bg-gradient-to-r from-emerald-950/70 via-slate-950 to-teal-950/70 p-3.5 rounded-2xl border border-emerald-500/40 space-y-2.5">
+              <div className="flex items-center space-x-2.5">
+                <span className="text-xl">🛠️</span>
+                <div>
+                  <span className="text-xs font-bold text-white block">Служба технической поддержки</span>
+                  <span className="text-[10px] text-emerald-300">Помощь 24/7, вопросы по оплате и верификации</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-950/80 rounded-xl p-2.5 border border-slate-800 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 text-[11px]">📞 Телефон поддержки:</span>
+                  <a
+                    href="tel:+998507775152"
+                    className="text-emerald-400 font-mono font-bold hover:underline"
+                  >
+                    +998 50 777 51 52
+                  </a>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 text-[11px]">💬 Telegram поддержки:</span>
+                  <button
+                    type="button"
+                    onClick={() => openTelegramChannel("@yuksak_it")}
+                    className="text-sky-400 font-mono font-bold hover:underline flex items-center space-x-1"
+                  >
+                    <span>@yuksak_it</span>
+                    <span className="text-[10px]">↗</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex space-x-2 pt-0.5">
+                <a
+                  href="tel:+998507775152"
+                  className="flex-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
+                >
+                  <span>📞</span>
+                  <span>Позвонить</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => openTelegramChannel("@yuksak_it")}
+                  className="flex-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
+                >
+                  <span>💬</span>
+                  <span>Написать</span>
+                </button>
+              </div>
             </div>
 
             {/* Account Info */}

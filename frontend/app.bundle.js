@@ -3652,7 +3652,17 @@ function MarketplaceView({
     type: "submit",
     disabled: !receiptUrl || !agreedToTerms || submittingOrder,
     className: "flex-1 bg-gradient-to-r from-emerald-600 to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-xs font-black shadow-lg shadow-emerald-600/30"
-  }, submittingOrder ? "Отправка..." : "Отправить чек на проверку"))))));
+  }, submittingOrder ? "Отправка..." : "Отправить чек на проверку")), /*#__PURE__*/React.createElement("div", {
+    className: "text-center pt-1 text-[10px] text-slate-400"
+  }, /*#__PURE__*/React.createElement("span", null, "\u0412\u043E\u043F\u0440\u043E\u0441\u044B \u043F\u043E \u043E\u043F\u043B\u0430\u0442\u0435? \u0422\u0435\u0445\u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0430: "), /*#__PURE__*/React.createElement("a", {
+    href: "tel:+998507775152",
+    className: "text-emerald-400 font-mono font-bold hover:underline"
+  }, "+998 50 777 51 52"), /*#__PURE__*/React.createElement("span", null, " \u2022 "), /*#__PURE__*/React.createElement("a", {
+    href: "https://t.me/yuksak_it",
+    target: "_blank",
+    rel: "noreferrer",
+    className: "text-sky-400 font-mono font-bold hover:underline"
+  }, "@yuksak_it"))))));
 }
 
 // --- File: components/WalletModal.jsx ---
@@ -4688,7 +4698,20 @@ function ProfileView({
     target: "_blank",
     rel: "noreferrer",
     className: "text-xs text-pink-400 hover:text-pink-300 font-semibold mt-1.5 flex items-center space-x-1"
-  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDD17"), /*#__PURE__*/React.createElement("span", null, user.website))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDD17"), /*#__PURE__*/React.createElement("span", null, user.website)), /*#__PURE__*/React.createElement("div", {
+    className: "mt-2.5 bg-slate-900/60 border border-slate-800 rounded-2xl p-2.5 flex items-center justify-between text-xs text-slate-300"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm"
+  }, "\uD83D\uDEE0\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] font-bold text-white block"
+  }, "\u0421\u043B\u0443\u0436\u0431\u0430 \u0442\u0435\u0445\u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438:"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400 font-mono"
+  }, "+998 50 777 51 52 \u2022 @yuksak_it"))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => openTelegramChannel("@yuksak_it"),
+    className: "bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold px-2.5 py-1 rounded-xl text-[10px] border border-slate-700 transition"
+  }, "\u0421\u0432\u044F\u0437\u0430\u0442\u044C\u0441\u044F \u2197"))), /*#__PURE__*/React.createElement("div", {
     className: "flex space-x-2"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
@@ -4913,6 +4936,44 @@ function ProfileView({
   }, "\u0417\u0430\u043A\u043E\u043D\u044B \u0420\u0423\u0437 \u0438 \u043F\u0440\u0430\u0432\u0438\u043B\u0430 \u043F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u044B")), /*#__PURE__*/React.createElement("span", {
     className: "text-slate-400 text-xs"
   }, "\u0427\u0438\u0442\u0430\u0442\u044C \u2197")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-r from-emerald-950/70 via-slate-950 to-teal-950/70 p-3.5 rounded-2xl border border-emerald-500/40 space-y-2.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xl"
+  }, "\uD83D\uDEE0\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-white block"
+  }, "\u0421\u043B\u0443\u0436\u0431\u0430 \u0442\u0435\u0445\u043D\u0438\u0447\u0435\u0441\u043A\u043E\u0439 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-emerald-300"
+  }, "\u041F\u043E\u043C\u043E\u0449\u044C 24/7, \u0432\u043E\u043F\u0440\u043E\u0441\u044B \u043F\u043E \u043E\u043F\u043B\u0430\u0442\u0435 \u0438 \u0432\u0435\u0440\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438"))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950/80 rounded-xl p-2.5 border border-slate-800 space-y-2 text-xs"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 text-[11px]"
+  }, "\uD83D\uDCDE \u0422\u0435\u043B\u0435\u0444\u043E\u043D \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438:"), /*#__PURE__*/React.createElement("a", {
+    href: "tel:+998507775152",
+    className: "text-emerald-400 font-mono font-bold hover:underline"
+  }, "+998 50 777 51 52")), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 text-[11px]"
+  }, "\uD83D\uDCAC Telegram \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438:"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => openTelegramChannel("@yuksak_it"),
+    className: "text-sky-400 font-mono font-bold hover:underline flex items-center space-x-1"
+  }, /*#__PURE__*/React.createElement("span", null, "@yuksak_it"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px]"
+  }, "\u2197")))), /*#__PURE__*/React.createElement("div", {
+    className: "flex space-x-2 pt-0.5"
+  }, /*#__PURE__*/React.createElement("a", {
+    href: "tel:+998507775152",
+    className: "flex-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCDE"), /*#__PURE__*/React.createElement("span", null, "\u041F\u043E\u0437\u0432\u043E\u043D\u0438\u0442\u044C")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => openTelegramChannel("@yuksak_it"),
+    className: "flex-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCAC"), /*#__PURE__*/React.createElement("span", null, "\u041D\u0430\u043F\u0438\u0441\u0430\u0442\u044C")))), /*#__PURE__*/React.createElement("div", {
     className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-1.5 text-xs"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex justify-between text-slate-400"

@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     COIN_PRICE_UZS: int = int(os.getenv("COIN_PRICE_UZS", "100"))
     ADMIN_TELEGRAM_IDS: list = [1477103854, 8787674425]
     OFFICIAL_EMAIL: str = "venstogram@gmail.com"
+    SUPPORT_PHONE: str = "+998 50 777 51 52"
+    SUPPORT_TELEGRAM: str = "yuksak_it"
     
     UPLOAD_DIR: str = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads"))
 
