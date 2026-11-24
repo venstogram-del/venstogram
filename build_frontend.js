@@ -20,6 +20,7 @@ const files = [
   'components/MarketplaceView.jsx',
   'components/WalletModal.jsx',
   'components/EmailAuthModal.jsx',
+  'components/FounderQuestModal.jsx',
   'components/ProfileView.jsx',
   'components/AdminView.jsx',
   'components/CreatePostModal.jsx',

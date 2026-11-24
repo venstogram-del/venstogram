@@ -1032,6 +1032,20 @@ function Header({
   onOpenCreate,
   onOpenChat
 }) {
+  const [supportOpen, setSupportOpen] = useState(false);
+  const openTelegramChannel = channel => {
+    triggerHaptic("light");
+    let url = channel;
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      const cleaned = url.replace("@", "");
+      url = `https://t.me/${cleaned}`;
+    }
+    if (window.Telegram?.WebApp?.openTelegramLink) {
+      window.Telegram.WebApp.openTelegramLink(url);
+    } else {
+      window.open(url, "_blank");
+    }
+  };
   return /*#__PURE__*/React.createElement("header", {
     className: "sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 px-4 py-2.5 flex items-center justify-between"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1045,7 +1059,7 @@ function Header({
   }, "Venstogram"), /*#__PURE__*/React.createElement("span", {
     className: "text-[10px] text-pink-400 font-semibold tracking-wider uppercase"
   }, "Live & Social"))), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-3"
+    className: "flex items-center space-x-2.5"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       triggerHaptic("medium");
@@ -1082,7 +1096,67 @@ function Header({
     d: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
   })), /*#__PURE__*/React.createElement("span", {
     className: "absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse"
-  }))));
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      triggerHaptic("light");
+      setSupportOpen(true);
+    },
+    className: "p-1.5 text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-colors flex items-center justify-center",
+    title: "\u0421\u043B\u0443\u0436\u0431\u0430 \u0442\u0435\u0445\u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm font-black tracking-widest leading-none px-0.5 text-slate-300 hover:text-white"
+  }, "\u22EF"))), supportOpen && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 pt-16 animate-in fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm space-y-4 shadow-2xl relative"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between border-b border-slate-800 pb-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xl"
+  }, "\uD83D\uDEE0\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-black text-white"
+  }, "\u0421\u043B\u0443\u0436\u0431\u0430 \u0442\u0435\u0445\u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[10px] text-slate-400"
+  }, "\u041F\u043E\u043C\u043E\u0449\u044C 24/7 \u043F\u043E \u043B\u044E\u0431\u044B\u043C \u0432\u043E\u043F\u0440\u043E\u0441\u0430\u043C"))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSupportOpen(false),
+    className: "w-7 h-7 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold text-xs"
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2.5 text-xs"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 text-[11px]"
+  }, "\uD83D\uDCDE \u0422\u0435\u043B\u0435\u0444\u043E\u043D \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438:"), /*#__PURE__*/React.createElement("a", {
+    href: "tel:+998507775152",
+    className: "text-emerald-400 font-mono font-bold hover:underline"
+  }, "+998 50 777 51 52")), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 text-[11px]"
+  }, "\uD83D\uDCAC Telegram \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438:"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => openTelegramChannel("@yuksak_it"),
+    className: "text-sky-400 font-mono font-bold hover:underline flex items-center space-x-1"
+  }, /*#__PURE__*/React.createElement("span", null, "@yuksak_it"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px]"
+  }, "\u2197"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 text-[11px]"
+  }, "\uD83D\uDCE7 \u041E\u0444\u0438\u0446\u0438\u0430\u043B\u044C\u043D\u0430\u044F \u043F\u043E\u0447\u0442\u0430:"), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-300 font-mono text-[11px]"
+  }, "venstogram@gmail.com"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex space-x-2"
+  }, /*#__PURE__*/React.createElement("a", {
+    href: "tel:+998507775152",
+    className: "flex-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 py-2.5 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCDE"), /*#__PURE__*/React.createElement("span", null, "\u041F\u043E\u0437\u0432\u043E\u043D\u0438\u0442\u044C")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => openTelegramChannel("@yuksak_it"),
+    className: "flex-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40 py-2.5 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCAC"), /*#__PURE__*/React.createElement("span", null, "\u041D\u0430\u043F\u0438\u0441\u0430\u0442\u044C"))))));
 }
 
 // --- File: components/BottomNav.jsx ---
@@ -4268,6 +4342,259 @@ function EmailAuthModal({
   }, loading ? "Сохранение..." : "Сохранить новый пароль и войти")))));
 }
 
+// --- File: components/FounderQuestModal.jsx ---
+
+function FounderQuestModal({
+  user,
+  onClose,
+  onUserUpdated
+}) {
+  const [quest, setQuest] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [claiming, setClaiming] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  useEffect(() => {
+    loadQuestData();
+  }, []);
+  const loadQuestData = async () => {
+    try {
+      setLoading(true);
+      const data = await Api.get("/users/founder-quest");
+      if (data && (data.status === "ok" || data.referral_link)) {
+        setQuest(data);
+      } else {
+        setQuest({
+          referrals_count: 0,
+          followers_count: 0,
+          posts_count: 0,
+          views_count: 0,
+          targets: {
+            referrals: 50,
+            followers: 500,
+            posts: 10,
+            views: 5000
+          },
+          referral_link: `https://t.me/venstogrambot?start=ref_${user?.id || 1477103854}`,
+          is_eligible: user?.role === "director",
+          has_claimed: user?.badge_type === "gold_founder"
+        });
+      }
+    } catch (err) {
+      console.warn("Fallback quest data:", err);
+      setQuest({
+        referrals_count: 0,
+        followers_count: 0,
+        posts_count: 0,
+        views_count: 0,
+        targets: {
+          referrals: 50,
+          followers: 500,
+          posts: 10,
+          views: 5000
+        },
+        referral_link: `https://t.me/venstogrambot?start=ref_${user?.id || 1477103854}`,
+        is_eligible: user?.role === "director",
+        has_claimed: user?.badge_type === "gold_founder"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleCopyLink = () => {
+    if (!quest?.referral_link) return;
+    navigator.clipboard.writeText(quest.referral_link);
+    setCopied(true);
+    triggerHaptic("medium");
+    setTimeout(() => setCopied(false), 2500);
+  };
+  const handleShareTelegram = () => {
+    if (!quest?.referral_link) return;
+    triggerHaptic("heavy");
+    const text = encodeURIComponent("🚀 Присоединяйся ко мне в Venstogram — новой соцсети с крутыми Reels, маркетплейсом никнеймов и живыми баттлами! Переходи по моей ссылке:");
+    const url = encodeURIComponent(quest.referral_link);
+    window.open(`https://t.me/share/url?url=${url}&text=${text}`, "_blank");
+  };
+  const handleClaim = async () => {
+    setErrorMsg("");
+    setSuccessMsg("");
+    setClaiming(true);
+    triggerHaptic("heavy");
+    try {
+      const res = await Api.post("/users/founder-quest/claim", {});
+      SoundEngine.playFanfare();
+      setSuccessMsg(res.message || "Поздравляем! Вам вручена Золотая Галочка!");
+      if (onUserUpdated) {
+        onUserUpdated(res.user);
+      }
+      loadQuestData();
+    } catch (err) {
+      setErrorMsg(err.message || "Не удалось получить награду. Проверьте условия.");
+    } finally {
+      setClaiming(false);
+    }
+  };
+  const targets = quest?.targets || {
+    referrals: 50,
+    followers: 500,
+    posts: 10,
+    views: 5000
+  };
+  const refs = quest?.referrals_count || 0;
+  const followers = quest?.followers_count || 0;
+  const posts = quest?.posts_count || 0;
+  const views = quest?.views_count || 0;
+  const refPct = Math.min(100, Math.round(refs / targets.referrals * 100));
+  const folPct = Math.min(100, Math.round(followers / targets.followers * 100));
+  const postPct = Math.min(100, Math.round(posts / targets.posts * 100));
+  const viewPct = Math.min(100, Math.round(views / targets.views * 100));
+  const isEligible = quest?.is_eligible || quest?.is_eligible_for_claim || user?.role === "director";
+  const hasClaimed = quest?.has_claimed || quest?.is_golden_winner || user?.badge_type === "gold_founder";
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex flex-col justify-end sm:justify-center p-0 sm:p-4 animate-in fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-900 border-t sm:border border-amber-500/40 rounded-t-3xl sm:rounded-3xl max-w-lg w-full mx-auto max-h-[92vh] flex flex-col overflow-hidden shadow-2xl shadow-amber-500/10"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-5 py-4 bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border-b border-amber-500/30 flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-600 text-slate-950 flex items-center justify-center font-black text-xl shadow-lg shadow-amber-500/30"
+  }, "\uD83D\uDC51"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-black text-white uppercase tracking-wide"
+  }, "\u041B\u0438\u0433\u0430 \u0411\u043B\u043E\u0433\u0435\u0440\u043E\u0432"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/40"
+  }, "\u0421\u043E\u0441\u0442\u044F\u0437\u0430\u043D\u0438\u0435")), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-amber-200/80"
+  }, "\u041A\u0432\u0435\u0441\u0442 \u043E\u0442 \u041E\u0441\u043D\u043E\u0432\u0430\u0442\u0435\u043B\u044F & \u0414\u0438\u0440\u0435\u043A\u0446\u0438\u0438 \u043F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u044B"))), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold text-sm"
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "p-5 overflow-y-auto space-y-4 flex-1 text-slate-200"
+  }, errorMsg && /*#__PURE__*/React.createElement("div", {
+    className: "bg-rose-950/70 border border-rose-500/50 p-3 rounded-2xl text-xs text-rose-300"
+  }, "\u26A0\uFE0F ", errorMsg), successMsg && /*#__PURE__*/React.createElement("div", {
+    className: "bg-emerald-950/70 border border-emerald-500/50 p-3 rounded-2xl text-xs text-emerald-300 font-medium"
+  }, "\uD83C\uDF89 ", successMsg), /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-br from-slate-950 to-amber-950/30 border border-amber-500/20 rounded-2xl p-3.5 space-y-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-semibold text-amber-300 flex items-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", null, "\u26A1"), /*#__PURE__*/React.createElement("span", null, "\u0418\u0441\u043F\u044B\u0442\u0430\u043D\u0438\u0435 \u0434\u043B\u044F \u0432\u0435\u0440\u043D\u044B\u0445 \u0431\u043B\u043E\u0433\u0435\u0440\u043E\u0432 \u0438 \u0441\u043E\u0437\u0434\u0430\u0442\u0435\u043B\u0435\u0439 \u043A\u043E\u043D\u0442\u0435\u043D\u0442\u0430")), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-300 leading-relaxed"
+  }, "\u0412\u044B\u043F\u043E\u043B\u043D\u0438\u0442\u0435 4 \u043A\u043B\u044E\u0447\u0435\u0432\u044B\u0445 \u0437\u0430\u0434\u0430\u043D\u0438\u044F \u044D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u044B: \u0441\u043E\u0431\u0435\u0440\u0438\u0442\u0435 \u0432\u0435\u0440\u043D\u0443\u044E \u0430\u0443\u0434\u0438\u0442\u043E\u0440\u0438\u044E, \u043F\u0440\u0438\u0432\u043B\u0435\u043A\u0430\u0439\u0442\u0435 \u043D\u043E\u0432\u044B\u0445 \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u043E\u0432 \u0438 \u0443\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0439\u0442\u0435 \u0432\u044B\u0441\u043E\u043A\u0438\u0435 \u043E\u0445\u0432\u0430\u0442\u044B. \u041F\u043E\u0431\u0435\u0434\u0438\u0442\u0435\u043B\u0438 \u043F\u043E\u043B\u0443\u0447\u0430\u044E\u0442 \u0432\u0435\u0447\u043D\u044B\u0439 \u0441\u0442\u0430\u0442\u0443\u0441 \u0438 \u044D\u043A\u0441\u043A\u043B\u044E\u0437\u0438\u0432\u043D\u044B\u0435 \u043F\u0440\u0438\u0432\u0438\u043B\u0435\u0433\u0438\u0438 \u043E\u0442 \u0414\u0438\u0440\u0435\u043A\u0442\u043E\u0440\u0430.")), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950/80 border border-amber-500/30 rounded-2xl p-3 text-center space-y-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-2xl block"
+  }, "\uD83D\uDC51"), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-black text-amber-300"
+  }, "\u0417\u043E\u043B\u043E\u0442\u0430\u044F \u0413\u0430\u043B\u043E\u0447\u043A\u0430"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[10px] text-slate-400 leading-tight"
+  }, "\u04455 \u043F\u0440\u0438\u043E\u0440\u0438\u0442\u0435\u0442 \u0432\u043E \u0432\u0441\u0435\u0445 \u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0430\u0446\u0438\u044F\u0445 Reels \u0438 \u041B\u0435\u043D\u0442\u044B")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950/80 border border-amber-500/30 rounded-2xl p-3 text-center space-y-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-2xl block"
+  }, "\uD83D\uDC8E"), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-black text-amber-300"
+  }, "\u0420\u0435\u0434\u043A\u0438\u0439 @\u043D\u0438\u043A\u043D\u0435\u0439\u043C"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[10px] text-slate-400 leading-tight"
+  }, "\u0411\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u044B\u0439 \u043F\u043E\u0434\u0430\u0440\u043E\u043A \u0438\u0437 \u0437\u043E\u043B\u043E\u0442\u043E\u0433\u043E \u0440\u0435\u0437\u0435\u0440\u0432\u0430 \u043E\u0442 \u0414\u0438\u0440\u0435\u043A\u0442\u043E\u0440\u0430"))), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-black uppercase text-slate-400 tracking-wider"
+  }, "\u041F\u0440\u043E\u0433\u0440\u0435\u0441\u0441 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u044F \u0437\u0430\u0434\u0430\u043D\u0438\u0439"), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-1.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-center text-xs"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-bold flex items-center space-x-1.5 text-white"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDC65"), /*#__PURE__*/React.createElement("span", null, "\u041F\u0440\u0438\u0433\u043B\u0430\u0441\u0438\u0442\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439 \u0432 \u0431\u043E\u0442\u0430:")), /*#__PURE__*/React.createElement("span", {
+    className: `font-mono font-bold ${refs >= targets.referrals ? "text-emerald-400" : "text-amber-400"}`
+  }, refs, " / ", targets.referrals, " ", refs >= targets.referrals && "✓")), /*#__PURE__*/React.createElement("div", {
+    className: "w-full bg-slate-800 h-2 rounded-full overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-r from-amber-500 to-yellow-400 h-full transition-all duration-500",
+    style: {
+      width: `${refPct}%`
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-1.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-center text-xs"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-bold flex items-center space-x-1.5 text-white"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83C\uDF1F"), /*#__PURE__*/React.createElement("span", null, "\u041F\u043E\u0434\u043F\u0438\u0441\u0447\u0438\u043A\u0438 \u043F\u0440\u043E\u0444\u0438\u043B\u044F:")), /*#__PURE__*/React.createElement("span", {
+    className: `font-mono font-bold ${followers >= targets.followers ? "text-emerald-400" : "text-amber-400"}`
+  }, followers, " / ", targets.followers, " ", followers >= targets.followers && "✓")), /*#__PURE__*/React.createElement("div", {
+    className: "w-full bg-slate-800 h-2 rounded-full overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-r from-amber-500 to-yellow-400 h-full transition-all duration-500",
+    style: {
+      width: `${folPct}%`
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-1.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-center text-xs"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-bold flex items-center space-x-1.5 text-white"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCF8"), /*#__PURE__*/React.createElement("span", null, "\u041E\u043F\u0443\u0431\u043B\u0438\u043A\u043E\u0432\u0430\u043D\u043E \u043F\u043E\u0441\u0442\u043E\u0432 / Reels:")), /*#__PURE__*/React.createElement("span", {
+    className: `font-mono font-bold ${posts >= targets.posts ? "text-emerald-400" : "text-amber-400"}`
+  }, posts, " / ", targets.posts, " ", posts >= targets.posts && "✓")), /*#__PURE__*/React.createElement("div", {
+    className: "w-full bg-slate-800 h-2 rounded-full overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-r from-amber-500 to-yellow-400 h-full transition-all duration-500",
+    style: {
+      width: `${postPct}%`
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-1.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-center text-xs"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-bold flex items-center space-x-1.5 text-white"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDC41\uFE0F"), /*#__PURE__*/React.createElement("span", null, "\u0421\u0443\u043C\u043C\u0430\u0440\u043D\u044B\u0435 \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u044B \u0432\u0438\u0434\u0435\u043E:")), /*#__PURE__*/React.createElement("span", {
+    className: `font-mono font-bold ${views >= targets.views ? "text-emerald-400" : "text-amber-400"}`
+  }, views.toLocaleString(), " / ", targets.views.toLocaleString(), " ", views >= targets.views && "✓")), /*#__PURE__*/React.createElement("div", {
+    className: "w-full bg-slate-800 h-2 rounded-full overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-r from-amber-500 to-yellow-400 h-full transition-all duration-500",
+    style: {
+      width: `${viewPct}%`
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950 border border-amber-500/30 rounded-2xl p-3.5 space-y-2.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-white flex items-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDD17"), /*#__PURE__*/React.createElement("span", null, "\u0412\u0430\u0448\u0430 \u0440\u0435\u0444\u0435\u0440\u0430\u043B\u044C\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430:")), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-amber-400 font-medium"
+  }, "\u041A\u0430\u0436\u0434\u044B\u0439 \u043F\u0435\u0440\u0435\u0445\u043E\u0434 = +1 \u0432 \u043F\u0440\u043E\u0433\u0440\u0435\u0441\u0441")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs font-mono text-amber-200 select-all break-all"
+  }, quest?.referral_link || `https://t.me/venstogrambot?start=ref_${user?.id || ""}`), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleCopyLink,
+    className: "w-full bg-slate-800 hover:bg-slate-700 active:scale-95 text-xs font-bold py-2 rounded-xl text-white transition flex items-center justify-center space-x-1"
+  }, /*#__PURE__*/React.createElement("span", null, copied ? "✅ Скопировано" : "📋 Скопировать")), /*#__PURE__*/React.createElement("button", {
+    onClick: handleShareTelegram,
+    className: "w-full bg-sky-600 hover:bg-sky-500 active:scale-95 text-xs font-bold py-2 rounded-xl text-white transition flex items-center justify-center space-x-1"
+  }, /*#__PURE__*/React.createElement("span", null, "\u2708\uFE0F \u041F\u043E\u0434\u0435\u043B\u0438\u0442\u044C\u0441\u044F"))))), /*#__PURE__*/React.createElement("div", {
+    className: "p-4 bg-slate-950 border-t border-slate-800 space-y-2"
+  }, hasClaimed ? /*#__PURE__*/React.createElement("div", {
+    className: "w-full py-3 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 rounded-2xl text-center text-xs font-black text-amber-300 flex items-center justify-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDC51"), /*#__PURE__*/React.createElement("span", null, "\u0412\u044B \u0443\u0436\u0435 \u044F\u0432\u043B\u044F\u0435\u0442\u0435\u0441\u044C \u043F\u043E\u0447\u0435\u0442\u043D\u044B\u043C \u0447\u043B\u0435\u043D\u043E\u043C \u041B\u0438\u0433\u0438 \u041E\u0441\u043D\u043E\u0432\u0430\u0442\u0435\u043B\u044F!")) : /*#__PURE__*/React.createElement("button", {
+    onClick: handleClaim,
+    disabled: !isEligible || claiming,
+    className: `w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wide transition-all shadow-lg flex items-center justify-center space-x-2 ${isEligible ? "bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 shadow-amber-500/30 active:scale-98 animate-pulse" : "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50"}`
+  }, /*#__PURE__*/React.createElement("span", null, claiming ? "Проверка..." : isEligible ? "👑 ЗАБРАТЬ ЗОЛОТУЮ ГАЛОЧКУ И ПРИЗ!" : "🔒 Выполните все 4 условия для награды")))));
+}
+
 // --- File: components/ProfileView.jsx ---
 
 function ProfileView({
@@ -4345,81 +4672,29 @@ function ProfileView({
   const [biometricActive, setBiometricActive] = useState(user?.biometric_enabled || false);
   const fileInputRef = useRef(null);
 
-  // Sample dynamic publications for current profile
-  const userPosts = [{
-    id: 101,
-    caption: "Новый день — новые победы в VENSTOGRAM! 🚀 #venstogram #tashkent #live",
-    media_urls: ["https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80"],
-    likes_count: 342,
-    views_count: 1850,
-    comments_count: 28,
-    is_liked: true,
-    author: user
-  }, {
-    id: 102,
-    caption: "Красивый вечер в Ташкенте 🇺🇿✨ #uzbekistan #tashkentcity #evening",
-    media_urls: ["https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&auto=format&fit=crop&q=80"],
-    likes_count: 512,
-    views_count: 2940,
-    comments_count: 45,
-    is_liked: false,
-    author: user
-  }, {
-    id: 103,
-    caption: "Качественный контент и живые рекомендации! 💎 #blogger #uzb #recommendations",
-    media_urls: ["https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&auto=format&fit=crop&q=80"],
-    likes_count: 278,
-    views_count: 1420,
-    comments_count: 19,
-    is_liked: true,
-    author: user
-  }, {
-    id: 104,
-    caption: "Готовим грандиозный запуск обновления! #tech #startup #venstogram",
-    media_urls: ["https://images.unsplash.com/photo-1545128485-c400e7702796?w=600&auto=format&fit=crop&q=80"],
-    likes_count: 689,
-    views_count: 4100,
-    comments_count: 52,
-    is_liked: false,
-    author: user
-  }, {
-    id: 105,
-    caption: "Атмосфера настоящего творчества 🎨 #creative #lifestyle",
-    media_urls: ["https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=600&auto=format&fit=crop&q=80"],
-    likes_count: 410,
-    views_count: 2300,
-    comments_count: 33,
-    is_liked: false,
-    author: user
-  }, {
-    id: 106,
-    caption: "Всем отличного настроения и продуктивной недели! 🌟 #samarkand #bukhara",
-    media_urls: ["https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&auto=format&fit=crop&q=80"],
-    likes_count: 890,
-    views_count: 5800,
-    comments_count: 67,
-    is_liked: true,
-    author: user
-  }];
-  const userReels = [{
-    id: 201,
-    caption: "Топ фишек в новом обновлении VENSTOGRAM 🔥 #reels #trend",
-    media_urls: ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600"],
-    likes_count: 1420,
-    views_count: 12400,
-    comments_count: 112,
-    is_liked: true,
-    author: user
-  }, {
-    id: 202,
-    caption: "Как взлететь в рекомендации за 1 день? Смотри до конца! 🚀 #recommendations",
-    media_urls: ["https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600"],
-    likes_count: 2890,
-    views_count: 24500,
-    comments_count: 240,
-    is_liked: true,
-    author: user
-  }];
+  // Dynamic publications and reels loaded from API
+  const [userPosts, setUserPosts] = useState([]);
+  const [userReels, setUserReels] = useState([]);
+  const [contentLoading, setContentLoading] = useState(false);
+  useEffect(() => {
+    if (user?.id) {
+      loadUserContent();
+    }
+  }, [user?.id]);
+  const loadUserContent = async () => {
+    try {
+      setContentLoading(true);
+      const [postsData, reelsData] = await Promise.all([Api.get(`/users/${user.id}/posts`), Api.get(`/users/${user.id}/reels`)]);
+      setUserPosts(Array.isArray(postsData) ? postsData : []);
+      setUserReels(Array.isArray(reelsData) ? reelsData : []);
+    } catch (err) {
+      console.warn("Failed loading user posts/reels:", err);
+      setUserPosts([]);
+      setUserReels([]);
+    } finally {
+      setContentLoading(false);
+    }
+  };
   const handleAvatarFileChange = async e => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -4638,15 +4913,15 @@ function ProfileView({
     className: "flex-1 flex justify-around text-center"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "text-base font-black text-white block"
-  }, userPosts.length), /*#__PURE__*/React.createElement("span", {
+  }, userPosts.length + userReels.length), /*#__PURE__*/React.createElement("span", {
     className: "text-[11px] text-slate-400"
-  }, "\u041F\u043E\u0441\u0442\u043E\u0432")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+  }, "\u041F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0439")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "text-base font-black text-white block"
-  }, "1.4K"), /*#__PURE__*/React.createElement("span", {
+  }, user.followers_count || 0), /*#__PURE__*/React.createElement("span", {
     className: "text-[11px] text-slate-400"
   }, "\u041F\u043E\u0434\u043F\u0438\u0441\u0447\u0438\u043A\u043E\u0432")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "text-base font-black text-white block"
-  }, "348"), /*#__PURE__*/React.createElement("span", {
+  }, user.following_count || 0), /*#__PURE__*/React.createElement("span", {
     className: "text-[11px] text-slate-400"
   }, "\u041F\u043E\u0434\u043F\u0438\u0441\u043E\u043A")))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-1.5"
@@ -4745,7 +5020,21 @@ function ProfileView({
       setActiveTab("saved");
     },
     className: `flex-1 pb-2 text-xs font-bold border-b-2 transition-all ${activeTab === "saved" ? "border-pink-500 text-white" : "border-transparent text-slate-500"}`
-  }, "\uD83D\uDD16 \u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043D\u043E\u0435")), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDD16 \u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043D\u043E\u0435")), contentLoading ? /*#__PURE__*/React.createElement("div", {
+    className: "py-12 text-center text-slate-500"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-6 h-6 border-2 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs"
+  }, "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043A\u043E\u043D\u0442\u0435\u043D\u0442\u0430...")) : displayList.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "py-12 px-4 text-center bg-slate-900/40 border border-slate-800/80 rounded-2xl my-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-3xl block mb-2"
+  }, activeTab === "reels" ? "🎬" : "📸"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-white mb-1"
+  }, activeTab === "reels" ? "У вас пока нет Reels" : "У вас пока нет публикаций"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-400 mb-3 max-w-xs mx-auto"
+  }, activeTab === "reels" ? "Загрузите первое видео, чтобы набрать просмотры и попасть в рекомендации!" : "Делитесь своими моментами, публикуйте фото и привлекайте подписчиков!")) : /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-3 gap-1.5 pt-1"
   }, displayList.map(postItem => /*#__PURE__*/React.createElement("div", {
     key: postItem.id,
@@ -4755,19 +5044,22 @@ function ProfileView({
     },
     className: "aspect-square bg-slate-900 overflow-hidden rounded-xl relative group cursor-pointer border border-slate-800/80 hover:border-pink-500/60 transition-all shadow-sm"
   }, /*#__PURE__*/React.createElement("img", {
-    src: postItem.media_urls[0],
+    src: postItem.media_urls?.[0] || postItem.video_url || "/placeholder.jpg",
     alt: "Post thumbnail",
     className: "w-full h-full object-cover group-hover:scale-105 transition-transform"
   }), activeTab === "reels" && /*#__PURE__*/React.createElement("div", {
     className: "absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-sm rounded-lg p-1 text-white text-[10px]"
   }, "\u25B6"), /*#__PURE__*/React.createElement("div", {
     className: "absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 flex items-center justify-between text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity"
-  }, /*#__PURE__*/React.createElement("span", null, "\u2764\uFE0F ", postItem.likes_count), /*#__PURE__*/React.createElement("span", null, "\uD83D\uDC41\uFE0F ", postItem.views_count))))), selectedPost && /*#__PURE__*/React.createElement(PostModal, {
+  }, /*#__PURE__*/React.createElement("span", null, "\u2764\uFE0F ", postItem.likes_count || 0), /*#__PURE__*/React.createElement("span", null, "\uD83D\uDC41\uFE0F ", postItem.views_count || 0))))), selectedPost && /*#__PURE__*/React.createElement(PostModal, {
     post: selectedPost,
     currentUser: user,
     onClose: () => setSelectedPost(null),
     onPostDeleted: deletedId => {
       setSelectedPost(null);
+      setUserPosts(prev => prev.filter(p => p.id !== deletedId));
+      setUserReels(prev => prev.filter(r => r.id !== deletedId));
+      triggerHaptic("success");
     }
   }), settingsOpen && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 animate-in fade-in duration-150"
@@ -4781,10 +5073,48 @@ function ProfileView({
     className: "text-xl"
   }, "\u2699\uFE0F"), /*#__PURE__*/React.createElement("h3", {
     className: "text-base font-black text-white"
-  }, "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0438 \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C")), /*#__PURE__*/React.createElement("button", {
+  }, "\u041C\u0435\u043D\u044E \u0438 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setSettingsOpen(false),
     className: "text-slate-400 hover:text-white text-lg p-1"
   }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-r from-emerald-950/90 via-slate-950 to-teal-950/90 p-3.5 rounded-2xl border border-emerald-500/50 space-y-2.5 shadow-lg shadow-emerald-500/10"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-2xl"
+  }, "\uD83D\uDEE0\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-black text-white block"
+  }, "\u0421\u043B\u0443\u0436\u0431\u0430 \u0442\u0435\u0445\u043D\u0438\u0447\u0435\u0441\u043A\u043E\u0439 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-emerald-300"
+  }, "\u041F\u043E\u043C\u043E\u0449\u044C 24/7, \u0432\u043E\u043F\u0440\u043E\u0441\u044B \u043F\u043E \u043E\u043F\u043B\u0430\u0442\u0435, \u043D\u0438\u043A\u043D\u0435\u0439\u043C\u0430\u043C \u0438 \u0432\u0435\u0440\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438"))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-950/80 rounded-xl p-2.5 border border-slate-800 space-y-2 text-xs"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 text-[11px]"
+  }, "\uD83D\uDCDE \u0422\u0435\u043B\u0435\u0444\u043E\u043D \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438:"), /*#__PURE__*/React.createElement("a", {
+    href: "tel:+998507775152",
+    className: "text-emerald-400 font-mono font-bold hover:underline"
+  }, "+998 50 777 51 52")), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400 text-[11px]"
+  }, "\uD83D\uDCAC Telegram \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438:"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => openTelegramChannel("@yuksak_it"),
+    className: "text-sky-400 font-mono font-bold hover:underline flex items-center space-x-1"
+  }, /*#__PURE__*/React.createElement("span", null, "@yuksak_it"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px]"
+  }, "\u2197")))), /*#__PURE__*/React.createElement("div", {
+    className: "flex space-x-2 pt-0.5"
+  }, /*#__PURE__*/React.createElement("a", {
+    href: "tel:+998507775152",
+    className: "flex-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCDE"), /*#__PURE__*/React.createElement("span", null, "\u041F\u043E\u0437\u0432\u043E\u043D\u0438\u0442\u044C")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => openTelegramChannel("@yuksak_it"),
+    className: "flex-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCAC"), /*#__PURE__*/React.createElement("span", null, "\u041D\u0430\u043F\u0438\u0441\u0430\u0442\u044C")))), /*#__PURE__*/React.createElement("div", {
     className: "bg-gradient-to-r from-sky-950/80 via-blue-900/40 to-slate-950 p-3.5 rounded-2xl border border-sky-500/40 space-y-2"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between"
@@ -4936,44 +5266,6 @@ function ProfileView({
   }, "\u0417\u0430\u043A\u043E\u043D\u044B \u0420\u0423\u0437 \u0438 \u043F\u0440\u0430\u0432\u0438\u043B\u0430 \u043F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u044B")), /*#__PURE__*/React.createElement("span", {
     className: "text-slate-400 text-xs"
   }, "\u0427\u0438\u0442\u0430\u0442\u044C \u2197")), /*#__PURE__*/React.createElement("div", {
-    className: "bg-gradient-to-r from-emerald-950/70 via-slate-950 to-teal-950/70 p-3.5 rounded-2xl border border-emerald-500/40 space-y-2.5"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2.5"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-xl"
-  }, "\uD83D\uDEE0\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-bold text-white block"
-  }, "\u0421\u043B\u0443\u0436\u0431\u0430 \u0442\u0435\u0445\u043D\u0438\u0447\u0435\u0441\u043A\u043E\u0439 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438"), /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] text-emerald-300"
-  }, "\u041F\u043E\u043C\u043E\u0449\u044C 24/7, \u0432\u043E\u043F\u0440\u043E\u0441\u044B \u043F\u043E \u043E\u043F\u043B\u0430\u0442\u0435 \u0438 \u0432\u0435\u0440\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438"))), /*#__PURE__*/React.createElement("div", {
-    className: "bg-slate-950/80 rounded-xl p-2.5 border border-slate-800 space-y-2 text-xs"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-slate-400 text-[11px]"
-  }, "\uD83D\uDCDE \u0422\u0435\u043B\u0435\u0444\u043E\u043D \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438:"), /*#__PURE__*/React.createElement("a", {
-    href: "tel:+998507775152",
-    className: "text-emerald-400 font-mono font-bold hover:underline"
-  }, "+998 50 777 51 52")), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-slate-400 text-[11px]"
-  }, "\uD83D\uDCAC Telegram \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0438:"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => openTelegramChannel("@yuksak_it"),
-    className: "text-sky-400 font-mono font-bold hover:underline flex items-center space-x-1"
-  }, /*#__PURE__*/React.createElement("span", null, "@yuksak_it"), /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px]"
-  }, "\u2197")))), /*#__PURE__*/React.createElement("div", {
-    className: "flex space-x-2 pt-0.5"
-  }, /*#__PURE__*/React.createElement("a", {
-    href: "tel:+998507775152",
-    className: "flex-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
-  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCDE"), /*#__PURE__*/React.createElement("span", null, "\u041F\u043E\u0437\u0432\u043E\u043D\u0438\u0442\u044C")), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => openTelegramChannel("@yuksak_it"),
-    className: "flex-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
-  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCAC"), /*#__PURE__*/React.createElement("span", null, "\u041D\u0430\u043F\u0438\u0441\u0430\u0442\u044C")))), /*#__PURE__*/React.createElement("div", {
     className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-1.5 text-xs"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex justify-between text-slate-400"
@@ -5033,41 +5325,89 @@ function ProfileView({
   }, "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0437\u0430\u0449\u0438\u0442\u0443")))), verifiedModalOpen && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm space-y-4"
+    className: "bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between border-b border-slate-800 pb-2"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "text-sm font-black text-white flex items-center space-x-1.5"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-sky-400"
-  }, "\u2713"), /*#__PURE__*/React.createElement("span", null, "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435 Venstogram Verified")), /*#__PURE__*/React.createElement("button", {
+  }, "\u2713"), /*#__PURE__*/React.createElement("span", null, "\u0421\u0442\u0430\u0442\u0443\u0441\u044B \u0432\u0435\u0440\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438 Venstogram")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setVerifiedModalOpen(false),
-    className: "text-slate-400 hover:text-white"
-  }, "\u2715")), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-300"
-  }, "\u041E\u0434\u0438\u043D \u0440\u0430\u0437 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u043B \u0433\u0430\u043B\u043E\u0447\u043A\u0443 \u2014 \u0438 \u0442\u0432\u043E\u0438 \u0440\u043E\u043B\u0438\u043A\u0438 \u0438 \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0438 \u043C\u043E\u043C\u0435\u043D\u0442\u0430\u043B\u044C\u043D\u043E \u043F\u043E\u043B\u0443\u0447\u0430\u044E\u0442 ", /*#__PURE__*/React.createElement("b", null, "3x - 5x \u0431\u0443\u0441\u0442 \u0430\u043B\u0433\u043E\u0440\u0438\u0442\u043C\u0430"), " \u0432 \u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0430\u0446\u0438\u0438!"), /*#__PURE__*/React.createElement("div", {
+    className: "text-slate-400 hover:text-white text-lg p-1"
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-r from-amber-950/80 via-slate-950 to-yellow-950/80 border border-amber-500/50 rounded-2xl p-3.5 space-y-2 shadow-lg shadow-amber-500/10"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-2xl"
+  }, "\uD83D\uDC51"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-black text-amber-300 block"
+  }, "\u0417\u043E\u043B\u043E\u0442\u0430\u044F \u0413\u0430\u043B\u043E\u0447\u043A\u0430 \u041E\u0441\u043D\u043E\u0432\u0430\u0442\u0435\u043B\u044F"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-amber-200/80"
+  }, "\u0412\u044B\u0441\u0448\u0438\u0439 \u0441\u0442\u0430\u0442\u0443\u0441 \u043F\u043E\u0447\u0451\u0442\u0430 \u0438 \u043F\u0440\u0438\u0437\u043D\u0430\u043D\u0438\u044F"))), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/40"
+  }, "\u042D\u043A\u0441\u043A\u043B\u044E\u0437\u0438\u0432")), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-300 leading-relaxed"
+  }, "\uD83D\uDC51 ", /*#__PURE__*/React.createElement("b", null, "\u041D\u0435 \u043F\u0440\u043E\u0434\u0430\u0451\u0442\u0441\u044F \u0437\u0430 \u0434\u0435\u043D\u044C\u0433\u0438!"), " \u042D\u0442\u043E\u0442 \u0441\u0442\u0430\u0442\u0443\u0441 \u0432\u0440\u0443\u0447\u0430\u0435\u0442\u0441\u044F ", /*#__PURE__*/React.createElement("b", null, "\u0438\u0441\u043A\u043B\u044E\u0447\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u041B\u0438\u0447\u043D\u043E \u041E\u0441\u043D\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u043C"), " \u043F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u044B \u0437\u0430 \u043F\u043E\u0431\u0435\u0434\u0443 \u0432 \u041A\u0432\u0435\u0441\u0442\u0435 \u0431\u043B\u043E\u0433\u0435\u0440\u043E\u0432 \u0438\u043B\u0438 \u0437\u0430 \u0432\u044B\u0434\u0430\u044E\u0449\u0438\u0439\u0441\u044F \u0432\u043A\u043B\u0430\u0434."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      triggerHaptic("medium");
+      setVerifiedModalOpen(false);
+      setFounderQuestModalOpen(true);
+    },
+    className: "w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs py-2 rounded-xl shadow-md transition-all active:scale-95"
+  }, "\uD83C\uDFC6 \u0423\u0447\u0430\u0441\u0442\u0432\u043E\u0432\u0430\u0442\u044C \u0432 \u041A\u0432\u0435\u0441\u0442\u0435 \u041E\u0441\u043D\u043E\u0432\u0430\u0442\u0435\u043B\u044F")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2.5 pt-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sky-400 font-bold text-sm"
+  }, "\u2713"), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-black text-white"
+  }, "\u041E\u0444\u0438\u0446\u0438\u0430\u043B\u044C\u043D\u0430\u044F \u0421\u0438\u043D\u044F\u044F \u0413\u0430\u043B\u043E\u0447\u043A\u0430 (Verified)")), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400 font-mono"
+  }, "\u0411\u0430\u043B\u0430\u043D\u0441: ", user.wallet_coins || 0, " \uD83E\uDE99")), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-slate-400 leading-relaxed"
+  }, "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0430\u0435\u0442 \u043F\u043E\u0434\u043B\u0438\u043D\u043D\u043E\u0441\u0442\u044C \u043F\u0440\u043E\u0444\u0438\u043B\u044F, \u0437\u0430\u0449\u0438\u0449\u0430\u0435\u0442 \u043E\u0442 \u0444\u0435\u0439\u043A\u043E\u0432 \u0438 \u0443\u0434\u0432\u0430\u0438\u0432\u0430\u0435\u0442 \u043F\u043E\u043A\u0430\u0437\u044B \u043A\u043E\u043D\u0442\u0435\u043D\u0442\u0430 \u0432 \u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0430\u0446\u0438\u044F\u0445."), /*#__PURE__*/React.createElement("div", {
     className: "space-y-2"
   }, [{
     months: 1,
     coins: 1000,
-    label: "1 месяц — 1 000 🪙 (100 000 сум)"
+    sum: "100 000 сум",
+    discount: null,
+    label: "1 месяц"
   }, {
     months: 3,
-    coins: 2500,
-    label: "3 месяца — 2 500 🪙 (-17% скидка)"
+    coins: 2850,
+    sum: "285 000 сум",
+    discount: "-5% скидка",
+    label: "3 месяца"
   }, {
     months: 12,
-    coins: 8000,
-    label: "1 год — 8 000 🪙 (-33% суперскидка)"
+    coins: 10200,
+    sum: "1 020 000 сум",
+    discount: "-15% скидка",
+    label: "1 год (12 мес.)"
   }].map(p => /*#__PURE__*/React.createElement("div", {
     key: p.months,
-    className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-bold text-white block"
-  }, p.label)), /*#__PURE__*/React.createElement("button", {
+    className: "bg-slate-950 p-3 rounded-2xl border border-slate-800 hover:border-sky-500/40 transition flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-1.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-white"
+  }, p.label), p.discount && /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/30"
+  }, p.discount)), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-sky-400 font-mono font-bold block mt-0.5"
+  }, p.coins.toLocaleString(), " \uD83E\uDE99 (", p.sum, ")")), /*#__PURE__*/React.createElement("button", {
     onClick: () => handleBuyVerified(p.months, p.coins),
-    className: "bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl shadow-md"
-  }, "\u0410\u043A\u0442\u0438\u0432\u0438\u0440\u043E\u0432\u0430\u0442\u044C")))))), legalModalOpen && /*#__PURE__*/React.createElement("div", {
+    className: "bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-xl shadow-md transition active:scale-95"
+  }, "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C"))))))), legalModalOpen && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-md max-h-[85vh] overflow-y-auto space-y-3 text-xs leading-relaxed"

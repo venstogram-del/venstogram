@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { triggerHaptic } from "../telegram.js";
 
 export function Header({
@@ -7,6 +7,22 @@ export function Header({
   onOpenCreate,
   onOpenChat
 }) {
+  const [supportOpen, setSupportOpen] = useState(false);
+
+  const openTelegramChannel = (channel) => {
+    triggerHaptic("light");
+    let url = channel;
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      const cleaned = url.replace("@", "");
+      url = `https://t.me/${cleaned}`;
+    }
+    if (window.Telegram?.WebApp?.openTelegramLink) {
+      window.Telegram.WebApp.openTelegramLink(url);
+    } else {
+      window.open(url, "_blank");
+    }
+  };
+
   return (
     <header className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 px-4 py-2.5 flex items-center justify-between">
       {/* Brand logo */}
@@ -23,7 +39,7 @@ export function Header({
       </div>
 
       {/* Right Action Bar: Clean and Minimalist */}
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-2.5">
         {/* Create Post Icon */}
         <button
           onClick={() => {
@@ -52,7 +68,87 @@ export function Header({
           </svg>
           <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse" />
         </button>
+
+        {/* Three Dots Menu for Support */}
+        <button
+          onClick={() => {
+            triggerHaptic("light");
+            setSupportOpen(true);
+          }}
+          className="p-1.5 text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-colors flex items-center justify-center"
+          title="Служба техподдержки"
+        >
+          <span className="text-sm font-black tracking-widest leading-none px-0.5 text-slate-300 hover:text-white">⋯</span>
+        </button>
       </div>
+
+      {/* Support Three Dots Modal */}
+      {supportOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 pt-16 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm space-y-4 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-xl">🛠️</span>
+                <div>
+                  <h3 className="text-sm font-black text-white">Служба техподдержки</h3>
+                  <p className="text-[10px] text-slate-400">Помощь 24/7 по любым вопросам</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSupportOpen(false)}
+                className="w-7 h-7 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 text-[11px]">📞 Телефон поддержки:</span>
+                <a
+                  href="tel:+998507775152"
+                  className="text-emerald-400 font-mono font-bold hover:underline"
+                >
+                  +998 50 777 51 52
+                </a>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 text-[11px]">💬 Telegram поддержки:</span>
+                <button
+                  type="button"
+                  onClick={() => openTelegramChannel("@yuksak_it")}
+                  className="text-sky-400 font-mono font-bold hover:underline flex items-center space-x-1"
+                >
+                  <span>@yuksak_it</span>
+                  <span className="text-[10px]">↗</span>
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 text-[11px]">📧 Официальная почта:</span>
+                <span className="text-slate-300 font-mono text-[11px]">venstogram@gmail.com</span>
+              </div>
+            </div>
+
+            <div className="flex space-x-2">
+              <a
+                href="tel:+998507775152"
+                className="flex-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 py-2.5 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
+              >
+                <span>📞</span>
+                <span>Позвонить</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => openTelegramChannel("@yuksak_it")}
+                className="flex-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40 py-2.5 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
+              >
+                <span>💬</span>
+                <span>Написать</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

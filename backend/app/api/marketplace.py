@@ -11,9 +11,9 @@ from app.api.deps import get_current_user
 router = APIRouter(prefix="/marketplace", tags=["Usernames & Verified Badge"])
 
 VERIFIED_PRICES = {
-    1: {"months": 1, "coins": 1000, "label": "1 месяц (3x Boost)"},
-    3: {"months": 3, "coins": 2500, "label": "3 месяца (-17% скидка)"},
-    12: {"months": 12, "coins": 8000, "label": "1 год (-33% суперскидка)"}
+    1: {"months": 1, "coins": 1000, "price_sum": 100000, "discount_pct": 0, "label": "1 месяц — 1 000 🪙 (100 000 сум)"},
+    3: {"months": 3, "coins": 2850, "price_sum": 285000, "discount_pct": 5, "label": "3 месяца — 2 850 🪙 (-5% скидка)"},
+    12: {"months": 12, "coins": 10200, "price_sum": 1020000, "discount_pct": 15, "label": "1 год — 10 200 🪙 (-15% скидка)"}
 }
 
 @router.get("/policy/username-terms")

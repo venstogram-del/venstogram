@@ -2,9 +2,10 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func, and_
+from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from app.database.session import get_db
-from app.models.entities import User, Follow, Post, Reel, UsernameListing
+from app.models.entities import User, Follow, Post, Reel, UsernameListing, PostLike, ReelLike
 from app.api.deps import get_current_user, get_current_user_optional
 
 router = APIRouter(prefix="/users", tags=["Users & Search"])
@@ -191,6 +192,105 @@ async def get_user_public_profile(
             for p in posts
         ]
     }
+
+
+@router.get("/{user_id}/posts")
+async def get_user_posts_full(
+    user_id: int,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
+    res = await db.execute(
+        select(Post)
+        .options(selectinload(Post.author))
+        .where(Post.user_id == user_id, Post.moderation_status != "rejected")
+        .order_by(Post.created_at.desc())
+    )
+    posts = res.scalars().all()
+
+    liked_ids = set()
+    if current_user and posts:
+        likes_res = await db.execute(
+            select(PostLike.post_id).where(
+                PostLike.user_id == current_user.id,
+                PostLike.post_id.in_([p.id for p in posts])
+            )
+        )
+        liked_ids = set(likes_res.scalars().all())
+
+    return [
+        {
+            "id": p.id,
+            "caption": p.caption,
+            "media_urls": p.media_urls or [],
+            "media_type": p.media_type,
+            "location": getattr(p, "location", None),
+            "likes_count": p.likes_count,
+            "views_count": p.views_count,
+            "comments_count": p.comments_count,
+            "is_liked": p.id in liked_ids,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "author": {
+                "id": p.author.id,
+                "username": p.author.username,
+                "first_name": p.author.first_name,
+                "last_name": p.author.last_name,
+                "avatar_url": p.author.avatar_url,
+                "is_verified": p.author.is_verified,
+                "badge_type": getattr(p.author, "badge_type", "blue")
+            } if p.author else None
+        }
+        for p in posts
+    ]
+
+
+@router.get("/{user_id}/reels")
+async def get_user_reels_full(
+    user_id: int,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
+    res = await db.execute(
+        select(Reel)
+        .options(selectinload(Reel.author))
+        .where(Reel.user_id == user_id, Reel.moderation_status != "rejected")
+        .order_by(Reel.created_at.desc())
+    )
+    reels = res.scalars().all()
+
+    liked_ids = set()
+    if current_user and reels:
+        likes_res = await db.execute(
+            select(ReelLike.reel_id).where(
+                ReelLike.user_id == current_user.id,
+                ReelLike.reel_id.in_([r.id for r in reels])
+            )
+        )
+        liked_ids = set(likes_res.scalars().all())
+
+    return [
+        {
+            "id": r.id,
+            "caption": r.caption,
+            "video_url": r.video_url,
+            "media_urls": [r.video_url] if r.video_url else [],
+            "likes_count": r.likes_count,
+            "views_count": r.views_count,
+            "comments_count": r.comments_count,
+            "is_liked": r.id in liked_ids,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "author": {
+                "id": r.author.id,
+                "username": r.author.username,
+                "first_name": r.author.first_name,
+                "last_name": r.author.last_name,
+                "avatar_url": r.author.avatar_url,
+                "is_verified": r.author.is_verified,
+                "badge_type": getattr(r.author, "badge_type", "blue")
+            } if r.author else None
+        }
+        for r in reels
+    ]
 
 
 @router.post("/{user_id}/follow")

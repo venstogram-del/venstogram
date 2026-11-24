@@ -78,92 +78,34 @@ export function ProfileView({
 
   const fileInputRef = useRef(null);
 
-  // Sample dynamic publications for current profile
-  const userPosts = [
-    {
-      id: 101,
-      caption: "Новый день — новые победы в VENSTOGRAM! 🚀 #venstogram #tashkent #live",
-      media_urls: ["https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80"],
-      likes_count: 342,
-      views_count: 1850,
-      comments_count: 28,
-      is_liked: true,
-      author: user
-    },
-    {
-      id: 102,
-      caption: "Красивый вечер в Ташкенте 🇺🇿✨ #uzbekistan #tashkentcity #evening",
-      media_urls: ["https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&auto=format&fit=crop&q=80"],
-      likes_count: 512,
-      views_count: 2940,
-      comments_count: 45,
-      is_liked: false,
-      author: user
-    },
-    {
-      id: 103,
-      caption: "Качественный контент и живые рекомендации! 💎 #blogger #uzb #recommendations",
-      media_urls: ["https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&auto=format&fit=crop&q=80"],
-      likes_count: 278,
-      views_count: 1420,
-      comments_count: 19,
-      is_liked: true,
-      author: user
-    },
-    {
-      id: 104,
-      caption: "Готовим грандиозный запуск обновления! #tech #startup #venstogram",
-      media_urls: ["https://images.unsplash.com/photo-1545128485-c400e7702796?w=600&auto=format&fit=crop&q=80"],
-      likes_count: 689,
-      views_count: 4100,
-      comments_count: 52,
-      is_liked: false,
-      author: user
-    },
-    {
-      id: 105,
-      caption: "Атмосфера настоящего творчества 🎨 #creative #lifestyle",
-      media_urls: ["https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=600&auto=format&fit=crop&q=80"],
-      likes_count: 410,
-      views_count: 2300,
-      comments_count: 33,
-      is_liked: false,
-      author: user
-    },
-    {
-      id: 106,
-      caption: "Всем отличного настроения и продуктивной недели! 🌟 #samarkand #bukhara",
-      media_urls: ["https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&auto=format&fit=crop&q=80"],
-      likes_count: 890,
-      views_count: 5800,
-      comments_count: 67,
-      is_liked: true,
-      author: user
-    }
-  ];
+  // Dynamic publications and reels loaded from API
+  const [userPosts, setUserPosts] = useState([]);
+  const [userReels, setUserReels] = useState([]);
+  const [contentLoading, setContentLoading] = useState(false);
 
-  const userReels = [
-    {
-      id: 201,
-      caption: "Топ фишек в новом обновлении VENSTOGRAM 🔥 #reels #trend",
-      media_urls: ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600"],
-      likes_count: 1420,
-      views_count: 12400,
-      comments_count: 112,
-      is_liked: true,
-      author: user
-    },
-    {
-      id: 202,
-      caption: "Как взлететь в рекомендации за 1 день? Смотри до конца! 🚀 #recommendations",
-      media_urls: ["https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600"],
-      likes_count: 2890,
-      views_count: 24500,
-      comments_count: 240,
-      is_liked: true,
-      author: user
+  useEffect(() => {
+    if (user?.id) {
+      loadUserContent();
     }
-  ];
+  }, [user?.id]);
+
+  const loadUserContent = async () => {
+    try {
+      setContentLoading(true);
+      const [postsData, reelsData] = await Promise.all([
+        Api.get(`/users/${user.id}/posts`),
+        Api.get(`/users/${user.id}/reels`)
+      ]);
+      setUserPosts(Array.isArray(postsData) ? postsData : []);
+      setUserReels(Array.isArray(reelsData) ? reelsData : []);
+    } catch (err) {
+      console.warn("Failed loading user posts/reels:", err);
+      setUserPosts([]);
+      setUserReels([]);
+    } finally {
+      setContentLoading(false);
+    }
+  };
 
   const handleAvatarFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -419,15 +361,15 @@ export function ProfileView({
         {/* Stats */}
         <div className="flex-1 flex justify-around text-center">
           <div>
-            <span className="text-base font-black text-white block">{userPosts.length}</span>
-            <span className="text-[11px] text-slate-400">Постов</span>
+            <span className="text-base font-black text-white block">{userPosts.length + userReels.length}</span>
+            <span className="text-[11px] text-slate-400">Публикаций</span>
           </div>
           <div>
-            <span className="text-base font-black text-white block">1.4K</span>
+            <span className="text-base font-black text-white block">{user.followers_count || 0}</span>
             <span className="text-[11px] text-slate-400">Подписчиков</span>
           </div>
           <div>
-            <span className="text-base font-black text-white block">348</span>
+            <span className="text-base font-black text-white block">{user.following_count || 0}</span>
             <span className="text-[11px] text-slate-400">Подписок</span>
           </div>
         </div>
@@ -600,33 +542,52 @@ export function ProfileView({
       </div>
 
       {/* Grid Content with Click to Open Post Viewer */}
-      <div className="grid grid-cols-3 gap-1.5 pt-1">
-        {displayList.map((postItem) => (
-          <div
-            key={postItem.id}
-            onClick={() => {
-              triggerHaptic("light");
-              setSelectedPost(postItem);
-            }}
-            className="aspect-square bg-slate-900 overflow-hidden rounded-xl relative group cursor-pointer border border-slate-800/80 hover:border-pink-500/60 transition-all shadow-sm"
-          >
-            <img
-              src={postItem.media_urls[0]}
-              alt="Post thumbnail"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-            />
-            {activeTab === "reels" && (
-              <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-sm rounded-lg p-1 text-white text-[10px]">
-                ▶
+      {contentLoading ? (
+        <div className="py-12 text-center text-slate-500">
+          <div className="w-6 h-6 border-2 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+          <span className="text-xs">Загрузка контента...</span>
+        </div>
+      ) : displayList.length === 0 ? (
+        <div className="py-12 px-4 text-center bg-slate-900/40 border border-slate-800/80 rounded-2xl my-2">
+          <span className="text-3xl block mb-2">{activeTab === "reels" ? "🎬" : "📸"}</span>
+          <p className="text-xs font-bold text-white mb-1">
+            {activeTab === "reels" ? "У вас пока нет Reels" : "У вас пока нет публикаций"}
+          </p>
+          <p className="text-[11px] text-slate-400 mb-3 max-w-xs mx-auto">
+            {activeTab === "reels"
+              ? "Загрузите первое видео, чтобы набрать просмотры и попасть в рекомендации!"
+              : "Делитесь своими моментами, публикуйте фото и привлекайте подписчиков!"}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-1.5 pt-1">
+          {displayList.map((postItem) => (
+            <div
+              key={postItem.id}
+              onClick={() => {
+                triggerHaptic("light");
+                setSelectedPost(postItem);
+              }}
+              className="aspect-square bg-slate-900 overflow-hidden rounded-xl relative group cursor-pointer border border-slate-800/80 hover:border-pink-500/60 transition-all shadow-sm"
+            >
+              <img
+                src={postItem.media_urls?.[0] || postItem.video_url || "/placeholder.jpg"}
+                alt="Post thumbnail"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+              />
+              {activeTab === "reels" && (
+                <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-sm rounded-lg p-1 text-white text-[10px]">
+                  ▶
+                </div>
+              )}
+              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 flex items-center justify-between text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                <span>❤️ {postItem.likes_count || 0}</span>
+                <span>👁️ {postItem.views_count || 0}</span>
               </div>
-            )}
-            <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 flex items-center justify-between text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-              <span>❤️ {postItem.likes_count}</span>
-              <span>👁️ {postItem.views_count}</span>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Post Modal Viewer */}
       {selectedPost && (
@@ -636,6 +597,9 @@ export function ProfileView({
           onClose={() => setSelectedPost(null)}
           onPostDeleted={(deletedId) => {
             setSelectedPost(null);
+            setUserPosts((prev) => prev.filter((p) => p.id !== deletedId));
+            setUserReels((prev) => prev.filter((r) => r.id !== deletedId));
+            triggerHaptic("success");
           }}
         />
       )}
@@ -648,7 +612,7 @@ export function ProfileView({
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center space-x-2">
                 <span className="text-xl">⚙️</span>
-                <h3 className="text-base font-black text-white">Настройки и безопасность</h3>
+                <h3 className="text-base font-black text-white">Меню и настройки</h3>
               </div>
               <button
                 onClick={() => setSettingsOpen(false)}
@@ -656,6 +620,58 @@ export function ProfileView({
               >
                 ✕
               </button>
+            </div>
+
+            {/* Tech Support Contact Card - Prominent at the Top */}
+            <div className="bg-gradient-to-r from-emerald-950/90 via-slate-950 to-teal-950/90 p-3.5 rounded-2xl border border-emerald-500/50 space-y-2.5 shadow-lg shadow-emerald-500/10">
+              <div className="flex items-center space-x-2.5">
+                <span className="text-2xl">🛠️</span>
+                <div>
+                  <span className="text-xs font-black text-white block">Служба технической поддержки</span>
+                  <span className="text-[10px] text-emerald-300">Помощь 24/7, вопросы по оплате, никнеймам и верификации</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-950/80 rounded-xl p-2.5 border border-slate-800 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 text-[11px]">📞 Телефон поддержки:</span>
+                  <a
+                    href="tel:+998507775152"
+                    className="text-emerald-400 font-mono font-bold hover:underline"
+                  >
+                    +998 50 777 51 52
+                  </a>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 text-[11px]">💬 Telegram поддержки:</span>
+                  <button
+                    type="button"
+                    onClick={() => openTelegramChannel("@yuksak_it")}
+                    className="text-sky-400 font-mono font-bold hover:underline flex items-center space-x-1"
+                  >
+                    <span>@yuksak_it</span>
+                    <span className="text-[10px]">↗</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex space-x-2 pt-0.5">
+                <a
+                  href="tel:+998507775152"
+                  className="flex-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
+                >
+                  <span>📞</span>
+                  <span>Позвонить</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => openTelegramChannel("@yuksak_it")}
+                  className="flex-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
+                >
+                  <span>💬</span>
+                  <span>Написать</span>
+                </button>
+              </div>
             </div>
 
             {/* Venstogram Verified Buy/Status Option */}
@@ -848,58 +864,6 @@ export function ProfileView({
               <span className="text-slate-400 text-xs">Читать ↗</span>
             </div>
 
-            {/* Tech Support Contact Card */}
-            <div className="bg-gradient-to-r from-emerald-950/70 via-slate-950 to-teal-950/70 p-3.5 rounded-2xl border border-emerald-500/40 space-y-2.5">
-              <div className="flex items-center space-x-2.5">
-                <span className="text-xl">🛠️</span>
-                <div>
-                  <span className="text-xs font-bold text-white block">Служба технической поддержки</span>
-                  <span className="text-[10px] text-emerald-300">Помощь 24/7, вопросы по оплате и верификации</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-950/80 rounded-xl p-2.5 border border-slate-800 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-[11px]">📞 Телефон поддержки:</span>
-                  <a
-                    href="tel:+998507775152"
-                    className="text-emerald-400 font-mono font-bold hover:underline"
-                  >
-                    +998 50 777 51 52
-                  </a>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-[11px]">💬 Telegram поддержки:</span>
-                  <button
-                    type="button"
-                    onClick={() => openTelegramChannel("@yuksak_it")}
-                    className="text-sky-400 font-mono font-bold hover:underline flex items-center space-x-1"
-                  >
-                    <span>@yuksak_it</span>
-                    <span className="text-[10px]">↗</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex space-x-2 pt-0.5">
-                <a
-                  href="tel:+998507775152"
-                  className="flex-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
-                >
-                  <span>📞</span>
-                  <span>Позвонить</span>
-                </a>
-                <button
-                  type="button"
-                  onClick={() => openTelegramChannel("@yuksak_it")}
-                  className="flex-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40 py-2 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
-                >
-                  <span>💬</span>
-                  <span>Написать</span>
-                </button>
-              </div>
-            </div>
-
             {/* Account Info */}
             <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-1.5 text-xs">
               <div className="flex justify-between text-slate-400">
@@ -993,43 +957,93 @@ export function ProfileView({
         </div>
       )}
 
-      {/* Verified Buy Sheet Modal */}
+      {/* Verified Badges Modal */}
       {verifiedModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm space-y-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <h3 className="text-sm font-black text-white flex items-center space-x-1.5">
                 <span className="text-sky-400">✓</span>
-                <span>Подключение Venstogram Verified</span>
+                <span>Статусы верификации Venstogram</span>
               </h3>
-              <button onClick={() => setVerifiedModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button onClick={() => setVerifiedModalOpen(false)} className="text-slate-400 hover:text-white text-lg p-1">✕</button>
             </div>
 
-            <p className="text-xs text-slate-300">
-              Один раз подключил галочку — и твои ролики и публикации моментально получают <b>3x - 5x буст алгоритма</b> в рекомендации!
-            </p>
-
-            <div className="space-y-2">
-              {[
-                { months: 1, coins: 1000, label: "1 месяц — 1 000 🪙 (100 000 сум)" },
-                { months: 3, coins: 2500, label: "3 месяца — 2 500 🪙 (-17% скидка)" },
-                { months: 12, coins: 8000, label: "1 год — 8 000 🪙 (-33% суперскидка)" }
-              ].map((p) => (
-                <div
-                  key={p.months}
-                  className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between"
-                >
+            {/* Tier 1: Gold Founder Badge (Cannot be bought) */}
+            <div className="bg-gradient-to-r from-amber-950/80 via-slate-950 to-yellow-950/80 border border-amber-500/50 rounded-2xl p-3.5 space-y-2 shadow-lg shadow-amber-500/10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="text-2xl">👑</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">{p.label}</span>
+                    <span className="text-xs font-black text-amber-300 block">Золотая Галочка Основателя</span>
+                    <span className="text-[10px] text-amber-200/80">Высший статус почёта и признания</span>
                   </div>
-                  <button
-                    onClick={() => handleBuyVerified(p.months, p.coins)}
-                    className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl shadow-md"
-                  >
-                    Активировать
-                  </button>
                 </div>
-              ))}
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/40">
+                  Эксклюзив
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                👑 <b>Не продаётся за деньги!</b> Этот статус вручается <b>исключительно Лично Основателем</b> платформы за победу в Квесте блогеров или за выдающийся вклад.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic("medium");
+                  setVerifiedModalOpen(false);
+                  setFounderQuestModalOpen(true);
+                }}
+                className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs py-2 rounded-xl shadow-md transition-all active:scale-95"
+              >
+                🏆 Участвовать в Квесте Основателя
+              </button>
+            </div>
+
+            {/* Tier 2: Blue Verified Badge (For purchase) */}
+            <div className="space-y-2.5 pt-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-sky-400 font-bold text-sm">✓</span>
+                  <span className="text-xs font-black text-white">Официальная Синяя Галочка (Verified)</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-mono">Баланс: {user.wallet_coins || 0} 🪙</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Подтверждает подлинность профиля, защищает от фейков и удваивает показы контента в рекомендациях.
+              </p>
+
+              <div className="space-y-2">
+                {[
+                  { months: 1, coins: 1000, sum: "100 000 сум", discount: null, label: "1 месяц" },
+                  { months: 3, coins: 2850, sum: "285 000 сум", discount: "-5% скидка", label: "3 месяца" },
+                  { months: 12, coins: 10200, sum: "1 020 000 сум", discount: "-15% скидка", label: "1 год (12 мес.)" }
+                ].map((p) => (
+                  <div
+                    key={p.months}
+                    className="bg-slate-950 p-3 rounded-2xl border border-slate-800 hover:border-sky-500/40 transition flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-xs font-bold text-white">{p.label}</span>
+                        {p.discount && (
+                          <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/30">
+                            {p.discount}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-sky-400 font-mono font-bold block mt-0.5">
+                        {p.coins.toLocaleString()} 🪙 ({p.sum})
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleBuyVerified(p.months, p.coins)}
+                      className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-xl shadow-md transition active:scale-95"
+                    >
+                      Подключить
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
