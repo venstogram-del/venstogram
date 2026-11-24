@@ -46,7 +46,7 @@ export function RegistrationModal({ user, onComplete }) {
     setErrorMsg("");
     triggerHaptic("light");
     try {
-      await Api.post("/auth/send-code", {
+      const res = await Api.post("/auth/send-code", {
         email: cleanEmail,
         username: username.trim().toLowerCase().replace(/^@/, "") || `u_${Date.now()}`,
         first_name: firstName.trim() || "Пользователь",
@@ -56,6 +56,9 @@ export function RegistrationModal({ user, onComplete }) {
       });
       setCodeSent(true);
       setCodeTimer(60);
+      if (res.debug_code) {
+        setEmailCode(res.debug_code);
+      }
       triggerHaptic("success");
     } catch (e) {
       setErrorMsg(e.message || "Не удалось отправить код на почту");
@@ -137,6 +140,20 @@ export function RegistrationModal({ user, onComplete }) {
     triggerHaptic("heavy");
 
     try {
+      if (codeSent && emailCode.trim()) {
+        try {
+          await Api.post("/auth/verify-email-code", {
+            email: email.trim().toLowerCase(),
+            code: emailCode.trim()
+          });
+        } catch (vErr) {
+          setErrorMsg(vErr.message || "Неверный код подтверждения из письма");
+          setSaving(false);
+          triggerHaptic("error");
+          return;
+        }
+      }
+
       const patchData = {
         first_name: trimmedFirst,
         last_name: lastName.trim(),

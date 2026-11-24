@@ -10,8 +10,13 @@ from typing import Optional
 
 router = APIRouter(prefix="/upload", tags=["Media Upload & Compression"])
 
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".webm"}
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".webm"}
+ALLOWED_AUDIO_EXTENSIONS = {".webm", ".weba", ".ogg", ".opus", ".mp3", ".m4a", ".wav", ".aac"}
+ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS | ALLOWED_VIDEO_EXTENSIONS | ALLOWED_AUDIO_EXTENSIONS
+
 MAX_VIDEO_SIZE = 100 * 1024 * 1024 # 100 MB max for high load stability
+MAX_AUDIO_SIZE = 50 * 1024 * 1024  # 50 MB max
 MAX_IMAGE_SIZE = 25 * 1024 * 1024  # 25 MB max
 
 @router.post("")
@@ -21,14 +26,24 @@ async def upload_file(
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
-    High-throughput streaming upload for photos and videos with low RAM usage.
+    High-throughput streaming upload for photos, videos, and voice messages with low RAM usage.
     """
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Неподдерживаемый формат файла. Допустимы: JPG, PNG, WEBP, MP4, MOV, WEBM.")
+    ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
+    if not ext:
+        ext = ".webm"
 
-    is_video = ext in {".mp4", ".mov", ".webm"}
-    max_size = MAX_VIDEO_SIZE if is_video else MAX_IMAGE_SIZE
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Неподдерживаемый формат файла ({ext}). Допустимы фото (JPG, PNG, WEBP), видео (MP4, MOV, WEBM) и аудио (WEBM, M4A, OGG, WAV, MP3, AAC)."
+        )
+
+    if ext in ALLOWED_VIDEO_EXTENSIONS:
+        max_size = MAX_VIDEO_SIZE
+    elif ext in ALLOWED_AUDIO_EXTENSIONS:
+        max_size = MAX_AUDIO_SIZE
+    else:
+        max_size = MAX_IMAGE_SIZE
 
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     unique_name = f"{uuid.uuid4().hex}{ext}"

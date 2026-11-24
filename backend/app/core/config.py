@@ -21,9 +21,19 @@ class Settings(BaseSettings):
     PLATFORM_SPLIT_PERCENT: int = int(os.getenv("PLATFORM_SPLIT_PERCENT", "60"))
     COIN_PRICE_UZS: int = int(os.getenv("COIN_PRICE_UZS", "100"))
     ADMIN_TELEGRAM_IDS: list = [1477103854, 8787674425]
-    OFFICIAL_EMAIL: str = "venstogram@gmail.com"
+    OFFICIAL_EMAIL: str = os.getenv("OFFICIAL_EMAIL", "venstogram@gmail.com")
+    EMAILS_FROM_NAME: str = os.getenv("EMAILS_FROM_NAME", "Venstogram Security")
+    EMAILS_FROM_EMAIL: str = os.getenv("EMAILS_FROM_EMAIL", os.getenv("OFFICIAL_EMAIL", "venstogram@gmail.com"))
     SUPPORT_PHONE: str = "+998 50 777 51 52"
     SUPPORT_TELEGRAM: str = "yuksak_it"
+
+    # SMTP Configuration for sending email verification codes
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "465"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_USE_SSL: bool = os.getenv("SMTP_USE_SSL", "True").lower() in ("true", "1", "t")
+    SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "False").lower() in ("true", "1", "t")
     
     UPLOAD_DIR: str = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads"))
 

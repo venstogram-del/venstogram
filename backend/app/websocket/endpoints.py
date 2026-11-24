@@ -44,14 +44,24 @@ async def websocket_live_endpoint(
             elif event_type in ("call_offer", "call_answer", "ice_candidate", "call_reject", "call_end"):
                 target_user_id = data.get("target_user_id")
                 if target_user_id:
-                    await ws_manager.send_personal_message(
-                        target_user_id,
-                        {
-                            "event": event_type,
-                            "from_user_id": user_id,
-                            "payload": data.get("payload")
-                        }
-                    )
+                    msg_body = {
+                        "event": event_type,
+                        "signal_type": event_type,
+                        "from_user_id": user_id,
+                        "target_user_id": target_user_id,
+                        "call_id": data.get("call_id"),
+                        "payload": data.get("payload")
+                    }
+                    await ws_manager.send_personal_message(target_user_id, msg_body)
+                    try:
+                        from app.api.chat import _pending_call_signals
+                        if target_user_id not in _pending_call_signals:
+                            _pending_call_signals[target_user_id] = []
+                        _pending_call_signals[target_user_id].append(msg_body)
+                        if len(_pending_call_signals[target_user_id]) > 50:
+                            _pending_call_signals[target_user_id] = _pending_call_signals[target_user_id][-50:]
+                    except Exception:
+                        pass
 
             # 3. WebRTC Live PK Stream Signaling between Battle Host & Guest
             elif event_type in ("pk_stream_offer", "pk_stream_answer", "pk_stream_ice"):

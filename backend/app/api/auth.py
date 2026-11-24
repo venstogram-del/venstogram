@@ -14,6 +14,7 @@ from app.schemas.all_schemas import (
 )
 from app.api.deps import get_current_user
 from app.core.config import settings
+from app.core.email import send_verification_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -387,14 +388,39 @@ async def register_email(req: EmailRegisterRequest, db: AsyncSession = Depends(g
         db.add(user)
 
     await db.commit()
-    print(f"\n[OFFICIAL EMAIL SERVICE: {settings.OFFICIAL_EMAIL}] Sent security code {code} to {clean_email} for user @{clean_username}\n")
+    
+    email_sent, email_err = await send_verification_email(
+        to_email=clean_email,
+        code=code,
+        username=clean_username,
+        purpose="registration"
+    )
+
+    # Optional Telegram bot instant delivery if user has a real Telegram account
+    if user.telegram_id and user.telegram_id < 9000000000:
+        try:
+            from app.bot.bot import send_bot_push_notification
+            await send_bot_push_notification(
+                telegram_id=user.telegram_id,
+                text=f"🔐 <b>Код подтверждения Venstogram</b>: <code>{code}</code>\n\nКод отправлен на почту: {clean_email}.",
+                button_text="Подтвердить",
+                start_param="verify_email"
+            )
+        except Exception:
+            pass
+
+    msg_text = f"Код подтверждения отправлен на почту {clean_email}." if email_sent else (
+        f"Код сгенерирован: {code}. (Для реальной отправки укажите данные SMTP в файле .env)"
+        if settings.DEBUG else f"Код отправлен на адрес {clean_email}."
+    )
 
     return {
         "status": "code_sent",
         "email": clean_email,
-        "from_email": settings.OFFICIAL_EMAIL,
-        "message": f"Код подтверждения отправлен с официальной почты {settings.OFFICIAL_EMAIL} на адрес {clean_email}.",
-        "debug_code": code if settings.DEBUG else None
+        "from_email": settings.EMAILS_FROM_EMAIL or settings.OFFICIAL_EMAIL,
+        "message": msg_text,
+        "email_delivered": email_sent,
+        "debug_code": code if (settings.DEBUG or not email_sent) else None
     }
 
 
@@ -512,11 +538,35 @@ async def forgot_password(req: ForgotPasswordRequest, db: AsyncSession = Depends
     user.email_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
     await db.commit()
 
-    print(f"\n[PASSWORD RESET] Sent code {code} to {clean_email}\n")
+    email_sent, email_err = await send_verification_email(
+        to_email=clean_email,
+        code=code,
+        username=user.username or "",
+        purpose="password_reset"
+    )
+
+    if user.telegram_id and user.telegram_id < 9000000000:
+        try:
+            from app.bot.bot import send_bot_push_notification
+            await send_bot_push_notification(
+                telegram_id=user.telegram_id,
+                text=f"🔐 <b>Сброс пароля Venstogram</b>: <code>{code}</code>\n\nКод отправлен на вашу почту: {clean_email}.",
+                button_text="Сбросить пароль",
+                start_param="reset_pass"
+            )
+        except Exception:
+            pass
+
+    msg_text = f"Код для сброса пароля отправлен на {clean_email}." if email_sent else (
+        f"Код сгенерирован: {code}. (Для реальной отправки укажите данные SMTP в файле .env)"
+        if settings.DEBUG else f"Код отправлен на {clean_email}."
+    )
+
     return {
         "status": "ok",
-        "message": f"Код для сброса пароля отправлен на {clean_email}.",
-        "debug_code": code if settings.DEBUG else None
+        "message": msg_text,
+        "email_delivered": email_sent,
+        "debug_code": code if (settings.DEBUG or not email_sent) else None
     }
 
 

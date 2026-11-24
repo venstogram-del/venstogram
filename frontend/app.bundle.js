@@ -494,54 +494,21 @@ const SoundEngine = {
       osc.stop(ctx.currentTime + 0.25);
     } catch (e) {}
   },
-  // Realistic Voice Note playback with formant voice modulation
+  // Voice Note fallback placeholder (no artificial synth bleeps)
   activeVoiceInterval: null,
   playVoiceNote(durationSeconds = 4, onEnd = null) {
     if (this.activeVoiceInterval) {
-      clearInterval(this.activeVoiceInterval);
+      clearTimeout(this.activeVoiceInterval);
       this.activeVoiceInterval = null;
     }
-    const ctx = getAudioContext();
-    if (!ctx) {
+    this.activeVoiceInterval = setTimeout(() => {
+      this.activeVoiceInterval = null;
       if (onEnd) onEnd();
-      return;
-    }
-    try {
-      const formants = [220, 310, 260, 380, 440, 290, 340, 410];
-      let elapsed = 0;
-      const step = 0.25;
-      const playSpeechPacket = () => {
-        if (elapsed >= durationSeconds) {
-          if (this.activeVoiceInterval) {
-            clearInterval(this.activeVoiceInterval);
-            this.activeVoiceInterval = null;
-          }
-          if (onEnd) onEnd();
-          return;
-        }
-        const freq = formants[Math.floor(Math.random() * formants.length)];
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(freq, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(freq * 1.15, ctx.currentTime + step * 0.7);
-        gain.gain.setValueAtTime(0.18, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + step);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + step);
-        elapsed += step;
-      };
-      playSpeechPacket();
-      this.activeVoiceInterval = setInterval(playSpeechPacket, step * 1000);
-    } catch (e) {
-      if (onEnd) onEnd();
-    }
+    }, durationSeconds * 1000);
   },
   stopVoiceNote() {
     if (this.activeVoiceInterval) {
-      clearInterval(this.activeVoiceInterval);
+      clearTimeout(this.activeVoiceInterval);
       this.activeVoiceInterval = null;
     }
   }
@@ -648,10 +615,19 @@ const Api = {
 class RealtimeSocket {
   constructor(token, onEvent) {
     this.token = token;
-    this.onEvent = onEvent;
+    this.listeners = new Set();
+    if (onEvent) this.listeners.add(onEvent);
     this.ws = null;
     this.reconnectTimer = null;
     this.connect();
+    window.__vensto_socket = this;
+  }
+  addListener(fn) {
+    if (fn) this.listeners.add(fn);
+    return () => this.removeListener(fn);
+  }
+  removeListener(fn) {
+    if (fn) this.listeners.delete(fn);
   }
   connect() {
     if (!this.token) return;
@@ -665,11 +641,17 @@ class RealtimeSocket {
       this.ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
-          if (this.onEvent) this.onEvent(data);
+          this.listeners.forEach(fn => {
+            try {
+              fn(data);
+            } catch (e) {
+              console.warn("[WS Listener Err]", e);
+            }
+          });
         } catch (e) {}
       };
       this.ws.onclose = () => {
-        this.reconnectTimer = setTimeout(() => this.connect(), 4000);
+        this.reconnectTimer = setTimeout(() => this.connect(), 3000);
       };
     } catch (e) {
       console.warn("[Venstogram WS] Connection error", e);
@@ -678,7 +660,9 @@ class RealtimeSocket {
   send(data) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
+      return true;
     }
+    return false;
   }
   joinRoom(room) {
     this.send({
@@ -3144,10 +3128,26 @@ function ChatView({
   const callTimerRef = useRef(null);
   const callPollTimerRef = useRef(null);
 
+  // WebRTC Audio & Video Media Refs
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const remoteStreamRef = useRef(null);
+  const peerConnectionRef = useRef(null);
+  const queuedIceCandidatesRef = useRef([]);
+  const queuedRemoteOfferRef = useRef(null);
+  const [cameraFacing, setCameraFacing] = useState("user");
+  const [isCameraOff, setIsCameraOff] = useState(false);
+
   // Real Audio Recording & Playback Refs
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const currentAudioRef = useRef(null);
+  const recordingFormatRef = useRef({
+    mimeType: "audio/webm",
+    ext: "webm"
+  });
 
   // Emoji picker toggle
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -3170,25 +3170,189 @@ function ChatView({
     }, 4000);
     return () => clearInterval(interval);
   }, [activePartner]);
-
-  // Periodic polling for incoming calls (if someone is calling current user)
-  useEffect(() => {
-    const checkIncoming = async () => {
+  const RTC_CONFIG = {
+    iceServers: [{
+      urls: "stun:stun.l.google.com:19302"
+    }, {
+      urls: "stun:stun1.l.google.com:19302"
+    }, {
+      urls: "stun:stun2.l.google.com:19302"
+    }, {
+      urls: "stun:stun3.l.google.com:19302"
+    }]
+  };
+  const sendCallSignal = async (signalType, payload, targetUserId, callId) => {
+    if (!targetUserId) return;
+    try {
+      if (window.__vensto_socket) {
+        window.__vensto_socket.send({
+          type: signalType,
+          signal_type: signalType,
+          target_user_id: targetUserId,
+          call_id: callId,
+          payload: payload
+        });
+      }
+    } catch (e) {}
+    try {
+      await Api.post("/chats/call/signal", {
+        target_user_id: targetUserId,
+        call_id: callId,
+        signal_type: signalType,
+        payload: payload
+      });
+    } catch (err) {
+      console.warn("[Signaling send fallback]", err);
+    }
+  };
+  const cleanupMediaCall = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        try {
+          track.stop();
+        } catch (e) {}
+      });
+      localStreamRef.current = null;
+    }
+    if (remoteStreamRef.current) {
+      remoteStreamRef.current.getTracks().forEach(track => {
+        try {
+          track.stop();
+        } catch (e) {}
+      });
+      remoteStreamRef.current = null;
+    }
+    if (peerConnectionRef.current) {
       try {
-        const res = await Api.get("/chats/call/incoming");
-        if (res && res.has_incoming) {
+        peerConnectionRef.current.close();
+      } catch (e) {}
+      peerConnectionRef.current = null;
+    }
+    if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+    queuedIceCandidatesRef.current = [];
+    queuedRemoteOfferRef.current = null;
+  };
+  const applyRemoteOffer = async (offer, pc, targetUserId, callId) => {
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      while (queuedIceCandidatesRef.current.length > 0) {
+        const cand = queuedIceCandidatesRef.current.shift();
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (e) {}
+      }
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      sendCallSignal("call_answer", answer, targetUserId, callId);
+    } catch (err) {
+      console.error("[applyRemoteOffer error]", err);
+    }
+  };
+  const handleRemoteOffer = async (offer, fromUserId, callId) => {
+    const pc = peerConnectionRef.current;
+    if (pc && pc.signalingState !== "closed") {
+      await applyRemoteOffer(offer, pc, fromUserId, callId);
+    } else {
+      queuedRemoteOfferRef.current = {
+        offer,
+        fromUserId,
+        callId
+      };
+    }
+  };
+  const handleRemoteAnswer = async answer => {
+    const pc = peerConnectionRef.current;
+    if (pc && pc.signalingState !== "closed") {
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        while (queuedIceCandidatesRef.current.length > 0) {
+          const cand = queuedIceCandidatesRef.current.shift();
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(cand));
+          } catch (e) {}
+        }
+      } catch (err) {
+        console.error("[setRemoteDescription Answer error]", err);
+      }
+    }
+  };
+  const handleRemoteCandidate = async candidate => {
+    const pc = peerConnectionRef.current;
+    if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.warn("[addIceCandidate error]", err);
+      }
+    } else {
+      queuedIceCandidatesRef.current.push(candidate);
+    }
+  };
+
+  // Real-time signaling & incoming call dispatcher (WebSocket + HTTP Fallback)
+  useEffect(() => {
+    const handleWsEvent = async data => {
+      if (!data) return;
+      const evt = data.event || data.type || data.signal_type;
+      if (evt === "incoming_call") {
+        if (!incomingCall && (!activeCall || !activeCall.isConnected)) {
+          setIncomingCall({
+            call_id: data.call_id,
+            call_type: data.call_type || "video",
+            caller: data.caller
+          });
+          SoundEngine.playRingtone();
+        }
+      } else if (evt === "call_offer" || evt === "offer") {
+        handleRemoteOffer(data.payload, data.from_user_id, data.call_id);
+      } else if (evt === "call_answer" || evt === "answer") {
+        handleRemoteAnswer(data.payload);
+      } else if (evt === "ice_candidate" || evt === "candidate") {
+        handleRemoteCandidate(data.payload);
+      } else if (evt === "call_rejected" || evt === "call_reject") {
+        SoundEngine.stopRingtone();
+        cleanupMediaCall();
+        setActiveCall(null);
+      } else if (evt === "call_ended" || evt === "call_end") {
+        SoundEngine.stopRingtone();
+        cleanupMediaCall();
+        setActiveCall(null);
+      }
+    };
+    let unsub = null;
+    if (window.__vensto_socket) {
+      unsub = window.__vensto_socket.addListener(handleWsEvent);
+    }
+    const checkIncomingAndSignals = async () => {
+      try {
+        // 1. Check ringing incoming calls
+        const incRes = await Api.get("/chats/call/incoming");
+        if (incRes && incRes.has_incoming) {
           if (!incomingCall && (!activeCall || !activeCall.isConnected)) {
-            setIncomingCall(res);
+            setIncomingCall(incRes);
             SoundEngine.playRingtone();
           }
         } else if (incomingCall && !activeCall) {
           setIncomingCall(null);
           SoundEngine.stopRingtone();
         }
+
+        // 2. Drain any pending WebRTC signals
+        const sigRes = await Api.get("/chats/call/signal/pending");
+        if (sigRes && sigRes.signals) {
+          for (const s of sigRes.signals) {
+            handleWsEvent(s);
+          }
+        }
       } catch (e) {}
     };
-    const interval = setInterval(checkIncoming, 3000);
-    return () => clearInterval(interval);
+    const interval = setInterval(checkIncomingAndSignals, 1800);
+    return () => {
+      if (unsub) unsub();
+      clearInterval(interval);
+    };
   }, [incomingCall, activeCall]);
 
   // Voice recording timer
@@ -3290,66 +3454,129 @@ function ChatView({
     }
   };
 
-  // Real Voice Note Playback (Audio Object + Fallback)
+  // Real Voice Note Playback (Native Audio Object)
   const handleToggleVoicePlayback = m => {
     triggerHaptic("medium");
     if (playingVoiceId === m.id) {
       if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
+        try {
+          currentAudioRef.current.pause();
+        } catch (e) {}
         currentAudioRef.current = null;
       }
-      SoundEngine.stopVoiceNote();
       setPlayingVoiceId(null);
       return;
     }
     if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
+      try {
+        currentAudioRef.current.pause();
+      } catch (e) {}
       currentAudioRef.current = null;
     }
-    setPlayingVoiceId(m.id);
-    if (m.media_url) {
-      try {
-        const audio = new Audio(m.media_url);
-        currentAudioRef.current = audio;
-        audio.play().catch(() => {
-          SoundEngine.playVoiceNote(m.duration || 5, () => setPlayingVoiceId(null));
-        });
-        audio.onended = () => {
-          setPlayingVoiceId(null);
-          currentAudioRef.current = null;
-        };
-      } catch (e) {
-        SoundEngine.playVoiceNote(m.duration || 5, () => setPlayingVoiceId(null));
-      }
-    } else {
-      SoundEngine.playVoiceNote(m.duration || 5, () => setPlayingVoiceId(null));
+    if (!m.media_url) {
+      alert("Аудиозапись не найдена.");
+      return;
     }
+    setPlayingVoiceId(m.id);
+    try {
+      const audio = new Audio(m.media_url);
+      currentAudioRef.current = audio;
+      audio.onended = () => {
+        setPlayingVoiceId(null);
+        currentAudioRef.current = null;
+      };
+      audio.onerror = e => {
+        console.warn("Audio playback error:", e);
+        setPlayingVoiceId(null);
+        currentAudioRef.current = null;
+        alert("Не удалось воспроизвести аудиофайл.");
+      };
+      audio.play().catch(err => {
+        console.warn("audio.play() error:", err);
+        setPlayingVoiceId(null);
+        currentAudioRef.current = null;
+      });
+    } catch (e) {
+      console.warn("Audio element error:", e);
+      setPlayingVoiceId(null);
+      currentAudioRef.current = null;
+    }
+  };
+  const getSupportedAudioMime = () => {
+    if (typeof MediaRecorder === "undefined") return {
+      mimeType: "",
+      ext: "webm"
+    };
+    const candidates = [{
+      mime: "audio/webm;codecs=opus",
+      ext: "webm"
+    }, {
+      mime: "audio/webm",
+      ext: "webm"
+    }, {
+      mime: "audio/mp4",
+      ext: "m4a"
+    }, {
+      mime: "audio/aac",
+      ext: "aac"
+    }, {
+      mime: "audio/ogg;codecs=opus",
+      ext: "ogg"
+    }, {
+      mime: "audio/wav",
+      ext: "wav"
+    }];
+    for (const c of candidates) {
+      if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c.mime)) {
+        return {
+          mimeType: c.mime,
+          ext: c.ext
+        };
+      }
+    }
+    return {
+      mimeType: "",
+      ext: "webm"
+    };
   };
 
   // Start real microphone recording
   const startVoiceRecording = async () => {
     triggerHaptic("medium");
     try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true
-        });
-        audioChunksRef.current = [];
-        const recorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = recorder;
-        recorder.ondataavailable = e => {
-          if (e.data && e.data.size > 0) {
-            audioChunksRef.current.push(e.data);
-          }
-        };
-        recorder.start();
-        setIsRecordingVoice(true);
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Запись звука не поддерживается в вашем браузере.");
         return;
       }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true
+      });
+      audioChunksRef.current = [];
+      const {
+        mimeType,
+        ext
+      } = getSupportedAudioMime();
+      recordingFormatRef.current = {
+        mimeType,
+        ext
+      };
+      const options = mimeType ? {
+        mimeType
+      } : {};
+      const recorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = e => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+      recorder.start();
+      setIsRecordingVoice(true);
     } catch (err) {
-      console.warn("Microphone not available, using simulated timer:", err);
+      console.warn("Microphone access error:", err);
+      alert("Доступ к микрофону заблокирован. Пожалуйста, разрешите доступ к микрофону в настройках браузера.");
+      setIsRecordingVoice(false);
     }
-    setIsRecordingVoice(true);
   };
 
   // Stop recording and send real voice message
@@ -3361,26 +3588,48 @@ function ChatView({
     const duration = voiceSeconds > 0 ? voiceSeconds : 3;
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.onstop = async () => {
+        const {
+          mimeType,
+          ext
+        } = recordingFormatRef.current;
+        const actualMime = mimeType || mediaRecorderRef.current.mimeType || "audio/webm";
+        const actualExt = ext || "webm";
         const audioBlob = new Blob(audioChunksRef.current, {
-          type: "audio/webm"
+          type: actualMime
         });
-        mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+        try {
+          mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+        } catch (e) {}
+        if (audioBlob.size === 0) {
+          alert("Запись аудио пуста. Попробуйте снова.");
+          return;
+        }
         let uploadedAudioUrl = "";
         try {
           const formData = new FormData();
-          formData.append("file", audioBlob, `voice_${Date.now()}.webm`);
+          formData.append("file", audioBlob, `voice_${Date.now()}.${actualExt}`);
           const token = localStorage.getItem("vensto_token");
           const uploadRes = await fetch("/api/upload", {
             method: "POST",
-            headers: {
+            headers: token ? {
               Authorization: `Bearer ${token}`
-            },
+            } : {},
             body: formData
           });
+          if (!uploadRes.ok) {
+            const errJson = await uploadRes.json().catch(() => ({}));
+            throw new Error(errJson.detail || "Ошибка сервера при загрузке аудио");
+          }
           const uploadData = await uploadRes.json();
           uploadedAudioUrl = uploadData.url;
         } catch (e) {
-          console.warn("Audio upload failed:", e);
+          console.error("Audio upload failed:", e);
+          alert(`Не удалось отправить голосовое сообщение: ${e.message || "ошибка сети"}`);
+          return;
+        }
+        if (!uploadedAudioUrl) {
+          alert("Сервер не вернул ссылку на аудиофайл.");
+          return;
         }
         const tempMsg = {
           id: Date.now(),
@@ -3404,25 +3653,6 @@ function ChatView({
         } catch (e) {}
       };
       mediaRecorderRef.current.stop();
-    } else {
-      const tempMsg = {
-        id: Date.now(),
-        sender_id: currentUserId,
-        recipient_id: activePartner.id,
-        content: `🎤 Голосовое сообщение (${duration} сек)`,
-        duration: duration,
-        media_type: "voice",
-        created_at: new Date().toISOString(),
-        is_read: false
-      };
-      setMessages(prev => [...prev, tempMsg]);
-      try {
-        await Api.post("/chats/send", {
-          recipient_id: activePartner.id,
-          content: `🎤 Голосовое сообщение (${duration} сек)`,
-          media_type: "voice"
-        });
-      } catch (e) {}
     }
   };
 
@@ -3504,12 +3734,75 @@ function ChatView({
     }
   };
 
+  // Handle Camera Flip
+  const handleFlipCamera = async () => {
+    if (!localStreamRef.current || !activeCall?.isVideo) return;
+    const newFacing = cameraFacing === "user" ? "environment" : "user";
+    setCameraFacing(newFacing);
+    try {
+      const oldVideoTrack = localStreamRef.current.getVideoTracks()[0];
+      if (oldVideoTrack) {
+        oldVideoTrack.stop();
+        localStreamRef.current.removeTrack(oldVideoTrack);
+      }
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: newFacing,
+          width: {
+            ideal: 640
+          },
+          height: {
+            ideal: 480
+          }
+        }
+      });
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      localStreamRef.current.addTrack(newVideoTrack);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+      }
+      const pc = peerConnectionRef.current;
+      if (pc) {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === "video");
+        if (sender) {
+          sender.replaceTrack(newVideoTrack);
+        }
+      }
+    } catch (err) {
+      console.warn("Camera flip failed:", err);
+    }
+  };
+
   // Real WebRTC & Signaling Call System
   const startCall = async (isVideo = true) => {
     if (!activePartner) return;
     triggerHaptic("heavy");
     SoundEngine.playRingtone();
     setIsCallMinimized(false);
+    setIsCameraOff(false);
+
+    // 1. Acquire Local Microphone & Optional Camera
+    let localStream = null;
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: isVideo ? {
+          facingMode: "user",
+          width: {
+            ideal: 640
+          },
+          height: {
+            ideal: 480
+          }
+        } : false
+      });
+      localStreamRef.current = localStream;
+    } catch (mediaErr) {
+      console.error("[startCall media error]", mediaErr);
+      SoundEngine.stopRingtone();
+      alert("Не удалось включить микрофон или камеру. Пожалуйста, разрешите доступ в настройках браузера.");
+      return;
+    }
     let callId = null;
     try {
       const res = await Api.post("/chats/call/start", {
@@ -3530,14 +3823,63 @@ function ChatView({
       callSeconds: 0
     });
 
-    // Start polling status until recipient answers or 35s timeout
+    // Attach local stream to preview element
+    setTimeout(() => {
+      if (localVideoRef.current && isVideo && localStream) {
+        localVideoRef.current.srcObject = localStream;
+      }
+    }, 100);
+
+    // 2. Initialize RTCPeerConnection
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+    peerConnectionRef.current = pc;
+    queuedIceCandidatesRef.current = [];
+
+    // Add local tracks to peer connection
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+    // Handle remote tracks
+    pc.ontrack = event => {
+      console.log("[Caller ontrack] Remote stream track received:", event.track.kind);
+      remoteStreamRef.current = event.streams[0];
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+      }
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = event.streams[0];
+      }
+      setActiveCall(prev => prev ? {
+        ...prev,
+        isConnected: true
+      } : null);
+      SoundEngine.stopRingtone();
+    };
+
+    // Handle ICE candidates
+    pc.onicecandidate = event => {
+      if (event.candidate) {
+        sendCallSignal("ice_candidate", event.candidate, activePartner.id, callId);
+      }
+    };
+
+    // 3. Create SDP Offer and dispatch
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      sendCallSignal("call_offer", offer, activePartner.id, callId);
+    } catch (err) {
+      console.error("[createOffer error]", err);
+    }
+
+    // Start polling status until recipient answers or 40s timeout
     let ringSec = 0;
     if (callPollTimerRef.current) clearInterval(callPollTimerRef.current);
     callPollTimerRef.current = setInterval(async () => {
       ringSec += 1.5;
-      if (ringSec >= 35) {
+      if (ringSec >= 40) {
         clearInterval(callPollTimerRef.current);
         SoundEngine.stopRingtone();
+        cleanupMediaCall();
         alert(`Абонент @${activePartner.username} не отвечает.`);
         if (callId) {
           Api.post("/chats/call/end", {
@@ -3561,11 +3903,13 @@ function ChatView({
           } else if (statusRes.status === "rejected") {
             clearInterval(callPollTimerRef.current);
             SoundEngine.stopRingtone();
+            cleanupMediaCall();
             alert(`Абонент @${activePartner.username} отклонил звонок.`);
             setActiveCall(null);
           } else if (statusRes.status === "ended") {
             clearInterval(callPollTimerRef.current);
             SoundEngine.stopRingtone();
+            cleanupMediaCall();
             setActiveCall(null);
           }
         } catch (e) {}
@@ -3578,6 +3922,9 @@ function ChatView({
     SoundEngine.stopRingtone();
     const callToAccept = incomingCall;
     setIncomingCall(null);
+    const isVideo = callToAccept.call_type === "video";
+    const partnerUser = callToAccept.caller;
+    setIsCameraOff(false);
     try {
       await Api.post("/chats/call/accept", {
         call_id: callToAccept.call_id
@@ -3585,26 +3932,89 @@ function ChatView({
     } catch (e) {}
     setActiveCall({
       id: callToAccept.call_id,
-      partner: callToAccept.caller,
+      partner: partnerUser,
       isIncoming: true,
       isConnected: true,
-      isVideo: callToAccept.call_type === "video",
+      isVideo,
       isMuted: false,
       callSeconds: 0
     });
     setIsCallMinimized(false);
+
+    // 1. Acquire Receiver Local Media
+    let localStream = null;
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: isVideo ? {
+          facingMode: "user",
+          width: {
+            ideal: 640
+          },
+          height: {
+            ideal: 480
+          }
+        } : false
+      });
+      localStreamRef.current = localStream;
+    } catch (mediaErr) {
+      console.error("[Accept media error]", mediaErr);
+    }
+    setTimeout(() => {
+      if (localVideoRef.current && isVideo && localStream) {
+        localVideoRef.current.srcObject = localStream;
+      }
+    }, 100);
+
+    // 2. Initialize RTCPeerConnection
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+    peerConnectionRef.current = pc;
+    if (localStream) {
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    }
+    pc.ontrack = event => {
+      console.log("[Receiver ontrack] Remote stream track received:", event.track.kind);
+      remoteStreamRef.current = event.streams[0];
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+      }
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = event.streams[0];
+      }
+    };
+    pc.onicecandidate = event => {
+      if (event.candidate) {
+        sendCallSignal("ice_candidate", event.candidate, partnerUser.id, callToAccept.call_id);
+      }
+    };
+
+    // 3. Process queued remote offer if received
+    if (queuedRemoteOfferRef.current) {
+      const {
+        offer,
+        fromUserId,
+        callId
+      } = queuedRemoteOfferRef.current;
+      await applyRemoteOffer(offer, pc, fromUserId || partnerUser.id, callId || callToAccept.call_id);
+      queuedRemoteOfferRef.current = null;
+    }
   };
   const handleRejectIncomingCall = async () => {
     if (!incomingCall) return;
     triggerHaptic("medium");
     SoundEngine.stopRingtone();
     const callId = incomingCall.call_id;
+    const partnerId = incomingCall.caller?.id;
     setIncomingCall(null);
     try {
       await Api.post("/chats/call/reject", {
         call_id: callId
       });
+      if (partnerId) {
+        sendCallSignal("call_reject", {}, partnerId, callId);
+      }
     } catch (e) {}
+    cleanupMediaCall();
   };
   const endCall = () => {
     triggerHaptic("medium");
@@ -3615,7 +4025,11 @@ function ChatView({
         call_id: activeCall.id,
         duration_seconds: activeCall.callSeconds || 0
       }).catch(() => {});
+      if (activeCall.partner?.id) {
+        sendCallSignal("call_end", {}, activeCall.partner.id, activeCall.id);
+      }
     }
+    cleanupMediaCall();
     setActiveCall(null);
     setIsCallMinimized(false);
   };
@@ -3907,17 +4321,30 @@ function ChatView({
     className: "max-h-[85vh] max-w-full object-contain rounded-xl"
   })), /*#__PURE__*/React.createElement("div", {
     className: "p-3 text-center text-slate-400 text-[11px] bg-slate-950/60 backdrop-blur-md"
-  }, "\u0414\u0432\u043E\u0439\u043D\u043E\u0439 \u043A\u043B\u0438\u043A \u0434\u043B\u044F \u0431\u044B\u0441\u0442\u0440\u043E\u0433\u043E \u043F\u0440\u0438\u0431\u043B\u0438\u0436\u0435\u043D\u0438\u044F \u2022 \u041B\u0438\u0441\u0442\u0430\u0439\u0442\u0435 \u0438\u043B\u0438 \u0440\u0430\u0437\u0434\u0432\u0438\u0433\u0430\u0439\u0442\u0435 \u0434\u0432\u0443\u043C\u044F \u043F\u0430\u043B\u044C\u0446\u0430\u043C\u0438")), activeCall && isCallMinimized && /*#__PURE__*/React.createElement("div", {
+  }, "\u0414\u0432\u043E\u0439\u043D\u043E\u0439 \u043A\u043B\u0438\u043A \u0434\u043B\u044F \u0431\u044B\u0441\u0442\u0440\u043E\u0433\u043E \u043F\u0440\u0438\u0431\u043B\u0438\u0436\u0435\u043D\u0438\u044F \u2022 \u041B\u0438\u0441\u0442\u0430\u0439\u0442\u0435 \u0438\u043B\u0438 \u0440\u0430\u0437\u0434\u0432\u0438\u0433\u0430\u0439\u0442\u0435 \u0434\u0432\u0443\u043C\u044F \u043F\u0430\u043B\u044C\u0446\u0430\u043C\u0438")), /*#__PURE__*/React.createElement("audio", {
+    ref: remoteAudioRef,
+    autoPlay: true,
+    playsInline: true
+  }), activeCall && isCallMinimized && /*#__PURE__*/React.createElement("div", {
     onClick: () => {
       triggerHaptic("light");
       setIsCallMinimized(false);
     },
     className: "fixed bottom-20 right-4 z-60 bg-slate-900/95 border-2 border-emerald-500 rounded-3xl p-3 shadow-2xl backdrop-blur-md flex items-center space-x-3 cursor-pointer animate-in slide-in-from-right"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "relative"
-  }, /*#__PURE__*/React.createElement("img", {
+    className: "relative w-12 h-12 rounded-full overflow-hidden ring-2 ring-emerald-500/50 bg-slate-950 flex items-center justify-center"
+  }, activeCall.isVideo && remoteStreamRef.current ? /*#__PURE__*/React.createElement("video", {
+    ref: el => {
+      if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) {
+        el.srcObject = remoteStreamRef.current;
+      }
+    },
+    autoPlay: true,
+    playsInline: true,
+    className: "w-full h-full object-cover"
+  }) : /*#__PURE__*/React.createElement("img", {
     src: activeCall.partner.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100",
-    className: "w-12 h-12 rounded-full object-cover ring-2 ring-emerald-500/50"
+    className: "w-full h-full object-cover"
   }), /*#__PURE__*/React.createElement("span", {
     className: "absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full animate-ping"
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
@@ -3931,52 +4358,101 @@ function ChatView({
       e.stopPropagation();
       endCall();
     },
-    className: "p-2 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs shadow-md",
+    className: "p-2 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs shadow-md active:scale-95 transition",
     title: "\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044C \u0437\u0432\u043E\u043D\u043E\u043A"
   }, "\uD83D\uDCDE")), activeCall && !isCallMinimized && /*#__PURE__*/React.createElement("div", {
-    className: "fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-lg flex flex-col justify-between p-6 animate-in fade-in"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between text-white"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      triggerHaptic("light");
-      setIsCallMinimized(true);
-    },
-    className: "bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-1.5 px-3 rounded-xl flex items-center space-x-1"
-  }, /*#__PURE__*/React.createElement("span", null, "\u2199 \u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C (\u0444\u043E\u043D\u043E\u0432\u044B\u0439 \u0437\u0432\u043E\u043D\u043E\u043A)")), /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-mono font-bold text-emerald-400"
-  }, activeCall.isConnected ? `🟢 ${formatCallTime(activeCall.callSeconds)}` : "📞 Идут гудки... Ожидание")), /*#__PURE__*/React.createElement("div", {
-    className: "text-center pt-4 space-y-3"
+    className: "fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between overflow-hidden animate-in fade-in select-none"
+  }, activeCall.isVideo ? /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-0 bg-slate-950 flex items-center justify-center overflow-hidden"
+  }, /*#__PURE__*/React.createElement("video", {
+    ref: remoteVideoRef,
+    autoPlay: true,
+    playsInline: true,
+    className: "w-full h-full object-cover"
+  }), (!activeCall.isConnected || !remoteStreamRef.current) && /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center space-y-3 p-6 text-center"
   }, /*#__PURE__*/React.createElement("img", {
-    src: activeCall.partner.avatar_url,
-    className: "w-24 h-24 rounded-full mx-auto object-cover ring-4 ring-pink-500/50 shadow-2xl animate-pulse"
+    src: activeCall.partner.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
+    className: "w-28 h-28 rounded-full object-cover ring-4 ring-pink-500/80 shadow-2xl animate-pulse"
   }), /*#__PURE__*/React.createElement("h2", {
-    className: "text-lg font-black text-white"
+    className: "text-xl font-black text-white"
+  }, activeCall.partner.first_name), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-pink-400 font-semibold animate-pulse"
+  }, activeCall.isConnected ? "🟢 Подключение видеопотока HD..." : "📲 Идут гудки... Ожидание ответа"))) :
+  /*#__PURE__*/
+  /* Audio-Only Call Presentation */
+  React.createElement("div", {
+    className: "absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-950 to-black flex flex-col items-center justify-center space-y-5 p-6 text-center"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: activeCall.partner.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150",
+    className: "w-32 h-32 rounded-full object-cover ring-4 ring-emerald-500 shadow-2xl"
+  }), activeCall.isConnected && /*#__PURE__*/React.createElement("span", {
+    className: "absolute -inset-2 rounded-full border-2 border-emerald-400 animate-ping opacity-60"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-black text-white"
   }, activeCall.partner.first_name), /*#__PURE__*/React.createElement("span", {
-    className: "text-xs text-pink-400 font-semibold block"
-  }, activeCall.isConnected ? "🟢 Идет разговор (WebRTC HD) • Вы можете свернуть звонок и писать в чат" : "📲 Идут гудки... Ожидание, пока собеседник примет звонок")), activeCall.isConnected && activeCall.isVideo && /*#__PURE__*/React.createElement("div", {
-    className: "flex-1 my-4 bg-slate-900 rounded-3xl border border-slate-800 relative overflow-hidden flex items-center justify-center"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-slate-500 text-xs"
-  }, "\u041A\u0430\u043C\u0435\u0440\u0430 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0430 (Live WebRTC stream)")), /*#__PURE__*/React.createElement("div", {
-    className: "flex justify-center space-x-6 pb-8"
+    className: "text-xs text-pink-400 font-mono"
+  }, "@", activeCall.partner.username), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-emerald-400 font-mono font-bold block mt-2"
+  }, activeCall.isConnected ? `🟢 Идет аудиоразговор (${formatCallTime(activeCall.callSeconds)})` : "📞 Идут гудки... Ожидание ответа"))), activeCall.isVideo && /*#__PURE__*/React.createElement("div", {
+    className: "absolute top-16 right-4 z-20 w-28 h-40 sm:w-36 sm:h-48 rounded-2xl overflow-hidden border-2 border-pink-500/80 shadow-2xl bg-slate-900"
+  }, /*#__PURE__*/React.createElement("video", {
+    ref: localVideoRef,
+    autoPlay: true,
+    playsInline: true,
+    muted: true,
+    className: `w-full h-full object-cover ${cameraFacing === "user" ? "scale-x-[-1]" : ""}`
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute bottom-1 right-1 bg-black/60 px-1.5 py-0.5 rounded text-[9px] text-white font-mono"
+  }, "\u0412\u044B")), /*#__PURE__*/React.createElement("div", {
+    className: "relative z-30 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent"
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setActiveCall({
-      ...activeCall,
-      isMuted: !activeCall.isMuted
-    }),
-    className: `p-4 rounded-full ${activeCall.isMuted ? "bg-amber-600" : "bg-slate-800"} text-white text-xl shadow-lg`,
-    title: "\u041C\u0438\u043A\u0440\u043E\u0444\u043E\u043D"
-  }, activeCall.isMuted ? "🔇" : "🎙️"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       triggerHaptic("light");
       setIsCallMinimized(true);
     },
-    className: "p-4 rounded-full bg-slate-800 text-white text-xl shadow-lg",
-    title: "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0432 \u043C\u0438\u043D\u0438-\u043E\u043A\u043D\u043E"
-  }, "\uD83D\uDCAC"), /*#__PURE__*/React.createElement("button", {
+    className: "bg-slate-900/80 hover:bg-slate-800 text-slate-200 text-xs font-bold py-2 px-3.5 rounded-2xl flex items-center space-x-1.5 border border-slate-700/60 backdrop-blur-md shadow-lg"
+  }, /*#__PURE__*/React.createElement("span", null, "\u2199 \u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-slate-700/60 text-xs font-mono font-bold text-emerald-400 shadow-lg"
+  }, activeCall.isConnected ? `🟢 ${formatCallTime(activeCall.callSeconds)}` : "📞 Вызов...")), /*#__PURE__*/React.createElement("div", {
+    className: "relative z-30 p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex items-center justify-center space-x-5"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      triggerHaptic("medium");
+      const willMute = !activeCall.isMuted;
+      if (localStreamRef.current) {
+        localStreamRef.current.getAudioTracks().forEach(t => t.enabled = !willMute);
+      }
+      setActiveCall({
+        ...activeCall,
+        isMuted: willMute
+      });
+    },
+    className: `p-4 rounded-full text-xl shadow-xl transition-all active:scale-90 ${activeCall.isMuted ? "bg-amber-600 text-white" : "bg-slate-800/90 text-white border border-slate-700"}`,
+    title: activeCall.isMuted ? "Включить микрофон" : "Выключить микрофон"
+  }, activeCall.isMuted ? "🔇" : "🎙️"), activeCall.isVideo && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      triggerHaptic("medium");
+      handleFlipCamera();
+    },
+    className: "p-4 rounded-full bg-slate-800/90 hover:bg-slate-700 text-white text-xl shadow-xl border border-slate-700 transition active:scale-90",
+    title: "\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u043A\u0430\u043C\u0435\u0440\u0443 (\u043F\u0435\u0440\u0435\u0434\u043D\u044F\u044F/\u0437\u0430\u0434\u043D\u044F\u044F)"
+  }, "\uD83D\uDD04"), activeCall.isVideo && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      triggerHaptic("medium");
+      const willBeOff = !isCameraOff;
+      setIsCameraOff(willBeOff);
+      if (localStreamRef.current) {
+        localStreamRef.current.getVideoTracks().forEach(t => t.enabled = !willBeOff);
+      }
+    },
+    className: `p-4 rounded-full text-xl shadow-xl transition active:scale-90 ${isCameraOff ? "bg-rose-600 text-white" : "bg-slate-800/90 text-white border border-slate-700"}`,
+    title: isCameraOff ? "Включить камеру" : "Выключить камеру"
+  }, isCameraOff ? "🚫" : "📹"), /*#__PURE__*/React.createElement("button", {
     onClick: endCall,
-    className: "p-4 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xl shadow-xl shadow-rose-600/40",
+    className: "p-4 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-2xl shadow-2xl shadow-rose-600/50 transition active:scale-90",
     title: "\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044C \u0437\u0432\u043E\u043D\u043E\u043A"
   }, "\uD83D\uDED1"))), incomingCall && /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-70 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 animate-in fade-in select-none"
@@ -8111,7 +8587,7 @@ function RegistrationModal({
     setErrorMsg("");
     triggerHaptic("light");
     try {
-      await Api.post("/auth/send-code", {
+      const res = await Api.post("/auth/send-code", {
         email: cleanEmail,
         username: username.trim().toLowerCase().replace(/^@/, "") || `u_${Date.now()}`,
         first_name: firstName.trim() || "Пользователь",
@@ -8121,6 +8597,9 @@ function RegistrationModal({
       });
       setCodeSent(true);
       setCodeTimer(60);
+      if (res.debug_code) {
+        setEmailCode(res.debug_code);
+      }
       triggerHaptic("success");
     } catch (e) {
       setErrorMsg(e.message || "Не удалось отправить код на почту");
@@ -8192,6 +8671,19 @@ function RegistrationModal({
     setSaving(true);
     triggerHaptic("heavy");
     try {
+      if (codeSent && emailCode.trim()) {
+        try {
+          await Api.post("/auth/verify-email-code", {
+            email: email.trim().toLowerCase(),
+            code: emailCode.trim()
+          });
+        } catch (vErr) {
+          setErrorMsg(vErr.message || "Неверный код подтверждения из письма");
+          setSaving(false);
+          triggerHaptic("error");
+          return;
+        }
+      }
       const patchData = {
         first_name: trimmedFirst,
         last_name: lastName.trim(),
@@ -8461,6 +8953,13 @@ function App() {
       if (authResult && authResult.user) {
         Api.setToken(authResult.access_token);
         setUser(authResult.user);
+        try {
+          if (!window.__vensto_socket) {
+            new RealtimeSocket(authResult.access_token);
+          }
+        } catch (wsErr) {
+          console.warn("[App WS Error]", wsErr);
+        }
       } else {
         // Safe ultimate fallback user so app never stays blank
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;

@@ -96,10 +96,21 @@ export const Api = {
 export class RealtimeSocket {
   constructor(token, onEvent) {
     this.token = token;
-    this.onEvent = onEvent;
+    this.listeners = new Set();
+    if (onEvent) this.listeners.add(onEvent);
     this.ws = null;
     this.reconnectTimer = null;
     this.connect();
+    window.__vensto_socket = this;
+  }
+
+  addListener(fn) {
+    if (fn) this.listeners.add(fn);
+    return () => this.removeListener(fn);
+  }
+
+  removeListener(fn) {
+    if (fn) this.listeners.delete(fn);
   }
 
   connect() {
@@ -117,12 +128,14 @@ export class RealtimeSocket {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (this.onEvent) this.onEvent(data);
+          this.listeners.forEach((fn) => {
+            try { fn(data); } catch (e) { console.warn("[WS Listener Err]", e); }
+          });
         } catch (e) {}
       };
 
       this.ws.onclose = () => {
-        this.reconnectTimer = setTimeout(() => this.connect(), 4000);
+        this.reconnectTimer = setTimeout(() => this.connect(), 3000);
       };
     } catch (e) {
       console.warn("[Venstogram WS] Connection error", e);
@@ -132,7 +145,9 @@ export class RealtimeSocket {
   send(data) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
+      return true;
     }
+    return false;
   }
 
   joinRoom(room) {
@@ -148,3 +163,4 @@ export class RealtimeSocket {
     if (this.ws) this.ws.close();
   }
 }
+

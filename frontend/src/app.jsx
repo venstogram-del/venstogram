@@ -113,6 +113,13 @@ export function App() {
       if (authResult && authResult.user) {
         Api.setToken(authResult.access_token);
         setUser(authResult.user);
+        try {
+          if (!window.__vensto_socket) {
+            new RealtimeSocket(authResult.access_token);
+          }
+        } catch (wsErr) {
+          console.warn("[App WS Error]", wsErr);
+        }
       } else {
         // Safe ultimate fallback user so app never stays blank
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;

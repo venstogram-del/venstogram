@@ -135,59 +135,22 @@ export const SoundEngine = {
     } catch (e) {}
   },
 
-  // Realistic Voice Note playback with formant voice modulation
+  // Voice Note fallback placeholder (no artificial synth bleeps)
   activeVoiceInterval: null,
   playVoiceNote(durationSeconds = 4, onEnd = null) {
     if (this.activeVoiceInterval) {
-      clearInterval(this.activeVoiceInterval);
+      clearTimeout(this.activeVoiceInterval);
       this.activeVoiceInterval = null;
     }
-    const ctx = getAudioContext();
-    if (!ctx) {
+    this.activeVoiceInterval = setTimeout(() => {
+      this.activeVoiceInterval = null;
       if (onEnd) onEnd();
-      return;
-    }
-
-    try {
-      const formants = [220, 310, 260, 380, 440, 290, 340, 410];
-      let elapsed = 0;
-      const step = 0.25;
-
-      const playSpeechPacket = () => {
-        if (elapsed >= durationSeconds) {
-          if (this.activeVoiceInterval) {
-            clearInterval(this.activeVoiceInterval);
-            this.activeVoiceInterval = null;
-          }
-          if (onEnd) onEnd();
-          return;
-        }
-
-        const freq = formants[Math.floor(Math.random() * formants.length)];
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(freq, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(freq * 1.15, ctx.currentTime + step * 0.7);
-        gain.gain.setValueAtTime(0.18, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + step);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + step);
-        elapsed += step;
-      };
-
-      playSpeechPacket();
-      this.activeVoiceInterval = setInterval(playSpeechPacket, step * 1000);
-    } catch (e) {
-      if (onEnd) onEnd();
-    }
+    }, durationSeconds * 1000);
   },
 
   stopVoiceNote() {
     if (this.activeVoiceInterval) {
-      clearInterval(this.activeVoiceInterval);
+      clearTimeout(this.activeVoiceInterval);
       this.activeVoiceInterval = null;
     }
   }

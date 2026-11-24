@@ -360,3 +360,79 @@ async def get_call_status(
         "status": call.status,
         "duration_seconds": call.duration_seconds
     }
+
+
+# In-memory mailbox for WebRTC signaling (offers, answers, ICE candidates)
+# Ensures signaling delivery even across WebSocket disconnects / cellular handovers
+_pending_call_signals: dict = {}
+
+@router.post("/call/signal")
+async def send_call_signal(
+    req: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Relays WebRTC SDP offers, SDP answers, and ICE candidates between call participants.
+    Delivers via active WebSocket with fallback queuing for HTTP polling.
+    """
+    target_user_id = req.get("target_user_id")
+    call_id = req.get("call_id")
+    signal_type = req.get("signal_type") # "call_offer", "call_answer", "ice_candidate", "call_end"
+    payload = req.get("payload")
+
+    if not target_user_id or not signal_type:
+        raise HTTPException(status_code=400, detail="Missing target_user_id or signal_type")
+
+    event_name = signal_type if signal_type.startswith("call_") or signal_type == "ice_candidate" else f"call_{signal_type}"
+
+    signal_data = {
+        "event": event_name,
+        "signal_type": signal_type,
+        "call_id": call_id,
+        "from_user_id": current_user.id,
+        "target_user_id": target_user_id,
+        "payload": payload,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+
+    # 1. Deliver immediately to active WebSocket
+    from app.websocket.manager import ws_manager
+    delivered = await ws_manager.send_personal_message(target_user_id, signal_data)
+
+    # 2. Store in pending queue for HTTP polling fallback
+    if target_user_id not in _pending_call_signals:
+        _pending_call_signals[target_user_id] = []
+
+    _pending_call_signals[target_user_id].append(signal_data)
+    if len(_pending_call_signals[target_user_id]) > 50:
+        _pending_call_signals[target_user_id] = _pending_call_signals[target_user_id][-50:]
+
+    return {"status": "ok", "delivered_ws": delivered}
+
+
+@router.get("/call/signal/pending")
+async def get_pending_call_signals(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Fetches and drains queued WebRTC signaling messages for current user.
+    """
+    signals = _pending_call_signals.pop(current_user.id, [])
+    return {"signals": signals}
+
+
+@router.get("/call/ice-servers")
+async def get_ice_servers():
+    """
+    Returns public STUN servers for WebRTC NAT traversal.
+    """
+    return {
+        "iceServers": [
+            {"urls": "stun:stun.l.google.com:19302"},
+            {"urls": "stun:stun1.l.google.com:19302"},
+            {"urls": "stun:stun2.l.google.com:19302"},
+            {"urls": "stun:stun3.l.google.com:19302"},
+            {"urls": "stun:stun4.l.google.com:19302"}
+        ]
+    }
+
