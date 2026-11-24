@@ -244,6 +244,113 @@ if dp is not None:
         except Exception as err:
             await message.answer(f"❌ Ошибка формирования Excel: {err}")
 
+    @dp.message(Command("grant", "gift"))
+    async def cmd_grant_username(message: types.Message):
+        """Allows Founder/Director to gift/grant any exclusive username to another user in 1 command."""
+        tg_id = message.from_user.id
+        if tg_id != 1477103854 and tg_id not in settings.ADMIN_TELEGRAM_IDS:
+            await message.answer("⛔ Доступ запрещен. Команда доступна только Основателю платформы.")
+            return
+
+        parts = message.text.strip().split()
+        if len(parts) < 3:
+            await message.answer(
+                "👑 <b>Вручение эксклюзивного никнейма от Основателя</b>\n\n"
+                "<b>Формат команды:</b>\n"
+                "<code>/grant &lt;никнейм&gt; &lt;получатель&gt;</code>\n\n"
+                "<b>Примеры:</b>\n"
+                "• <code>/grant uzbekiston 1477103854</code>\n"
+                "• <code>/grant uzbekiston @shoxrux</code>\n\n"
+                "<i>Никнейм моментально передаётся пользователю с верификацией и поздравлением!</i>",
+                parse_mode=ParseMode.HTML
+            )
+            return
+
+        desired_username = parts[1].strip().lower().replace("@", "")
+        target_str = parts[2].strip().replace("@", "")
+
+        from app.database.session import AsyncSessionLocal
+        from app.models.entities import User, UsernameListing
+        from sqlalchemy import select, func
+        from datetime import datetime, timezone, timedelta
+
+        async with AsyncSessionLocal() as session:
+            # Find recipient by ID, Telegram ID, or @username
+            if target_str.isdigit():
+                t_int = int(target_str)
+                res = await session.execute(
+                    select(User).where((User.telegram_id == t_int) | (User.id == t_int))
+                )
+            else:
+                res = await session.execute(
+                    select(User).where(func.lower(User.username) == target_str.lower())
+                )
+            recipient = res.scalars().first()
+
+            if not recipient:
+                await message.answer(f"❌ Пользователь <code>{target_str}</code> не найден в базе Venstogram.")
+                return
+
+            # Reassign any previous holder
+            other_res = await session.execute(
+                select(User).where(func.lower(User.username) == desired_username, User.id != recipient.id)
+            )
+            other_user = other_res.scalars().first()
+            if other_user:
+                other_user.username = f"user_{other_user.telegram_id}"
+
+            # Update or create marketplace listing
+            m_res = await session.execute(
+                select(UsernameListing).where(func.lower(UsernameListing.username) == desired_username)
+            )
+            listing = m_res.scalars().first()
+            if listing:
+                listing.is_sold = True
+                listing.highest_bidder_id = recipient.id
+            else:
+                new_listing = UsernameListing(
+                    username=desired_username,
+                    seller_id=recipient.id,
+                    category="exclusive",
+                    current_price_coins=0,
+                    buyout_price_coins=0,
+                    price_uzs=0.0,
+                    price_usd=0,
+                    is_sold=True,
+                    highest_bidder_id=recipient.id,
+                    expires_at=datetime.now(timezone.utc) + timedelta(days=365)
+                )
+                session.add(new_listing)
+
+            old_name = recipient.username
+            recipient.username = desired_username
+            recipient.is_verified = True
+
+            await session.commit()
+
+        # Send push notification to recipient
+        await send_bot_push_notification(
+            telegram_id=recipient.telegram_id,
+            text=(
+                f"👑 <b>ЛИЧНЫЙ ПОДАРОК ОТ ОСНОВАТЕЛЯ VENSTOGRAM!</b>\n\n"
+                f"Здравствуйте, {recipient.first_name}!\n"
+                f"Основатель платформы лично вручил вам эксклюзивный никнейм: <b>@{desired_username}</b>!\n"
+                f"Ваш профиль официально подтвержден и верифицирован. Поздравляем!"
+            ),
+            button_text="🚀 Открыть мой профиль",
+            start_param="tab_profile"
+        )
+
+        await message.answer(
+            f"🎉 <b>Никнейм успешно вручен!</b>\n\n"
+            f"• Эксклюзивный никнейм: <b>@{desired_username}</b>\n"
+            f"• Получатель: <b>{recipient.first_name}</b> (ID: <code>{recipient.id}</code>, TG: <code>{recipient.telegram_id}</code>)\n"
+            f"• Предыдущий ник: @{old_name}\n"
+            f"• Верификация: <b>Активна (✓)</b>\n\n"
+            f"Пользователь получил поздравление в личные сообщения бота!",
+            parse_mode=ParseMode.HTML
+        )
+
     @dp.message(Command("help"))
     async def cmd_help(message: types.Message):
         await message.answer(

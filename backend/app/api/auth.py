@@ -196,6 +196,14 @@ async def update_profile(
             )
 
         if not current_user.username or current_user.username.lower() != new_username:
+            founder_reserved = {
+                "uzbekiston", "uzbekistan", "venstogram", "director", "admin", "yuksak", "yuksak_it", "official"
+            }
+            if new_username in founder_reserved and current_user.role != "director" and current_user.telegram_id not in settings.ADMIN_TELEGRAM_IDS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Никнейм @{new_username} зарезервирован Основателем платформы. Выдаётся лично Директором."
+                )
             u_res = await db.execute(
                 select(User.id).where(func.lower(User.username) == new_username, User.id != current_user.id)
             )

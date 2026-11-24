@@ -642,21 +642,29 @@ async def gift_username_free(
     from app.bot.bot import send_bot_push_notification
 
     target_user_id = req.get("target_user_id")
+    target_telegram_id = req.get("target_telegram_id")
     target_username = req.get("target_username")
+    target_input = str(req.get("target_user") or "").strip()
     raw_name = req.get("gifted_username", "")
     gift_name = raw_name.strip().lower().replace("@", "")
 
     if not gift_name:
         raise HTTPException(status_code=400, detail="Укажите никнейм для подарка")
 
-    # Find recipient user
+    # Find recipient user by ID, Telegram ID, or @username
     if target_user_id:
         res = await db.execute(select(User).where(User.id == int(target_user_id)))
-    elif target_username:
-        clean_target = target_username.strip().lower().replace("@", "")
-        res = await db.execute(select(User).where(func.lower(User.username) == clean_target))
+    elif target_telegram_id:
+        res = await db.execute(select(User).where(User.telegram_id == int(target_telegram_id)))
+    elif target_username or target_input:
+        clean_target = (target_username or target_input).strip().lower().replace("@", "")
+        if clean_target.isdigit():
+            c_int = int(clean_target)
+            res = await db.execute(select(User).where((User.id == c_int) | (User.telegram_id == c_int)))
+        else:
+            res = await db.execute(select(User).where(func.lower(User.username) == clean_target))
     else:
-        raise HTTPException(status_code=400, detail="Укажите получателя (ID или никнейм)")
+        raise HTTPException(status_code=400, detail="Укажите получателя (ID, Telegram ID или @никнейм)")
 
     recipient = res.scalars().first()
     if not recipient:

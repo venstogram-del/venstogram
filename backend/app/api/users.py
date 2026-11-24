@@ -8,6 +8,10 @@ from app.database.session import get_db
 from app.models.entities import User, Follow, Post, Reel, UsernameListing, PostLike, ReelLike
 from app.api.deps import get_current_user, get_current_user_optional
 
+FOUNDER_RESERVED_USERNAMES = {
+    "uzbekiston", "uzbekistan", "venstogram", "director", "admin", "yuksak", "yuksak_it", "official"
+}
+
 router = APIRouter(prefix="/users", tags=["Users & Search"])
 
 @router.get("/check-username")
@@ -36,6 +40,16 @@ async def check_username(
             "message": "Это ваш текущий никнейм ✓",
             "is_current": True,
             "suggestions": []
+        }
+
+    # Reserved by Founder
+    if cleaned in FOUNDER_RESERVED_USERNAMES:
+        return {
+            "available": False,
+            "username": cleaned,
+            "message": f"Никнейм @{cleaned} зарезервирован Основателем платформы. Выдаётся лично Директором.",
+            "is_current": False,
+            "suggestions": [f"{cleaned}1", f"{cleaned}2", f"{cleaned}_1", f"{cleaned}77"]
         }
 
     # Check users table
