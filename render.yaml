@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: venstogram-platform
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 10000
+      - key: BOT_TOKEN
+        sync: false
+      - key: BOT_USERNAME
+        value: venstogrambot
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./venstogram.db
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: WEBAPP_URL
+        sync: false
