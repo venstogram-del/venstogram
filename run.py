@@ -4,15 +4,14 @@ import subprocess
 import uvicorn
 from dotenv import load_dotenv
 
-# Ensure backend directory is in sys.path
 root_dir = os.path.dirname(os.path.abspath(__file__))
-backend_dir = os.path.join(root_dir, "backend")
-if backend_dir not in sys.path:
-    sys.path.insert(0, backend_dir)
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
 load_dotenv()
+
+# Export app at module level for ASGI runners (uvicorn run:app, gunicorn run:app, etc.)
+from backend.main import app
 
 def build_frontend_bundle():
     """Builds the frontend bundle if node is available."""
@@ -43,5 +42,4 @@ if __name__ == "__main__":
     print_banner()
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
-    from main import app
     uvicorn.run(app, host=host, port=port, reload=False)
