@@ -118,19 +118,19 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
   };
 
   return (
-    <div className="p-4 space-y-4 pb-24">
+    <div className="p-4 space-y-4 pb-24 bg-white min-h-screen">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-amber-500/20 via-pink-500/20 to-purple-500/20 border border-amber-500/40 rounded-3xl p-4 text-center shadow-lg">
+      <div className="bg-gradient-to-r from-amber-50 via-pink-50 to-purple-50 border border-amber-200 rounded-3xl p-4 text-center shadow-sm">
         <span className="text-2xl block mb-1">💎</span>
-        <h2 className="text-base font-black text-white">Официальный Маркетплейс VENSTOGRAM</h2>
-        <p className="text-[11px] text-slate-300 mt-1 max-w-sm mx-auto">
+        <h2 className="text-base font-black text-slate-900">Официальный Маркетплейс VENSTOGRAM</h2>
+        <p className="text-[11px] text-slate-600 mt-1 max-w-sm mx-auto">
           Редкие имена, официальная галочка и пакеты продвижения для бизнеса.
           Оплата переводом с прикреплением чека.
         </p>
       </div>
 
       {/* Tab Switcher */}
-      <div className="flex bg-slate-900 p-1 rounded-2xl border border-slate-800">
+      <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
         <button
           onClick={() => {
             triggerHaptic("light");
@@ -138,8 +138,8 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
           }}
           className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
             activeTab === "usernames"
-              ? "bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md"
-              : "text-slate-400 hover:text-slate-200"
+              ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md"
+              : "text-slate-600 hover:text-slate-900"
           }`}
         >
           🏷️ Никнеймы
@@ -151,8 +151,8 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
           }}
           className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
             activeTab === "verified"
-              ? "bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-md"
-              : "text-slate-400 hover:text-slate-200"
+              ? "bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow-md"
+              : "text-slate-600 hover:text-slate-900"
           }`}
         >
           ✓ Галочка
@@ -165,7 +165,7 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
           className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
             activeTab === "promo"
               ? "bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black shadow-md"
-              : "text-slate-400 hover:text-slate-200"
+              : "text-slate-600 hover:text-slate-900"
           }`}
         >
           🚀 Бизнес
@@ -191,12 +191,12 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                   setVisibleCount(25);
                 }}
                 placeholder="🔍 Найти имя (Aziza, Laylo, Madina, Sevara)..."
-                className="w-full bg-slate-900 border border-slate-800 focus:border-pink-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 outline-none transition-colors"
+                className="w-full bg-slate-50 border border-slate-200 focus:border-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 outline-none transition-colors shadow-sm"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white text-xs"
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700 text-xs"
                 >
                   ✕
                 </button>
@@ -221,8 +221,8 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                     }}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
                       category === cat.id
-                        ? "bg-gradient-to-r from-pink-600 to-rose-500 text-white shadow-md"
-                        : "bg-slate-900 text-slate-400 border border-slate-800 hover:text-white"
+                        ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-sm"
+                        : "bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200"
                     }`}
                   >
                     {cat.label}
@@ -231,14 +231,14 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
               </div>
             </div>
 
-            <div className="text-[11px] text-slate-400 flex justify-between px-1">
-              <span>Доступно: <b className="text-white">{filteredListings.length}</b> никнеймов</span>
-              {category === "uzbek_names" && <span className="text-amber-400 font-bold">Фиксированная цена: $500</span>}
+            <div className="text-[11px] text-slate-500 flex justify-between px-1">
+              <span>Доступно: <b className="text-slate-900">{filteredListings.length}</b> никнеймов</span>
+              {category === "uzbek_names" && <span className="text-pink-600 font-bold">Фиксированная цена: $500</span>}
             </div>
 
             {/* Listings Cards */}
             {displayedListings.length === 0 ? (
-              <div className="bg-slate-900/60 p-8 rounded-2xl border border-slate-800 text-center text-slate-400 text-xs">
+              <div className="bg-slate-50 p-8 rounded-2xl border border-slate-200 text-center text-slate-500 text-xs shadow-sm">
                 По запросу "{searchQuery}" ничего не найдено. Попробуйте другое имя.
               </div>
             ) : (
@@ -250,50 +250,50 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                   return (
                     <div
                       key={item.id}
-                      className="bg-slate-900/90 border border-slate-800 hover:border-pink-500/40 rounded-2xl p-4 flex flex-col justify-between space-y-3 relative overflow-hidden transition-all shadow-md"
+                      className="bg-white border border-slate-200 hover:border-pink-300 rounded-2xl p-4 flex flex-col justify-between space-y-3 relative overflow-hidden transition-all shadow-sm"
                     >
                       <div className="flex items-start justify-between">
                         <div>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xl font-black text-white tracking-tight">@{item.username}</span>
+                          <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                            <span className="text-xl font-black text-slate-900 tracking-tight">@{item.username}</span>
                             {(item.category === "ultra_rare" || item.username === "ou") && (
-                              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                              <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300 shadow-sm">
                                 💎 2-ЗНАЧНЫЙ РЕДКИЙ ($30,000)
                               </span>
                             )}
                             {item.category === "vip_brands" && (
-                              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 shadow-sm">
                                 👑 VIP BRAND
                               </span>
                             )}
                             {item.category === "uzbek_cities" && (
-                              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                              <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-300 shadow-sm">
                                 🏛️ ГОРОД
                               </span>
                             )}
                             {item.category === "uzbek_names" && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-400 border border-pink-500/30">
+                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-pink-100 text-pink-900 border border-pink-300 shadow-sm">
                                 🇺🇿 ИМЯ
                               </span>
                             )}
                           </div>
-                          <span className="text-[11px] text-emerald-400 font-semibold mt-1 block">
+                          <span className="text-[11px] text-emerald-700 font-bold mt-1 block">
                             🛡️ Продавец: VENSTOGRAM OFFICIAL
                           </span>
                         </div>
 
                         <div className="text-right">
-                          <span className="text-base font-black text-amber-300 block">
+                          <span className="text-base font-black text-emerald-600 block">
                             ${priceUsd.toLocaleString()}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-medium">
+                          <span className="text-[10px] text-slate-500 font-semibold">
                             ≈ {priceUzs.toLocaleString()} сум
                           </span>
                         </div>
                       </div>
 
                       {/* Buy Button */}
-                      <div className="pt-2 border-t border-slate-800/80">
+                      <div className="pt-2 border-t border-slate-100">
                         <button
                           onClick={() => {
                             triggerHaptic("medium");
@@ -333,12 +333,12 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
       {/* Tab 2: Venstogram Verified Showcase */}
       {activeTab === "verified" && (
         <div className="space-y-4">
-          <div className="bg-gradient-to-br from-sky-950/80 via-blue-900/40 to-slate-900 border border-sky-500/40 rounded-3xl p-5 text-center relative overflow-hidden shadow-xl">
-            <div className="w-16 h-16 rounded-full bg-sky-500/20 border-2 border-sky-400 mx-auto flex items-center justify-center text-3xl mb-3 shadow-lg shadow-sky-500/30">
+          <div className="bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-50 border border-sky-200 rounded-3xl p-5 text-center relative overflow-hidden shadow-sm">
+            <div className="w-16 h-16 rounded-full bg-sky-100 border-2 border-sky-400 mx-auto flex items-center justify-center text-3xl mb-3 shadow-md shadow-sky-500/10 text-sky-600 font-black">
               ✓
             </div>
-            <h3 className="text-lg font-black text-white">{t.verifiedBadge}</h3>
-            <p className="text-xs text-slate-300 mt-1 max-w-xs mx-auto">
+            <h3 className="text-lg font-black text-slate-900">{t.verifiedBadge}</h3>
+            <p className="text-xs text-slate-600 mt-1 max-w-xs mx-auto">
               Один раз подключил галочку — и твои видео взлетают в рекомендации! Официальный статус, доверие и 3x-5x охваты.
             </p>
           </div>
@@ -348,15 +348,15 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
             {plans.map((p) => (
               <div
                 key={p.months}
-                className="bg-slate-900 border border-slate-800 hover:border-sky-500/60 rounded-2xl p-4 flex items-center justify-between transition-all"
+                className="bg-white border border-slate-200 hover:border-sky-300 rounded-2xl p-4 flex items-center justify-between transition-all shadow-sm"
               >
                 <div>
-                  <h4 className="text-sm font-bold text-white">{p.label}</h4>
-                  <span className="text-xs text-sky-400 font-semibold">{p.coins.toLocaleString()} Vensto Coins</span>
+                  <h4 className="text-sm font-bold text-slate-900">{p.label}</h4>
+                  <span className="text-xs text-sky-600 font-bold">{p.coins.toLocaleString()} Vensto Coins</span>
                 </div>
                 <button
                   onClick={() => handleBuyVerified(p.months)}
-                  className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl shadow-md shadow-sky-500/20 transition-transform active:scale-95"
+                  className="bg-gradient-to-r from-sky-500 to-blue-500 hover:from-sky-600 hover:to-blue-600 text-white font-black text-xs px-4 py-2 rounded-xl shadow-md shadow-sky-500/20 transition-transform active:scale-95"
                 >
                   Подключить
                 </button>
@@ -369,12 +369,12 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
       {/* Tab 3: Business Promotion Showcase */}
       {activeTab === "promo" && (
         <div className="space-y-4">
-          <div className="bg-gradient-to-br from-amber-950/80 via-orange-950/40 to-slate-900 border border-amber-500/40 rounded-3xl p-5 text-center relative overflow-hidden shadow-xl">
-            <div className="w-16 h-16 rounded-full bg-amber-500/20 border-2 border-amber-400 mx-auto flex items-center justify-center text-3xl mb-3 shadow-lg shadow-amber-500/30">
+          <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 border border-amber-200 rounded-3xl p-5 text-center relative overflow-hidden shadow-sm">
+            <div className="w-16 h-16 rounded-full bg-amber-100 border-2 border-amber-400 mx-auto flex items-center justify-center text-3xl mb-3 shadow-md shadow-amber-500/10">
               🚀
             </div>
-            <h3 className="text-lg font-black text-white">Продвижение бизнеса в VENSTOGRAM</h3>
-            <p className="text-xs text-slate-300 mt-1 max-w-sm mx-auto">
+            <h3 className="text-lg font-black text-slate-900">Продвижение бизнеса в VENSTOGRAM</h3>
+            <p className="text-xs text-slate-600 mt-1 max-w-sm mx-auto">
               Быстрый рост продаж, целевые показы в ленте и Reels для малого бизнеса, магазинов и брендов Узбекистана.
             </p>
           </div>
@@ -410,34 +410,34 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
             ].map((pkg) => (
               <div
                 key={pkg.id}
-                className={`bg-slate-900 border rounded-3xl p-4 space-y-3 relative overflow-hidden transition-all shadow-lg ${
-                  pkg.popular ? "border-amber-500/70 ring-1 ring-amber-500/30" : "border-slate-800"
+                className={`bg-white border rounded-3xl p-4 space-y-3 relative overflow-hidden transition-all shadow-sm ${
+                  pkg.popular ? "border-amber-400 ring-2 ring-amber-400/20" : "border-slate-200"
                 }`}
               >
                 {pkg.popular && (
-                  <span className="absolute top-3 right-3 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                  <span className="absolute top-3 right-3 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase shadow-sm">
                     ХИТ ПРОДАЖ 🔥
                   </span>
                 )}
 
                 <div>
-                  <h4 className="text-sm font-black text-white">{pkg.title}</h4>
-                  <span className="text-xs font-bold text-amber-400 block mt-0.5">{pkg.views}</span>
+                  <h4 className="text-sm font-black text-slate-900">{pkg.title}</h4>
+                  <span className="text-xs font-bold text-amber-600 block mt-0.5">{pkg.views}</span>
                 </div>
 
                 <div className="space-y-1">
                   {pkg.features.map((f, i) => (
-                    <div key={i} className="flex items-center space-x-1.5 text-[11px] text-slate-300">
-                      <span className="text-emerald-400">✓</span>
+                    <div key={i} className="flex items-center space-x-1.5 text-[11px] text-slate-700">
+                      <span className="text-emerald-600 font-bold">✓</span>
                       <span>{f}</span>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                   <div>
-                    <span className="text-base font-black text-white">{pkg.coins} 🪙</span>
-                    <span className="text-[10px] text-slate-400 block">≈ {pkg.priceUzs}</span>
+                    <span className="text-base font-black text-slate-900">{pkg.coins} 🪙</span>
+                    <span className="text-[10px] text-slate-500 block">≈ {pkg.priceUzs}</span>
                   </div>
 
                   <button
@@ -469,35 +469,35 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
 
       {/* Order Modal with Screenshot Upload and Paynet QR */}
       {selectedListing && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-md max-h-[92vh] overflow-y-auto space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-3">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 w-full max-w-md max-h-[92vh] overflow-y-auto space-y-4 shadow-2xl text-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-base font-black text-white">Оплата {selectedListing.username}</h3>
-                <span className="text-xs text-pink-400 font-bold">
+                <h3 className="text-base font-black text-slate-900">Оплата {selectedListing.username}</h3>
+                <span className="text-xs text-pink-600 font-bold">
                   Стоимость: ${selectedListing.price_usd?.toLocaleString() || 500} ({(selectedListing.price_uzs || (selectedListing.price_usd * 13000))?.toLocaleString()} UZS)
                 </span>
               </div>
               <button
                 onClick={() => setSelectedListing(null)}
-                className="text-slate-400 hover:text-white text-base p-1"
+                className="text-slate-400 hover:text-slate-700 text-base p-1"
               >
                 ✕
               </button>
             </div>
 
             {/* Payment Requisites & Paynet QR Code */}
-            <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-3 text-xs">
-              <span className="font-bold text-white block">Оплата через Paynet / Click / Payme / Uzum:</span>
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3 text-xs">
+              <span className="font-bold text-slate-900 block">Оплата через Paynet / Click / Payme / Uzum:</span>
 
               {/* QR Code Card */}
-              <div className="flex flex-col items-center bg-white p-3 rounded-2xl border border-slate-700 shadow-md">
+              <div className="flex flex-col items-center bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
                 <img
                   src="./paynet_qr.jpg"
                   alt="QR kodni skanerlang"
-                  className="w-52 h-auto object-contain rounded-xl shadow"
+                  className="w-52 h-auto object-contain rounded-xl shadow-sm"
                 />
-                <span className="text-[11px] text-slate-800 font-extrabold mt-2 text-center">
+                <span className="text-[11px] text-slate-900 font-extrabold mt-2 text-center">
                   📱 Отсканируйте QR-код в любом приложении
                 </span>
                 <span className="text-[9px] text-slate-500 font-semibold text-center">
@@ -506,9 +506,9 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
               </div>
 
               {/* Card Number & Recipient Box */}
-              <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-1.5">
+              <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5 shadow-sm">
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">
+                  <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">
                     Biznes karta raqami:
                   </span>
                   <button
@@ -521,22 +521,22 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                       setCopiedCard(true);
                       setTimeout(() => setCopiedCard(false), 2500);
                     }}
-                    className="text-[10px] bg-slate-800 hover:bg-slate-700 text-pink-400 px-2 py-0.5 rounded-lg font-bold border border-slate-700"
+                    className="text-[10px] bg-slate-100 hover:bg-slate-200 text-pink-600 px-2 py-0.5 rounded-lg font-bold border border-slate-200 transition"
                   >
                     {copiedCard ? "✓ Скопировано!" : "📋 Скопировать"}
                   </button>
                 </div>
 
-                <div className="font-mono font-black text-base text-emerald-400 tracking-wider">
+                <div className="font-mono font-black text-base text-emerald-600 tracking-wider">
                   8888 0144 9062 6927
                 </div>
 
-                <div className="text-[11px] text-slate-200 font-bold">
-                  Qabul qiluvchi: <span className="text-amber-300">ABDULAZIZ KAMOLOV SHERZODBEK O'G'LI</span>
+                <div className="text-[11px] text-slate-800 font-bold">
+                  Qabul qiluvchi: <span className="text-amber-700">ABDULAZIZ KAMOLOV SHERZODBEK O'G'LI</span>
                 </div>
               </div>
 
-              <p className="text-[10px] text-amber-200/90 font-medium bg-amber-950/40 border border-amber-500/30 p-2.5 rounded-xl leading-relaxed">
+              <p className="text-[10px] text-amber-900 font-medium bg-amber-50 border border-amber-200 p-2.5 rounded-xl leading-relaxed">
                 Оплатите точную сумму и прикрепите скриншот чека ниже. После подтверждения Основателем у вас сразу появится окно: нажимая кнопку, название вашего профиля сменится в один клик!
               </p>
             </div>
@@ -544,16 +544,16 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
             {/* Screenshot Upload Form */}
             <form onSubmit={handleSubmitOrder} className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-white block mb-1.5">
+                <label className="text-xs font-bold text-slate-900 block mb-1.5">
                   Прикрепить скриншот чека об оплате:
                 </label>
 
                 {receiptUrl ? (
-                  <div className="relative rounded-2xl overflow-hidden border border-emerald-500/60 p-1 bg-slate-950">
+                  <div className="relative rounded-2xl overflow-hidden border border-emerald-500/60 p-1 bg-white">
                     <img
                       src={receiptUrl}
                       alt="Чек"
-                      className="w-full h-44 object-contain rounded-xl bg-black"
+                      className="w-full h-44 object-contain rounded-xl bg-slate-50"
                     />
                     <button
                       type="button"
@@ -562,7 +562,7 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                     >
                       ✕ Удалить
                     </button>
-                    <span className="text-[10px] text-emerald-400 font-bold block text-center py-1">
+                    <span className="text-[10px] text-emerald-600 font-bold block text-center py-1">
                       ✓ Скриншот успешно прикреплен
                     </span>
                   </div>
@@ -579,10 +579,10 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingReceipt}
-                      className="w-full border-2 border-dashed border-slate-700 hover:border-pink-500 rounded-2xl p-5 text-center transition-all bg-slate-950/60 flex flex-col items-center justify-center space-y-1.5"
+                      className="w-full border-2 border-dashed border-slate-300 hover:border-pink-500 rounded-2xl p-5 text-center transition-all bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center space-y-1.5"
                     >
                       <span className="text-2xl">📸</span>
-                      <span className="text-xs font-bold text-pink-400">
+                      <span className="text-xs font-bold text-pink-600">
                         {uploadingReceipt ? "Загрузка фото..." : "Нажмите, чтобы выбрать скриншот из галереи"}
                       </span>
                       <span className="text-[10px] text-slate-500">Поддерживаются форматы JPG, PNG, WEBP</span>
@@ -592,7 +592,7 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
               </div>
 
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">
+                <label className="text-[11px] text-slate-600 block mb-1">
                   Комментарий или контакт для связи (опционально):
                 </label>
                 <input
@@ -600,31 +600,31 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                   value={orderNotes}
                   onChange={(e) => setOrderNotes(e.target.value)}
                   placeholder="Ваш номер или Telegram @..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-pink-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 outline-none focus:border-pink-500 focus:bg-white transition"
                 />
               </div>
 
               {/* Legal Terms & Ownership Regulations Banner */}
-              <div className="bg-amber-950/40 border border-amber-500/50 rounded-2xl p-3.5 space-y-2 text-left">
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-2 text-left">
                 <div className="flex items-center space-x-2">
                   <span className="text-sm">⚖️</span>
-                  <span className="text-xs font-black text-amber-300 uppercase tracking-wide">
+                  <span className="text-xs font-black text-amber-900 uppercase tracking-wide">
                     Регламент владения и правила платформы
                   </span>
                 </div>
-                <ul className="text-[11px] text-slate-300 space-y-1.5 list-disc pl-4 leading-snug">
+                <ul className="text-[11px] text-slate-700 space-y-1.5 list-disc pl-4 leading-snug">
                   <li>
                     <b>Личное пользование:</b> Никнейм закрепляется за покупателем на правах эксклюзивного личного пользования внутри экосистемы Venstogram.
                   </li>
-                  <li className="text-amber-200">
+                  <li className="text-amber-900">
                     <b>Запрет перепродажи:</b> <u>Перепродажа, передача или уступка никнейма третьим лицам категорически запрещена.</u> Вы можете менять имя профиля, фото и описание, но никнейм не подлежит вторичной продаже.
                   </li>
-                  <li className="text-amber-300">
+                  <li className="text-amber-900">
                     <b>Право Руководства:</b> Руководство платформы сохраняет за собой безоговорочное право изменять условия регламента, правила экосистемы и статус никнеймов в соответствии с интересами платформы и законами РУз.
                   </li>
                 </ul>
 
-                <label className="flex items-start space-x-2.5 pt-2 border-t border-amber-500/30 cursor-pointer">
+                <label className="flex items-start space-x-2.5 pt-2 border-t border-amber-200 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={agreedToTerms}
@@ -632,9 +632,9 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                       triggerHaptic("selection");
                       setAgreedToTerms(e.target.checked);
                     }}
-                    className="mt-0.5 rounded border-slate-700 text-pink-600 focus:ring-pink-500 w-4 h-4 bg-slate-900"
+                    className="mt-0.5 rounded border-slate-300 text-pink-600 focus:ring-pink-500 w-4 h-4 bg-white"
                   />
-                  <span className="text-[11px] font-bold text-white select-none">
+                  <span className="text-[11px] font-bold text-slate-900 select-none">
                     Я принимаю Регламент Venstogram, подтверждаю запрет перепродажи и согласен с условиями Руководства
                   </span>
                 </label>
@@ -644,25 +644,25 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                 <button
                   type="button"
                   onClick={() => setSelectedListing(null)}
-                  className="flex-1 bg-slate-800 text-slate-300 py-2.5 rounded-xl text-xs font-bold"
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl text-xs font-bold border border-slate-200 transition"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={!receiptUrl || !agreedToTerms || submittingOrder}
-                  className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-xs font-black shadow-lg shadow-emerald-600/30"
+                  className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-xs font-black shadow-lg shadow-emerald-600/30 active:scale-95 transition"
                 >
                   {submittingOrder ? "Отправка..." : "Отправить чек на проверку"}
                 </button>
               </div>
 
               {/* Tech Support Notice in Checkout */}
-              <div className="text-center pt-1 text-[10px] text-slate-400">
+              <div className="text-center pt-1 text-[10px] text-slate-500">
                 <span>Вопросы по оплате? Техподдержка: </span>
-                <a href="tel:+998507775152" className="text-emerald-400 font-mono font-bold hover:underline">+998 50 777 51 52</a>
+                <a href="tel:+998507775152" className="text-emerald-600 font-mono font-bold hover:underline">+998 50 777 51 52</a>
                 <span> • </span>
-                <a href="https://t.me/yuksak_it" target="_blank" rel="noreferrer" className="text-sky-400 font-mono font-bold hover:underline">@yuksak_it</a>
+                <a href="https://t.me/yuksak_it" target="_blank" rel="noreferrer" className="text-sky-600 font-mono font-bold hover:underline">@yuksak_it</a>
               </div>
             </form>
           </div>

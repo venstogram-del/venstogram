@@ -104,75 +104,75 @@ export function FounderQuestModal({ user, onClose, onUserUpdated }) {
   const hasClaimed = quest?.has_claimed || quest?.is_golden_winner || user?.badge_type === "gold_founder";
 
   return (
-    <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex flex-col justify-end sm:justify-center p-0 sm:p-4 animate-in fade-in">
-      <div className="bg-slate-900 border-t sm:border border-amber-500/40 rounded-t-3xl sm:rounded-3xl max-w-lg w-full mx-auto max-h-[92vh] flex flex-col overflow-hidden shadow-2xl shadow-amber-500/10">
+    <div className="fixed inset-0 z-60 bg-black/75 backdrop-blur-md flex flex-col justify-end sm:justify-center p-0 sm:p-4 animate-in fade-in">
+      <div className="bg-white border-t sm:border border-amber-300 rounded-t-3xl sm:rounded-3xl max-w-lg w-full mx-auto max-h-[92vh] flex flex-col overflow-hidden shadow-2xl text-slate-900">
         
         {/* Header with Gold Glow */}
-        <div className="px-5 py-4 bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border-b border-amber-500/30 flex items-center justify-between">
+        <div className="px-5 py-4 bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 border-b border-amber-200 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-600 text-slate-950 flex items-center justify-center font-black text-xl shadow-lg shadow-amber-500/30">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-950 flex items-center justify-center font-black text-xl shadow-md ring-2 ring-amber-300">
               👑
             </div>
             <div>
               <div className="flex items-center space-x-1.5">
-                <h3 className="text-sm font-black text-white uppercase tracking-wide">
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
                   Лига Блогеров
                 </h3>
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/40">
+                <span className="text-[10px] bg-amber-200 text-amber-900 font-black px-2 py-0.5 rounded-full border border-amber-300">
                   Состязание
                 </span>
               </div>
-              <p className="text-[11px] text-amber-200/80">
+              <p className="text-[11px] text-amber-800 font-medium">
                 Квест от Основателя & Дирекции платформы
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold text-sm"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition"
           >
             ✕
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-5 overflow-y-auto space-y-4 flex-1 text-slate-200">
+        <div className="p-5 overflow-y-auto space-y-4 flex-1 text-slate-800 bg-white">
           {errorMsg && (
-            <div className="bg-rose-950/70 border border-rose-500/50 p-3 rounded-2xl text-xs text-rose-300">
+            <div className="bg-rose-50 border border-rose-200 p-3 rounded-2xl text-xs text-rose-700 font-medium shadow-sm">
               ⚠️ {errorMsg}
             </div>
           )}
 
           {successMsg && (
-            <div className="bg-emerald-950/70 border border-emerald-500/50 p-3 rounded-2xl text-xs text-emerald-300 font-medium">
+            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl text-xs text-emerald-800 font-medium shadow-sm">
               🎉 {successMsg}
             </div>
           )}
 
           {/* Intro Card */}
-          <div className="bg-gradient-to-br from-slate-950 to-amber-950/30 border border-amber-500/20 rounded-2xl p-3.5 space-y-2">
-            <div className="text-xs font-semibold text-amber-300 flex items-center space-x-1.5">
+          <div className="bg-gradient-to-br from-amber-50 to-yellow-50/50 border border-amber-200 rounded-2xl p-3.5 space-y-2 shadow-sm">
+            <div className="text-xs font-black text-amber-950 flex items-center space-x-1.5">
               <span>⚡</span>
               <span>Испытание для верных блогеров и создателей контента</span>
             </div>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
+            <p className="text-[11px] text-slate-700 leading-relaxed font-medium">
               Выполните 4 ключевых задания экосистемы: соберите верную аудиторию, привлекайте новых участников и удерживайте высокие охваты. Победители получают вечный статус и эксклюзивные привилегии от Директора.
             </p>
           </div>
 
           {/* Reward Preview */}
           <div className="grid grid-cols-2 gap-2.5">
-            <div className="bg-slate-950/80 border border-amber-500/30 rounded-2xl p-3 text-center space-y-1">
+            <div className="bg-white border border-amber-300 rounded-2xl p-3 text-center space-y-1 shadow-sm">
               <span className="text-2xl block">👑</span>
-              <div className="text-xs font-black text-amber-300">Золотая Галочка</div>
-              <p className="text-[10px] text-slate-400 leading-tight">
+              <div className="text-xs font-black text-amber-900">Золотая Галочка</div>
+              <p className="text-[10px] text-slate-600 leading-tight">
                 х5 приоритет во всех рекомендациях Reels и Ленты
               </p>
             </div>
-            <div className="bg-slate-950/80 border border-amber-500/30 rounded-2xl p-3 text-center space-y-1">
+            <div className="bg-white border border-amber-300 rounded-2xl p-3 text-center space-y-1 shadow-sm">
               <span className="text-2xl block">💎</span>
-              <div className="text-xs font-black text-amber-300">Редкий @никнейм</div>
-              <p className="text-[10px] text-slate-400 leading-tight">
+              <div className="text-xs font-black text-amber-900">Редкий @никнейм</div>
+              <p className="text-[10px] text-slate-600 leading-tight">
                 Бесплатный подарок из золотого резерва от Директора
               </p>
             </div>
@@ -180,22 +180,22 @@ export function FounderQuestModal({ user, onClose, onUserUpdated }) {
 
           {/* Conditions & Progress */}
           <div className="space-y-3">
-            <div className="text-xs font-black uppercase text-slate-400 tracking-wider">
+            <div className="text-xs font-black uppercase text-slate-600 tracking-wider">
               Прогресс выполнения заданий
             </div>
 
             {/* 1. Referrals */}
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-1.5">
+            <div className="bg-white border border-slate-200 rounded-2xl p-3 space-y-1.5 shadow-sm">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-bold flex items-center space-x-1.5 text-white">
+                <span className="font-bold flex items-center space-x-1.5 text-slate-900">
                   <span>👥</span>
                   <span>Пригласить пользователей в бота:</span>
                 </span>
-                <span className={`font-mono font-bold ${refs >= targets.referrals ? "text-emerald-400" : "text-amber-400"}`}>
+                <span className={`font-mono font-bold ${refs >= targets.referrals ? "text-emerald-600 font-black" : "text-amber-700"}`}>
                   {refs} / {targets.referrals} {refs >= targets.referrals && "✓"}
                 </span>
               </div>
-              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200">
                 <div
                   className="bg-gradient-to-r from-amber-500 to-yellow-400 h-full transition-all duration-500"
                   style={{ width: `${refPct}%` }}
@@ -204,17 +204,17 @@ export function FounderQuestModal({ user, onClose, onUserUpdated }) {
             </div>
 
             {/* 2. Followers */}
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-1.5">
+            <div className="bg-white border border-slate-200 rounded-2xl p-3 space-y-1.5 shadow-sm">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-bold flex items-center space-x-1.5 text-white">
+                <span className="font-bold flex items-center space-x-1.5 text-slate-900">
                   <span>🌟</span>
                   <span>Подписчики профиля:</span>
                 </span>
-                <span className={`font-mono font-bold ${followers >= targets.followers ? "text-emerald-400" : "text-amber-400"}`}>
+                <span className={`font-mono font-bold ${followers >= targets.followers ? "text-emerald-600 font-black" : "text-amber-700"}`}>
                   {followers} / {targets.followers} {followers >= targets.followers && "✓"}
                 </span>
               </div>
-              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200">
                 <div
                   className="bg-gradient-to-r from-amber-500 to-yellow-400 h-full transition-all duration-500"
                   style={{ width: `${folPct}%` }}
@@ -223,17 +223,17 @@ export function FounderQuestModal({ user, onClose, onUserUpdated }) {
             </div>
 
             {/* 3. Posts */}
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-1.5">
+            <div className="bg-white border border-slate-200 rounded-2xl p-3 space-y-1.5 shadow-sm">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-bold flex items-center space-x-1.5 text-white">
+                <span className="font-bold flex items-center space-x-1.5 text-slate-900">
                   <span>📸</span>
                   <span>Опубликовано постов / Reels:</span>
                 </span>
-                <span className={`font-mono font-bold ${posts >= targets.posts ? "text-emerald-400" : "text-amber-400"}`}>
+                <span className={`font-mono font-bold ${posts >= targets.posts ? "text-emerald-600 font-black" : "text-amber-700"}`}>
                   {posts} / {targets.posts} {posts >= targets.posts && "✓"}
                 </span>
               </div>
-              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200">
                 <div
                   className="bg-gradient-to-r from-amber-500 to-yellow-400 h-full transition-all duration-500"
                   style={{ width: `${postPct}%` }}
@@ -242,17 +242,17 @@ export function FounderQuestModal({ user, onClose, onUserUpdated }) {
             </div>
 
             {/* 4. Total Views */}
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-1.5">
+            <div className="bg-white border border-slate-200 rounded-2xl p-3 space-y-1.5 shadow-sm">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-bold flex items-center space-x-1.5 text-white">
+                <span className="font-bold flex items-center space-x-1.5 text-slate-900">
                   <span>👁️</span>
                   <span>Суммарные просмотры видео:</span>
                 </span>
-                <span className={`font-mono font-bold ${views >= targets.views ? "text-emerald-400" : "text-amber-400"}`}>
+                <span className={`font-mono font-bold ${views >= targets.views ? "text-emerald-600 font-black" : "text-amber-700"}`}>
                   {views.toLocaleString()} / {targets.views.toLocaleString()} {views >= targets.views && "✓"}
                 </span>
               </div>
-              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200">
                 <div
                   className="bg-gradient-to-r from-amber-500 to-yellow-400 h-full transition-all duration-500"
                   style={{ width: `${viewPct}%` }}
@@ -262,29 +262,29 @@ export function FounderQuestModal({ user, onClose, onUserUpdated }) {
           </div>
 
           {/* Referral Link Box */}
-          <div className="bg-slate-950 border border-amber-500/30 rounded-2xl p-3.5 space-y-2.5">
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3.5 space-y-2.5 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-white flex items-center space-x-1.5">
+              <span className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
                 <span>🔗</span>
                 <span>Ваша реферальная ссылка:</span>
               </span>
-              <span className="text-[10px] text-amber-400 font-medium">Каждый переход = +1 в прогресс</span>
+              <span className="text-[10px] text-amber-800 font-semibold">Каждый переход = +1 в прогресс</span>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs font-mono text-amber-200 select-all break-all">
+            <div className="bg-white border border-amber-200 rounded-xl p-2.5 text-xs font-mono text-amber-900 select-all break-all shadow-inner font-bold">
               {quest?.referral_link || `https://t.me/venstogrambot?start=ref_${user?.id || ""}`}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={handleCopyLink}
-                className="w-full bg-slate-800 hover:bg-slate-700 active:scale-95 text-xs font-bold py-2 rounded-xl text-white transition flex items-center justify-center space-x-1"
+                className="w-full bg-slate-100 hover:bg-slate-200 active:scale-95 text-xs font-bold py-2 rounded-xl text-slate-800 border border-slate-200 transition flex items-center justify-center space-x-1"
               >
                 <span>{copied ? "✅ Скопировано" : "📋 Скопировать"}</span>
               </button>
               <button
                 onClick={handleShareTelegram}
-                className="w-full bg-sky-600 hover:bg-sky-500 active:scale-95 text-xs font-bold py-2 rounded-xl text-white transition flex items-center justify-center space-x-1"
+                className="w-full bg-sky-500 hover:bg-sky-600 active:scale-95 text-xs font-bold py-2 rounded-xl text-white transition flex items-center justify-center space-x-1 shadow-sm"
               >
                 <span>✈️ Поделиться</span>
               </button>
@@ -292,10 +292,10 @@ export function FounderQuestModal({ user, onClose, onUserUpdated }) {
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-4 bg-slate-950 border-t border-slate-800 space-y-2">
+        {/* Footer Actions - ALWAYS VISIBLE with safe area padding */}
+        <div className="p-4 pb-8 sm:pb-5 bg-white border-t border-slate-200 space-y-2 sticky bottom-0 z-20 shadow-lg">
           {hasClaimed ? (
-            <div className="w-full py-3 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 rounded-2xl text-center text-xs font-black text-amber-300 flex items-center justify-center space-x-2">
+            <div className="w-full py-3.5 bg-gradient-to-r from-amber-100 to-yellow-100 border border-amber-300 rounded-2xl text-center text-xs font-black text-amber-950 flex items-center justify-center space-x-2 shadow-sm">
               <span>👑</span>
               <span>Вы уже являетесь почетным членом Лиги Основателя!</span>
             </div>
@@ -303,10 +303,10 @@ export function FounderQuestModal({ user, onClose, onUserUpdated }) {
             <button
               onClick={handleClaim}
               disabled={!isEligible || claiming}
-              className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wide transition-all shadow-lg flex items-center justify-center space-x-2 ${
+              className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-xl flex items-center justify-center space-x-2 ${
                 isEligible
-                  ? "bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 shadow-amber-500/30 active:scale-98 animate-pulse"
-                  : "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50"
+                  ? "bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 shadow-amber-500/30 active:scale-98 animate-pulse border border-amber-400"
+                  : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
               }`}
             >
               <span>{claiming ? "Проверка..." : isEligible ? "👑 ЗАБРАТЬ ЗОЛОТУЮ ГАЛОЧКУ И ПРИЗ!" : "🔒 Выполните все 4 условия для награды"}</span>

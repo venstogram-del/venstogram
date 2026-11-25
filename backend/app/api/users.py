@@ -13,6 +13,18 @@ FOUNDER_RESERVED_USERNAMES = {
     "uzbekiston", "uzbekistan", "venstogram", "director", "admin", "yuksak", "yuksak_it", "official"
 }
 
+def is_sacred_username(username: str) -> bool:
+    norm = re.sub(r'[^a-zA-Z0-9]', '', (username or '').lower())
+    sacred_roots = [
+        "allah", "alloh", "allokh", "qaba", "kaaba", "kabah", "kaabah",
+        "muhammad", "mukhammad", "muhammed", "mohammed", "rasululloh",
+        "rasulullah", "paygambar", "paygamber", "sallallahu", "alayhiwasallam"
+    ]
+    for root in sacred_roots:
+        if root in norm:
+            return True
+    return False
+
 router = APIRouter(prefix="/users", tags=["Users & Search"])
 
 @router.get("/check-username")
@@ -30,6 +42,16 @@ async def check_username(
             "available": False,
             "username": cleaned,
             "message": "Никнейм должен быть от 3 до 32 символов (латинские буквы, цифры и _)",
+            "is_current": False,
+            "suggestions": []
+        }
+
+    # Sacred Religious Names Blacklist
+    if is_sacred_username(cleaned):
+        return {
+            "available": False,
+            "username": cleaned,
+            "message": "Никнейм содержит священное религиозное имя и запрещён к регистрации из уважения к чувствам верующих.",
             "is_current": False,
             "suggestions": []
         }

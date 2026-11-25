@@ -73,16 +73,16 @@ export function SearchView({ currentUser, t, onOpenChat, onOpenProfile }) {
   };
 
   return (
-    <div className="p-4 space-y-4 pb-24">
+    <div className="p-4 space-y-4 pb-24 bg-white min-h-screen">
       {/* Search Bar Header */}
-      <div className="sticky top-12 z-20 bg-slate-950/95 backdrop-blur-md pt-1 pb-2">
+      <div className="sticky top-12 z-20 bg-white/95 backdrop-blur-md pt-1 pb-2">
         <div className="relative">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t?.searchUsers || "🔍 Найти друга по имени или @никнейму..."}
-            className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-11 pr-10 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all shadow-inner"
+            className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-10 py-3 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 focus:bg-white transition-all shadow-sm"
           />
           <div className="absolute left-3.5 top-3.5 text-slate-400">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,7 +95,7 @@ export function SearchView({ currentUser, t, onOpenChat, onOpenProfile }) {
                 triggerHaptic("light");
                 setQuery("");
               }}
-              className="absolute right-3.5 top-3.5 text-slate-400 hover:text-white"
+              className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-700"
             >
               ✕
             </button>
@@ -104,9 +104,9 @@ export function SearchView({ currentUser, t, onOpenChat, onOpenProfile }) {
       </div>
 
       {/* Subheader */}
-      <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+      <div className="flex items-center justify-between text-xs text-slate-600 font-semibold px-1">
         <span>{query ? `Результаты поиска (${results.length}):` : "🔥 Рекомендованные друзья и авторы:"}</span>
-        {loading && <span className="text-pink-400 text-[11px] animate-pulse">Поиск...</span>}
+        {loading && <span className="text-pink-600 text-[11px] font-bold animate-pulse">Поиск...</span>}
       </div>
 
       {/* Results List */}
@@ -118,7 +118,7 @@ export function SearchView({ currentUser, t, onOpenChat, onOpenProfile }) {
           return (
             <div
               key={u.id}
-              className="bg-slate-900/80 border border-slate-800 hover:border-slate-700 rounded-2xl p-3.5 flex flex-col space-y-2.5 transition-all shadow-md"
+              className="bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-3.5 flex flex-col space-y-2.5 transition-all shadow-sm"
             >
               <div className="flex items-center justify-between">
                 <div
@@ -130,12 +130,12 @@ export function SearchView({ currentUser, t, onOpenChat, onOpenProfile }) {
                 >
                   <div className="relative">
                     <img
-                      src={u.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
+                      src={u.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%23f1f5f9'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%23cbd5e1'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%23cbd5e1'/%3E%3C/svg%3E"}
                       alt={u.username}
-                      className="w-12 h-12 rounded-full object-cover ring-2 ring-slate-800"
+                      className="w-12 h-12 rounded-full object-cover ring-2 ring-slate-100"
                     />
                     {u.is_verified && (
-                      <div className="absolute -bottom-1 -right-1 bg-sky-500 text-white w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold">
+                      <div className="absolute -bottom-1 -right-1 bg-sky-500 text-white w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm">
                         ✓
                       </div>
                     )}
@@ -143,14 +143,14 @@ export function SearchView({ currentUser, t, onOpenChat, onOpenProfile }) {
 
                   <div>
                     <div className="flex items-center space-x-1">
-                      <span className="text-xs font-black text-white">
+                      <span className="text-xs font-black text-slate-900">
                         {u.first_name} {u.last_name || ""}
                       </span>
                     </div>
-                    <span className="text-[11px] text-pink-400 font-bold block">
+                    <span className="text-[11px] text-pink-600 font-bold block">
                       @{u.username}
                     </span>
-                    <span className="text-[10px] text-slate-400">
+                    <span className="text-[10px] text-slate-500 font-medium">
                       👥 {u.followers_count || 0} подписчиков
                     </span>
                   </div>
@@ -162,8 +162,8 @@ export function SearchView({ currentUser, t, onOpenChat, onOpenProfile }) {
                       onClick={() => handleFollowToggle(u)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                         isFollowing
-                          ? "bg-slate-800 text-slate-300 border border-slate-700"
-                          : "bg-gradient-to-r from-pink-600 to-rose-500 text-white shadow-md shadow-pink-600/30"
+                          ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+                          : "bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white shadow-md shadow-pink-500/20 active:scale-95"
                       }`}
                     >
                       {isFollowing ? "В подписках" : "+ Подписаться"}
@@ -174,7 +174,7 @@ export function SearchView({ currentUser, t, onOpenChat, onOpenProfile }) {
                         triggerHaptic("medium");
                         onOpenChat(u);
                       }}
-                      className="p-2 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded-xl border border-slate-700"
+                      className="p-2 bg-slate-100 hover:bg-slate-200 text-sky-600 rounded-xl border border-slate-200 transition"
                       title="Написать сообщение"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,7 +186,7 @@ export function SearchView({ currentUser, t, onOpenChat, onOpenProfile }) {
               </div>
 
               {u.bio && (
-                <p className="text-[11px] text-slate-300 line-clamp-2 pl-1 leading-relaxed">
+                <p className="text-[11px] text-slate-600 line-clamp-2 pl-1 leading-relaxed">
                   {u.bio}
                 </p>
               )}
@@ -194,10 +194,10 @@ export function SearchView({ currentUser, t, onOpenChat, onOpenProfile }) {
               {u.telegram_channel && (
                 <button
                   onClick={() => handleOpenUserTelegramChannel(u.telegram_channel)}
-                  className="w-full text-left bg-sky-950/40 border border-sky-800/40 rounded-xl px-2.5 py-1.5 text-[11px] text-sky-300 hover:text-sky-200 flex items-center justify-between"
+                  className="w-full text-left bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-xl px-2.5 py-1.5 text-[11px] text-sky-700 flex items-center justify-between transition"
                 >
                   <span className="truncate">📢 Telegram: {u.telegram_channel}</span>
-                  <span className="text-[9px] bg-sky-600/30 px-1 py-0.5 rounded text-sky-200 ml-1 shrink-0">
+                  <span className="text-[9px] bg-sky-600 text-white font-bold px-1.5 py-0.5 rounded shadow-sm ml-1 shrink-0">
                     Открыть ↗
                   </span>
                 </button>
@@ -209,7 +209,7 @@ export function SearchView({ currentUser, t, onOpenChat, onOpenProfile }) {
         {!loading && results.length === 0 && (
           <div className="text-center py-12 space-y-2">
             <span className="text-4xl block">🔍</span>
-            <p className="text-xs font-bold text-slate-300">Никого не найдено</p>
+            <p className="text-xs font-bold text-slate-900">Никого не найдено</p>
             <p className="text-[11px] text-slate-500">
               Попробуйте ввести другой никнейм или имя вашего друга
             </p>

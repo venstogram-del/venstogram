@@ -682,7 +682,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     let localStream = null;
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: isVideo ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false
       });
       localStreamRef.current = localStream;
@@ -727,17 +727,24 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     queuedIceCandidatesRef.current = [];
 
     // Add local tracks to peer connection
-    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+    localStream.getTracks().forEach((track) => {
+      track.enabled = true;
+      pc.addTrack(track, localStream);
+    });
 
     // Handle remote tracks
     pc.ontrack = (event) => {
       console.log("[Caller ontrack] Remote stream track received:", event.track.kind);
-      remoteStreamRef.current = event.streams[0];
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-      }
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = event.streams[0];
+      if (event.streams && event.streams[0]) {
+        remoteStreamRef.current = event.streams[0];
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.streams[0];
+          try { remoteVideoRef.current.play().catch(() => {}); } catch(e) {}
+        }
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = event.streams[0];
+          try { remoteAudioRef.current.play().catch(() => {}); } catch(e) {}
+        }
       }
       setActiveCall((prev) => (prev ? { ...prev, isConnected: true } : null));
       SoundEngine.stopRingtone();
@@ -829,7 +836,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     let localStream = null;
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: isVideo ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false
       });
       localStreamRef.current = localStream;
@@ -848,18 +855,27 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     peerConnectionRef.current = pc;
 
     if (localStream) {
-      localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+      localStream.getTracks().forEach((track) => {
+        track.enabled = true;
+        pc.addTrack(track, localStream);
+      });
     }
 
     pc.ontrack = (event) => {
       console.log("[Receiver ontrack] Remote stream track received:", event.track.kind);
-      remoteStreamRef.current = event.streams[0];
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
+      if (event.streams && event.streams[0]) {
+        remoteStreamRef.current = event.streams[0];
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.streams[0];
+          try { remoteVideoRef.current.play().catch(() => {}); } catch(e) {}
+        }
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = event.streams[0];
+          try { remoteAudioRef.current.play().catch(() => {}); } catch(e) {}
+        }
       }
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = event.streams[0];
-      }
+      setActiveCall((prev) => (prev ? { ...prev, isConnected: true } : null));
+      SoundEngine.stopRingtone();
     };
 
     pc.onicecandidate = (event) => {
@@ -943,20 +959,20 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
   const emojisList = ["❤️", "🔥", "😂", "👏", "🚀", "✨", "🎉", "👍", "😍", "💎", "🇺🇿", "🌸", "⭐", "💯"];
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 bg-white text-slate-900 flex flex-col animate-in fade-in duration-150">
       {/* Hidden file inputs */}
       <input type="file" ref={photoInputRef} accept="image/*" onChange={handlePhotoUpload} className="hidden" />
       <input type="file" ref={videoInputRef} accept="video/*" onChange={handleVideoUpload} className="hidden" />
 
       {/* View 1: Active Dialog Screen */}
       {activePartner ? (
-        <div className="flex-1 flex flex-col h-full">
+        <div className="flex-1 flex flex-col h-full bg-white">
           {/* Header */}
-          <div className="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between">
+          <div className="bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shadow-sm">
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => setActivePartner(null)}
-                className="text-slate-400 hover:text-white p-1 text-base font-bold flex items-center space-x-1"
+                className="text-slate-600 hover:text-slate-900 p-1 text-base font-bold flex items-center space-x-1"
               >
                 <span>←</span>
                 <span className="text-xs">Чаты</span>
@@ -971,21 +987,21 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
               >
                 <div className="relative">
                   <img
-                    src={activePartner.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
-                    className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-700"
+                    src={activePartner.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%23f1f5f9'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%23cbd5e1'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%23cbd5e1'/%3E%3C/svg%3E"}
+                    className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200"
                     onError={(e) => {
                       e.currentTarget.onerror = null;
-                      e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E";
+                      e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%23f1f5f9'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%23cbd5e1'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%23cbd5e1'/%3E%3C/svg%3E";
                     }}
                   />
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-slate-900" />
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-black text-white flex items-center space-x-1">
+                  <h3 className="text-xs font-black text-slate-900 flex items-center space-x-1">
                     <span>{activePartner.first_name} {activePartner.last_name || ""}</span>
-                    {activePartner.is_verified && <span className="text-sky-400">✓</span>}
+                    {activePartner.is_verified && <span className="text-sky-500 font-bold">✓</span>}
                   </h3>
-                  <span className="text-[10px] text-pink-400 font-semibold block">@{activePartner.username}</span>
+                  <span className="text-[10px] text-pink-600 font-bold block">@{activePartner.username}</span>
                 </div>
               </div>
             </div>
@@ -994,14 +1010,14 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => startCall(false)}
-                className="p-2 text-slate-300 hover:text-white bg-slate-800 rounded-xl hover:bg-slate-700 transition-colors"
+                className="p-2 text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-200 transition-colors shadow-sm"
                 title="Аудиозвонок HD"
               >
                 📞
               </button>
               <button
                 onClick={() => startCall(true)}
-                className="p-2 text-slate-300 hover:text-white bg-slate-800 rounded-xl hover:bg-slate-700 transition-colors"
+                className="p-2 text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-200 transition-colors shadow-sm"
                 title="Видеозвонок HD"
               >
                 📹
@@ -1010,7 +1026,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
           </div>
 
           {/* Messages Stream */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/70">
             {messages.map((m) => {
               const isMine = m.sender_id === (user?.id || 5);
               const isVoicePlaying = playingVoiceId === m.id;
@@ -1021,10 +1037,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                   className={`flex ${isMine ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[78%] rounded-2xl px-3.5 py-2.5 text-xs ${
+                    className={`max-w-[78%] rounded-2xl px-3.5 py-2.5 text-xs shadow-sm ${
                       isMine
-                        ? "bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-br-sm shadow-md"
-                        : "bg-slate-800 text-slate-200 rounded-bl-sm border border-slate-700/60"
+                        ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-br-sm shadow-pink-500/10"
+                        : "bg-white text-slate-900 rounded-bl-sm border border-slate-200 shadow-slate-200/50"
                     }`}
                   >
                     {/* 1. Voice Message */}
@@ -1032,21 +1048,21 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                       <div className="flex items-center space-x-3 py-1 min-w-[170px]">
                         <button
                           onClick={() => handleToggleVoicePlayback(m)}
-                          className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-md transition-all ${
+                          className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-sm transition-all ${
                             isVoicePlaying
                               ? "bg-amber-400 text-slate-950 scale-105 animate-pulse"
-                              : "bg-white/20 hover:bg-white/30 text-white"
+                              : isMine ? "bg-white/20 hover:bg-white/30 text-white" : "bg-pink-500 text-white"
                           }`}
                         >
                           {isVoicePlaying ? "⏸" : "▶"}
                         </button>
                         <div className="flex-1">
                           <div className="flex items-center space-x-1 font-mono text-sm tracking-wider">
-                            <span className={isVoicePlaying ? "text-amber-300 animate-pulse" : "opacity-80"}>
+                            <span className={isVoicePlaying ? (isMine ? "text-amber-200 animate-pulse" : "text-pink-600 animate-pulse") : (isMine ? "opacity-80" : "text-slate-500")}>
                               {isVoicePlaying ? "▂▃▅▆▇▅▃▂" : "ılılıllılılı"}
                             </span>
                           </div>
-                          <span className="text-[10px] opacity-80 block font-semibold mt-0.5">
+                          <span className={`text-[10px] block font-semibold mt-0.5 ${isMine ? "opacity-90" : "text-slate-500"}`}>
                             {isVoicePlaying ? "Воспроизведение..." : `Голосовое (${m.duration || 6} сек)`}
                           </span>
                         </div>
@@ -1064,9 +1080,9 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                             setZoomPhotoUrl(m.content);
                             setZoomScale(1);
                           }}
-                          className="rounded-xl max-h-60 w-full object-cover cursor-pointer hover:opacity-95 transition-opacity border border-black/20"
+                          className="rounded-xl max-h-60 w-full object-cover cursor-pointer hover:opacity-95 transition-opacity border border-black/10"
                         />
-                        <span className="text-[9px] opacity-75 block text-center">🔍 Нажмите для приближения</span>
+                        <span className={`text-[9px] block text-center ${isMine ? "opacity-80" : "text-slate-500"}`}>🔍 Нажмите для приближения</span>
                       </div>
                     )}
 
@@ -1079,10 +1095,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
                     {/* 4. Text Message */}
                     {m.media_type !== "voice" && m.media_type !== "photo" && m.media_type !== "video" && (
-                      <p className="leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                      <p className="leading-relaxed whitespace-pre-wrap font-medium">{m.content}</p>
                     )}
 
-                    <span className="text-[9px] opacity-60 block text-right mt-1 font-mono">
+                    <span className={`text-[9px] block text-right mt-1 font-mono ${isMine ? "text-white/80" : "text-slate-400"}`}>
                       {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
@@ -1093,7 +1109,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
           {/* Emoji Picker Row */}
           {showEmojiPicker && (
-            <div className="bg-slate-900 border-t border-slate-800 p-2 flex items-center space-x-2 overflow-x-auto no-scrollbar animate-in slide-in-from-bottom duration-150">
+            <div className="bg-white border-t border-slate-200 p-2 flex items-center space-x-2 overflow-x-auto no-scrollbar shadow-inner animate-in slide-in-from-bottom duration-150">
               {emojisList.map((emoji) => (
                 <button
                   key={emoji}
@@ -1112,7 +1128,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
           {/* Voice Recording Banner if Active */}
           {isRecordingVoice && (
-            <div className="bg-rose-950/80 border-t border-rose-500/40 px-4 py-2 flex items-center justify-between text-xs text-rose-300 animate-pulse">
+            <div className="bg-rose-50 border-t border-rose-200 px-4 py-2 flex items-center justify-between text-xs text-rose-800 animate-pulse">
               <div className="flex items-center space-x-2">
                 <span className="w-2.5 h-2.5 bg-rose-500 rounded-full animate-ping" />
                 <span>Идет запись голоса: <b>{voiceSeconds} сек</b></span>
@@ -1120,13 +1136,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setIsRecordingVoice(false)}
-                  className="text-slate-400 text-xs px-2 py-1 hover:text-white"
+                  className="text-slate-500 text-xs px-2 py-1 hover:text-slate-800"
                 >
                   Отмена
                 </button>
                 <button
                   onClick={handleSendVoiceNote}
-                  className="bg-rose-600 text-white font-bold text-xs px-3 py-1 rounded-lg shadow-md"
+                  className="bg-rose-600 text-white font-bold text-xs px-3 py-1 rounded-lg shadow-sm"
                 >
                   Отправить
                 </button>
@@ -1137,13 +1153,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
           {/* Input Bar */}
           <form
             onSubmit={handleSendMessage}
-            className="p-2.5 bg-slate-900 border-t border-slate-800 flex items-center space-x-2"
+            className="p-2.5 bg-white border-t border-slate-200 flex items-center space-x-2 shadow-sm"
           >
             {/* Emoji toggle button */}
             <button
               type="button"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="p-2 text-slate-400 hover:text-amber-400 text-base"
+              className="p-2 text-slate-500 hover:text-pink-600 text-base transition-colors"
               title="Смайлики"
             >
               😊
@@ -1153,7 +1169,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             <button
               type="button"
               onClick={() => photoInputRef.current?.click()}
-              className="p-2 text-slate-400 hover:text-pink-400 text-base"
+              className="p-2 text-slate-500 hover:text-pink-600 text-base transition-colors"
               title="Отправить фото"
             >
               📷
@@ -1163,7 +1179,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             <button
               type="button"
               onClick={() => videoInputRef.current?.click()}
-              className="p-2 text-slate-400 hover:text-sky-400 text-base"
+              className="p-2 text-slate-500 hover:text-sky-600 text-base transition-colors"
               title="Отправить видео"
             >
               🎥
@@ -1182,7 +1198,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
               className={`p-2 rounded-xl border transition-all ${
                 isRecordingVoice
                   ? "bg-rose-600 text-white border-rose-500 animate-pulse"
-                  : "bg-slate-950 text-slate-300 border-slate-800 hover:text-white"
+                  : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
               }`}
               title={isRecordingVoice ? "Отправить голосовое" : "Записать голосовое"}
             >
@@ -1195,14 +1211,14 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder="Напишите сообщение..."
-              className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 outline-none focus:border-pink-500"
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-pink-500 focus:bg-white shadow-inner transition"
             />
 
             {/* Send Button */}
             <button
               type="submit"
               disabled={!inputText.trim()}
-              className="bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-500 hover:to-rose-400 disabled:opacity-40 text-white font-bold p-2.5 rounded-2xl shadow-lg transition-transform active:scale-95"
+              className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 disabled:opacity-40 text-white font-bold p-2.5 rounded-2xl shadow-md shadow-pink-500/20 transition-transform active:scale-95"
             >
               <svg className="w-4 h-4 transform rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -1212,24 +1228,24 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         </div>
       ) : (
         /* View 2: Dialogs List */
-        <div className="flex-1 flex flex-col h-full">
+        <div className="flex-1 flex flex-col h-full bg-white">
           {/* Header */}
-          <div className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
-            <h2 className="text-base font-black text-white flex items-center space-x-2">
+          <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
+            <h2 className="text-base font-black text-slate-900 flex items-center space-x-2">
               <span>💬</span>
               <span>Сообщения и чаты</span>
             </h2>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white text-base p-1"
+              className="text-slate-400 hover:text-slate-700 text-base p-1"
             >
               ✕
             </button>
           </div>
 
           {/* Dialogs List Stream */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            <span className="text-[11px] text-slate-400 font-bold px-1 uppercase tracking-wider block">
+          <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50/50">
+            <span className="text-[11px] text-slate-500 font-bold px-1 uppercase tracking-wider block">
               Все диалоги ({dialogs.length}):
             </span>
 
@@ -1237,28 +1253,28 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
               <div
                 key={d.partner.id}
                 onClick={() => openDialog(d.partner)}
-                className="bg-slate-900/80 hover:bg-slate-850 border border-slate-800 hover:border-pink-500/40 rounded-2xl p-3.5 flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] shadow-sm"
+                className="bg-white hover:bg-slate-50 border border-slate-200 hover:border-pink-300 rounded-2xl p-3.5 flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] shadow-sm"
               >
                 <div className="flex items-center space-x-3">
                   <div className="relative">
                     <img
-                      src={d.partner.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150"}
-                      className="w-12 h-12 rounded-full object-cover ring-2 ring-slate-800"
+                      src={d.partner.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%23f1f5f9'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%23cbd5e1'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%23cbd5e1'/%3E%3C/svg%3E"}
+                      className="w-12 h-12 rounded-full object-cover ring-2 ring-slate-100"
                     />
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-slate-900" />
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-white" />
                   </div>
 
                   <div className="max-w-[190px] sm:max-w-xs">
                     <div className="flex items-center space-x-1">
-                      <span className="text-xs font-black text-white truncate">
+                      <span className="text-xs font-black text-slate-900 truncate">
                         {d.partner.first_name} {d.partner.last_name || ""}
                       </span>
-                      {d.partner.is_verified && <span className="text-sky-400 text-xs">✓</span>}
+                      {d.partner.is_verified && <span className="text-sky-500 font-bold text-xs">✓</span>}
                     </div>
-                    <span className="text-[10px] text-pink-400 font-semibold block">
+                    <span className="text-[10px] text-pink-600 font-bold block">
                       @{d.partner.username}
                     </span>
-                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                    <p className="text-[11px] text-slate-500 truncate mt-0.5">
                       {d.last_message ? d.last_message.content : "Начните общение..."}
                     </p>
                   </div>
@@ -1266,7 +1282,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
                 <div className="text-right flex flex-col items-end space-y-1">
                   {d.last_message && d.last_message.created_at && (
-                    <span className="text-[9px] text-slate-500 font-mono">
+                    <span className="text-[9px] text-slate-400 font-mono">
                       {new Date(d.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   )}

@@ -110,7 +110,7 @@ def _send_sync_smtp(to_email: str, subject: str, html_body: str, plain_body: str
     # Attempt 1: Port 465 SSL
     ssl_err = None
     try:
-        with smtplib.SMTP_SSL(smtp_host, 465, timeout=6) as server:
+        with smtplib.SMTP_SSL(smtp_host, 465, timeout=12) as server:
             server.login(smtp_user, smtp_password)
             server.sendmail(settings.EMAILS_FROM_EMAIL or smtp_user, [to_email], msg_str)
         return True, "Email successfully sent via SSL (465)"
@@ -120,7 +120,7 @@ def _send_sync_smtp(to_email: str, subject: str, html_body: str, plain_body: str
 
     # Attempt 2: Fallback to Port 587 TLS
     try:
-        with smtplib.SMTP(smtp_host, 587, timeout=6) as server:
+        with smtplib.SMTP(smtp_host, 587, timeout=12) as server:
             server.starttls()
             server.login(smtp_user, smtp_password)
             server.sendmail(settings.EMAILS_FROM_EMAIL or smtp_user, [to_email], msg_str)

@@ -598,6 +598,24 @@ export function AdminView({ user, t }) {
         >
           ⚙️ Сервер
         </button>
+
+        <button
+          onClick={() => {
+            triggerHaptic("light");
+            setActiveSubTab("security");
+            loadAuditLogs();
+          }}
+          className={`py-2 px-3 rounded-xl whitespace-nowrap transition-all flex items-center space-x-1 ${
+            activeSubTab === "security" ? "bg-rose-600 text-white font-black shadow-md" : "text-slate-400"
+          }`}
+        >
+          <span>🛡️ Безопасность</span>
+          {auditLogs.filter(l => l.action === "security_ban").length > 0 && (
+            <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
+              {auditLogs.filter(l => l.action === "security_ban").length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Orders Tab: Username Purchase Receipts Queue */}
@@ -1302,6 +1320,90 @@ export function AdminView({ user, t }) {
           </div>
         </div>
       )}
+
+      {/* Security Tab: Cyber Defense & Attack/Prank Logs */}
+      {activeSubTab === "security" && (() => {
+        const securityLogs = auditLogs.filter(l => l.action === "security_ban");
+
+        return (
+          <div className="space-y-4">
+            {/* Header Status Card */}
+            <div className="bg-gradient-to-r from-rose-950/60 via-slate-900 to-rose-950/60 border border-rose-500/40 rounded-3xl p-4 flex items-center justify-between shadow-lg">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-600/30 border border-rose-500 flex items-center justify-center text-xl shadow-md text-rose-400">
+                  🛡️
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">
+                    Кибербезопасность & Защита от пранков
+                  </h3>
+                  <p className="text-[11px] text-slate-300">
+                    Автоматическая блокировка prompt injection, вредоносного кода и пранков
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-lg font-black text-rose-400 block">
+                  {securityLogs.length}
+                </span>
+                <span className="text-[9px] text-slate-400 font-bold uppercase">Заблокировано</span>
+              </div>
+            </div>
+
+            {/* List of Security Incidents */}
+            <div className="space-y-3">
+              <span className="text-xs font-black uppercase text-slate-400 px-1 tracking-wider block">
+                Журнал инцидентов и заблокированные нарушители:
+              </span>
+
+              {securityLogs.length === 0 ? (
+                <div className="bg-slate-900/60 border border-slate-800 p-8 rounded-3xl text-center text-slate-400 text-xs">
+                  <span className="text-3xl block mb-2">✅</span>
+                  <span className="font-bold text-white block">Система в полной безопасности!</span>
+                  <span>Атак и вредоносных пранков на бота не зафиксировано.</span>
+                </div>
+              ) : (
+                securityLogs.map((log) => {
+                  const d = log.details || {};
+                  return (
+                    <div
+                      key={log.id}
+                      className="bg-slate-900 border border-rose-500/30 rounded-2xl p-4 space-y-2 shadow-md relative overflow-hidden"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-black text-white">
+                              {d.username ? `@${d.username}` : `Telegram ID: ${d.telegram_id}`}
+                            </span>
+                            <span className="bg-rose-600/30 text-rose-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-rose-500/40">
+                              ⛔ BANNED
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
+                            ID нарушителя: {d.telegram_id || "—"} • {new Date(log.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                        <span className="text-[10px] font-bold text-rose-400 block">
+                          Причина: {d.reason || "Попытка вредоносного запроса/пранка"}
+                        </span>
+                        {d.text && (
+                          <div className="text-[11px] font-mono text-slate-300 bg-black/40 p-2 rounded-lg border border-slate-800 break-all select-all">
+                            "{d.text}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal Zoom Preview for Receipt */}
       {previewReceiptUrl && (

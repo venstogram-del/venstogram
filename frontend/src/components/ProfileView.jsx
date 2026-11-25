@@ -429,18 +429,6 @@ export function ProfileView({
       <div className="flex items-center justify-between pb-1">
         <div className="flex items-center space-x-1.5 flex-wrap">
           <span className="text-base font-black text-slate-900">@{user.username}</span>
-          <button
-            onClick={() => {
-              triggerHaptic("light");
-              setEditUsername(user?.username || "");
-              setIsEditing(true);
-            }}
-            className="text-[10px] bg-slate-100 hover:bg-slate-200 text-pink-600 hover:text-pink-700 font-bold px-2 py-0.5 rounded-lg border border-slate-200 transition flex items-center space-x-1"
-            title="Сменить никнейм"
-          >
-            <span>✏️</span>
-            <span>Сменить</span>
-          </button>
           {user.badge_type === "gold_founder" ? (
             <span className="text-amber-500 font-bold text-sm" title="Золотая Галочка Основателя">👑</span>
           ) : user.is_verified ? (
@@ -459,41 +447,29 @@ export function ProfileView({
             triggerHaptic("light");
             setSettingsOpen(true);
           }}
-          className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl border border-slate-200 transition-all flex items-center justify-center space-x-1"
+          className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl border border-slate-200 transition-all flex items-center justify-center space-x-1 shadow-sm"
           title="Настройки (Sozlamalar)"
         >
           <span className="text-base font-black tracking-widest leading-none">⋯</span>
         </button>
       </div>
 
-      {/* Founder VIP Banner & Gift Button */}
+      {/* Founder VIP Banner */}
       {isFounderTheme && (
-        <div className="bg-gradient-to-r from-amber-500/20 via-yellow-500/25 to-amber-600/20 border border-amber-400/40 rounded-2xl p-3 shadow-lg shadow-amber-500/10 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-200 border border-amber-300 rounded-2xl p-3 shadow-md flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 to-yellow-600 flex items-center justify-center text-base shadow-md ring-2 ring-amber-300 shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 to-yellow-500 flex items-center justify-center text-base shadow-sm ring-2 ring-amber-300 shrink-0">
               👑
             </div>
             <div>
-              <span className="text-xs font-black text-amber-300 tracking-wide block uppercase">
+              <span className="text-xs font-black text-amber-950 tracking-wide block uppercase">
                 {isDirector ? "Основатель Venstogram" : "Лига Победителей Лиги Основателя"}
               </span>
-              <span className="text-[10px] text-amber-200/80">
+              <span className="text-[10px] text-amber-900 font-medium">
                 Эксклюзивный VIP дизайн • Золотой фон
               </span>
             </div>
           </div>
-          {isDirector && (
-            <button
-              onClick={() => {
-                triggerHaptic("medium");
-                setGiftThemeModalOpen(true);
-              }}
-              className="bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black text-[11px] px-3 py-1.5 rounded-xl shadow-md active:scale-95 transition flex items-center space-x-1 shrink-0 ml-2"
-            >
-              <span>🎁</span>
-              <span>Подарить VIP</span>
-            </button>
-          )}
         </div>
       )}
 

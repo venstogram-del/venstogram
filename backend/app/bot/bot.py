@@ -529,3 +529,73 @@ if dp is not None:
             reply_markup=get_webapp_keyboard(f"post_{post_id}"),
             parse_mode=ParseMode.HTML
         )
+
+    MALICIOUS_SECURITY_PATTERNS = [
+        "ignore instructions", "system prompt", "jailbreak", "prompt injection",
+        "dan mode", "act as", "forget rules", "bypass security", "disregard all",
+        "drop table", "union select", "select * from", "<script", "javascript:",
+        "rm -rf", "exec(", "eval(", "os.system", "subprocess", "взлом",
+        "хакер", "ddos", "ддос", "слив базы"
+    ]
+
+    def is_malicious_prank(text: str) -> bool:
+        if not text:
+            return False
+        lower = text.lower().strip()
+        for pat in MALICIOUS_SECURITY_PATTERNS:
+            if pat in lower:
+                return True
+        return False
+
+    @dp.message(F.text)
+    async def handle_text_messages(message: types.Message):
+        """Processes incoming text messages, auto-detects pranks/attacks, bans abusers and logs security incidents."""
+        text = message.text or ""
+        tg_id = message.from_user.id
+        
+        # Don't ban admins
+        is_admin = tg_id in settings.ADMIN_TELEGRAM_IDS or tg_id == 1477103854
+
+        if not is_admin and is_malicious_prank(text):
+            from app.database.session import AsyncSessionLocal
+            from app.models.entities import User, AdminAuditLog
+            from sqlalchemy import select
+
+            try:
+                async with AsyncSessionLocal() as session:
+                    res = await session.execute(select(User).where(User.telegram_id == tg_id))
+                    user = res.scalars().first()
+                    if user:
+                        user.role = "banned"
+                        user.warnings_count = 3
+                    
+                    audit = AdminAuditLog(
+                        admin_id=None,
+                        action="security_ban",
+                        details={
+                            "reason": "Вредоносный запрос / атака / пранк на бота",
+                            "text": text[:200],
+                            "telegram_id": tg_id,
+                            "username": message.from_user.username
+                        }
+                    )
+                    session.add(audit)
+                    await session.commit()
+            except Exception as e:
+                print(f"[Security Ban Error] {e}")
+
+            await message.reply(
+                "⛔ <b>ДОСТУП ЗАБЛОКИРОВАН СИСТЕМОЙ БЕЗОПАСНОСТИ</b>\n\n"
+                "Зафиксирована попытка вредоносного запроса, атаки или недопустимого пранка. "
+                "Ваш аккаунт навсегда заблокирован в Venstogram, а данные инцидента занесены в журнал кибербезопасности Директора.",
+                parse_mode=ParseMode.HTML
+            )
+            return
+
+        # Polite fallback for ordinary chat messages
+        await message.reply(
+            f"👋 Здравствуйте, {message.from_user.first_name}!\n\n"
+            "Venstogram работает в формате Telegram Mini App. Нажмите кнопку ниже для перехода в соцсеть:",
+            reply_markup=get_webapp_keyboard(),
+            parse_mode=ParseMode.HTML
+        )

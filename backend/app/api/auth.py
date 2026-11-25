@@ -16,6 +16,7 @@ from app.schemas.all_schemas import (
 from app.api.deps import get_current_user, get_current_user_optional
 from app.core.config import settings
 from app.core.email import send_verification_email
+from app.api.users import is_sacred_username
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -215,6 +216,12 @@ async def update_profile(
             raise HTTPException(
                 status_code=400,
                 detail="Никнейм может содержать только латинские буквы, цифры и символ подчеркивания _ (от 3 до 32 символов)."
+            )
+
+        if is_sacred_username(new_username):
+            raise HTTPException(
+                status_code=400,
+                detail="Этот никнейм содержит священное религиозное имя (Аллах, Кааба, Мухаммад и др.) и запрещён к использованию из уважения к чувствам верующих."
             )
 
         if not current_user.username or current_user.username.lower() != new_username:
@@ -427,6 +434,12 @@ async def register_email(
     clean_username = req.username.lower().strip().replace("@", "")
     if len(clean_username) < 3:
         raise HTTPException(status_code=400, detail="Nikneym kamida 3 ta belgidan iborat bo'lishi kerak / Никнейм должен содержать минимум 3 символа.")
+
+    if is_sacred_username(clean_username):
+        raise HTTPException(
+            status_code=400,
+            detail="Этот никнейм содержит священное религиозное имя (Аллах, Кааба, Мухаммад и др.) и запрещён к использованию из уважения к чувствам верующих."
+        )
 
     # 1. Check if username is in reserved marketplace listings
     res_listing = await db.execute(

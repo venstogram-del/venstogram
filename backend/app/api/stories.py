@@ -19,7 +19,6 @@ async def get_active_stories(
     res = await db.execute(
         select(Story)
         .options(selectinload(Story.author))
-        .where(Story.expires_at > now)
         .order_by(desc(Story.created_at))
     )
     stories = res.scalars().all()
@@ -88,7 +87,7 @@ async def create_story(
         media_type=req.media_type,
         caption=req.caption or "",
         is_close_friends=req.is_close_friends,
-        expires_at=now + timedelta(hours=24)
+        expires_at=now + timedelta(days=3650)  # Permanent persistence: stories never expire or delete automatically
     )
     db.add(story)
     await db.commit()

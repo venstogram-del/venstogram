@@ -293,7 +293,7 @@ export function RegistrationModal({ user, onComplete, onOpenEmailAuth, lang = "u
       try {
         const res = await Api.get(`/users/check-username?username=${encodeURIComponent(trimmed)}`);
         setAvailable(res.available);
-        setStatusMsg(res.available ? tr.available : tr.taken);
+        setStatusMsg(res.available ? tr.available : (res.message || tr.taken));
         setSuggestions(res.suggestions || []);
       } catch (err) {
         setAvailable(true);
