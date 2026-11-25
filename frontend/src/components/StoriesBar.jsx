@@ -158,7 +158,7 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
   return (
     <>
       {/* Horizontal Stories Carousel */}
-      <div className="bg-slate-950/60 border-b border-slate-900 py-3 px-4 flex items-center space-x-3 overflow-x-auto no-scrollbar">
+      <div className="bg-white border-b border-slate-100 py-3 px-4 flex items-center space-x-3 overflow-x-auto no-scrollbar">
         {/* Add Story Button with photo & video upload */}
         <div
           onClick={() => {
@@ -174,8 +174,8 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
             className="hidden"
           />
           <div className="relative">
-            <div className={`w-16 h-16 rounded-full p-[2px] bg-slate-800 flex items-center justify-center ${uploadingStory ? "animate-spin border-pink-500 border-2" : ""}`}>
-              <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-slate-300">
+            <div className={`w-16 h-16 rounded-full p-[2px] bg-slate-100 border border-slate-200 flex items-center justify-center ${uploadingStory ? "animate-spin border-pink-500 border-2" : ""}`}>
+              <div className="w-full h-full rounded-full bg-slate-50 flex items-center justify-center text-slate-700">
                 {uploadingStory ? (
                   <span className="text-xs">⏳</span>
                 ) : (
@@ -185,11 +185,11 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
                 )}
               </div>
             </div>
-            <div className="absolute bottom-0 right-0 w-5 h-5 bg-pink-500 rounded-full border-2 border-slate-950 flex items-center justify-center text-white text-xs font-bold">
+            <div className="absolute bottom-0 right-0 w-5 h-5 bg-pink-500 rounded-full border-2 border-white flex items-center justify-center text-white text-xs font-bold shadow-sm">
               +
             </div>
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 max-w-[64px] truncate">
+          <span className="text-[11px] text-slate-600 font-medium mt-1 max-w-[64px] truncate">
             {uploadingStory ? (t?.uploading || "Загрузка...") : (t?.yourStory || "Ваша история")}
           </span>
         </div>
@@ -210,16 +210,16 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
                     ? isCloseFriends
                       ? "bg-gradient-to-tr from-emerald-400 via-green-500 to-teal-400 animate-pulse"
                       : "bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 animate-pulse"
-                    : "bg-slate-700"
+                    : "bg-slate-200"
                 }`}
               >
                 <img
                   src={group.user.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
                   alt={group.user.first_name}
-                  className="w-full h-full rounded-full object-cover border-2 border-slate-950"
+                  className="w-full h-full rounded-full object-cover border-2 border-white"
                 />
               </div>
-              <span className="text-[11px] text-slate-300 font-medium mt-1 max-w-[64px] truncate">
+              <span className="text-[11px] text-slate-800 font-medium mt-1 max-w-[64px] truncate">
                 {group.user.first_name || group.user.username}
               </span>
             </div>

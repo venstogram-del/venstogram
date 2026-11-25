@@ -366,15 +366,15 @@ export function ProfileView({
   const isDirector = user?.role === "director";
   const isFounderTheme = userTheme === "gold_founder" || isDirector;
 
-  let themeContainerStyle = "p-4 space-y-4 pb-24";
+  let themeContainerStyle = "p-4 space-y-4 pb-24 bg-white text-slate-900";
   if (isFounderTheme) {
-    themeContainerStyle += " bg-gradient-to-b from-[#1c1507] via-[#0d0d12] to-[#040406] border-t-2 border-amber-500/40";
+    themeContainerStyle += " bg-gradient-to-b from-amber-50/60 via-white to-amber-50/40 border-t-2 border-amber-500/40";
   } else if (userTheme === "cyber_neon") {
-    themeContainerStyle += " bg-gradient-to-b from-[#180629] via-[#090b14] to-[#030508] border-t-2 border-cyan-400/40";
+    themeContainerStyle += " bg-gradient-to-b from-cyan-50/60 via-white to-purple-50/40 border-t-2 border-cyan-400/40";
   } else if (userTheme === "royal_emerald") {
-    themeContainerStyle += " bg-gradient-to-b from-[#061e12] via-[#060e0a] to-[#020503] border-t-2 border-emerald-400/40";
+    themeContainerStyle += " bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40 border-t-2 border-emerald-400/40";
   } else if (userTheme === "ruby_luxury") {
-    themeContainerStyle += " bg-gradient-to-b from-[#24060f] via-[#0f0508] to-[#040102] border-t-2 border-rose-500/40";
+    themeContainerStyle += " bg-gradient-to-b from-rose-50/60 via-white to-pink-50/40 border-t-2 border-rose-500/40";
   }
 
   const handleGiftThemeSubmit = async (e) => {
@@ -428,23 +428,23 @@ export function ProfileView({
       {/* Top Profile Bar with Username and Three-Dots Menu */}
       <div className="flex items-center justify-between pb-1">
         <div className="flex items-center space-x-1.5 flex-wrap">
-          <span className="text-base font-black text-white">@{user.username}</span>
+          <span className="text-base font-black text-slate-900">@{user.username}</span>
           <button
             onClick={() => {
               triggerHaptic("light");
               setEditUsername(user?.username || "");
               setIsEditing(true);
             }}
-            className="text-[10px] bg-slate-800 hover:bg-slate-700 text-pink-400 hover:text-pink-300 font-bold px-2 py-0.5 rounded-lg border border-pink-500/30 transition flex items-center space-x-1"
+            className="text-[10px] bg-slate-100 hover:bg-slate-200 text-pink-600 hover:text-pink-700 font-bold px-2 py-0.5 rounded-lg border border-slate-200 transition flex items-center space-x-1"
             title="Сменить никнейм"
           >
             <span>✏️</span>
             <span>Сменить</span>
           </button>
           {user.badge_type === "gold_founder" ? (
-            <span className="text-amber-400 font-bold text-sm" title="Золотая Галочка Основателя">👑</span>
+            <span className="text-amber-500 font-bold text-sm" title="Золотая Галочка Основателя">👑</span>
           ) : user.is_verified ? (
-            <span className="text-sky-400 font-bold text-sm" title="Верифицирован">✓</span>
+            <span className="text-sky-500 font-bold text-sm" title="Верифицирован">✓</span>
           ) : null}
           {user.role === "director" && (
             <span className="text-[9px] bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black px-1.5 py-0.5 rounded-full uppercase ml-1 shadow-sm">
@@ -459,7 +459,7 @@ export function ProfileView({
             triggerHaptic("light");
             setSettingsOpen(true);
           }}
-          className="p-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl border border-slate-800 transition-all flex items-center justify-center space-x-1"
+          className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl border border-slate-200 transition-all flex items-center justify-center space-x-1"
           title="Настройки (Sozlamalar)"
         >
           <span className="text-base font-black tracking-widest leading-none">⋯</span>
@@ -555,8 +555,8 @@ export function ProfileView({
         {/* Stats */}
         <div className="flex-1 flex justify-around text-center">
           <div>
-            <span className="text-base font-black text-white block">{userPosts.length + userReels.length}</span>
-            <span className="text-[11px] text-slate-400">{t?.postsCount || "Публикаций"}</span>
+            <span className="text-base font-black text-slate-900 block">{userPosts.length + userReels.length}</span>
+            <span className="text-[11px] text-slate-500 font-medium">{t?.postsCount || "Публикаций"}</span>
           </div>
           <div
             onClick={() => {
@@ -565,8 +565,8 @@ export function ProfileView({
             }}
             className="cursor-pointer active:scale-95 transition hover:opacity-80"
           >
-            <span className="text-base font-black text-white block">{user.followers_count || 0}</span>
-            <span className="text-[11px] text-pink-400 font-bold hover:underline">{t?.followers || "Подписчиков"}</span>
+            <span className="text-base font-black text-slate-900 block">{user.followers_count || 0}</span>
+            <span className="text-[11px] text-pink-600 font-bold hover:underline">{t?.followers || "Подписчиков"}</span>
           </div>
           <div
             onClick={() => {
@@ -575,8 +575,8 @@ export function ProfileView({
             }}
             className="cursor-pointer active:scale-95 transition hover:opacity-80"
           >
-            <span className="text-base font-black text-white block">{user.following_count || 0}</span>
-            <span className="text-[11px] text-pink-400 font-bold hover:underline">{t?.followingCount || "Подписок"}</span>
+            <span className="text-base font-black text-slate-900 block">{user.following_count || 0}</span>
+            <span className="text-[11px] text-pink-600 font-bold hover:underline">{t?.followingCount || "Подписок"}</span>
           </div>
         </div>
       </div>
@@ -584,17 +584,17 @@ export function ProfileView({
       {/* User Info & Bio */}
       <div>
         <div className="flex items-center space-x-1.5">
-          <h2 className="text-base font-black text-white">
+          <h2 className="text-base font-black text-slate-900">
             {user.first_name} {user.last_name || ""}
           </h2>
         </div>
 
         {user.bio ? (
-          <p className="text-xs text-slate-300 mt-1.5 whitespace-pre-line leading-relaxed">
+          <p className="text-xs text-slate-700 mt-1.5 whitespace-pre-line leading-relaxed">
             {user.bio}
           </p>
         ) : (user.role === "director" || user.telegram_id === 1477103854 || user.username === "oqyolai") ? (
-          <p className="text-xs text-amber-300 font-bold mt-1.5 leading-relaxed">
+          <p className="text-xs text-amber-700 font-bold mt-1.5 leading-relaxed">
             👑 Основатель платформы Venstogram
           </p>
         ) : null}
@@ -631,42 +631,13 @@ export function ProfileView({
           </div>
         )}
 
-        {/* Founder League Blogger Quest Banner */}
-        <button
-          onClick={() => {
-            triggerHaptic("medium");
-            setFounderQuestModalOpen(true);
-          }}
-          className="mt-2.5 w-full bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/70 border border-amber-500/40 hover:border-amber-400/80 rounded-2xl p-3 flex items-center justify-between text-left transition shadow-lg shadow-amber-500/10 active:scale-98"
-        >
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-600 text-slate-950 flex items-center justify-center text-lg font-black shadow-md shadow-amber-500/30">
-              👑
-            </div>
-            <div>
-              <div className="text-xs font-black text-white flex items-center space-x-1.5">
-                <span>Лига Блогеров & Квест Основателя</span>
-                {user.badge_type === "gold_founder" ? (
-                  <span className="text-[9px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-500/40">Победитель 👑</span>
-                ) : (
-                  <span className="text-[9px] bg-pink-500/20 text-pink-300 font-bold px-1.5 py-0.5 rounded border border-pink-500/40">Состязание</span>
-                )}
-              </div>
-              <p className="text-[10px] text-amber-200/70">
-                Приглашай друзей, набирай охваты и получи Золотую Галочку!
-              </p>
-            </div>
-          </div>
-          <span className="text-amber-400 text-base font-bold pr-1">→</span>
-        </button>
-
         {/* External Website */}
         {user.website && (
           <a
             href={user.website}
             target="_blank"
             rel="noreferrer"
-            className="text-xs text-pink-400 hover:text-pink-300 font-semibold mt-1.5 flex items-center space-x-1"
+            className="text-xs text-pink-600 hover:text-pink-700 font-semibold mt-1.5 flex items-center space-x-1"
           >
             <span>🔗</span>
             <span>{user.website}</span>
@@ -681,7 +652,7 @@ export function ProfileView({
             triggerHaptic("light");
             setIsEditing(true);
           }}
-          className="flex-1 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-2.5 rounded-xl border border-slate-700 transition-all flex items-center justify-center space-x-1"
+          className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 text-xs font-bold py-2.5 rounded-xl border border-slate-200 transition-all flex items-center justify-center space-x-1"
         >
           <span>✏️</span>
           <span>{t?.editProfile || "Редактировать профиль"}</span>
@@ -692,7 +663,7 @@ export function ProfileView({
             triggerHaptic("medium");
             onOpenWallet();
           }}
-          className="flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 text-xs font-black py-2.5 rounded-xl shadow-lg shadow-amber-500/20 flex items-center justify-center space-x-1.5 transition-transform active:scale-95"
+          className="flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 text-xs font-black py-2.5 rounded-xl shadow-md shadow-amber-500/20 flex items-center justify-center space-x-1.5 transition-transform active:scale-95"
         >
           <span>🪙</span>
           <span>{t?.wallet || "Баланс"}: {user.wallet_coins?.toLocaleString()}</span>
@@ -700,14 +671,14 @@ export function ProfileView({
       </div>
 
       {/* Content Tabs */}
-      <div className="flex border-b border-slate-800 pt-2">
+      <div className="flex border-b border-slate-200 pt-2">
         <button
           onClick={() => {
             triggerHaptic("light");
             setActiveTab("posts");
           }}
           className={`flex-1 pb-2 text-xs font-bold border-b-2 transition-all ${
-            activeTab === "posts" ? "border-pink-500 text-white" : "border-transparent text-slate-500"
+            activeTab === "posts" ? "border-pink-500 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
           🖼️ {t?.postsCount || "Публикации"}
@@ -718,7 +689,7 @@ export function ProfileView({
             setActiveTab("reels");
           }}
           className={`flex-1 pb-2 text-xs font-bold border-b-2 transition-all ${
-            activeTab === "reels" ? "border-pink-500 text-white" : "border-transparent text-slate-500"
+            activeTab === "reels" ? "border-pink-500 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
           🎬 Reels
@@ -729,7 +700,7 @@ export function ProfileView({
             setActiveTab("saved");
           }}
           className={`flex-1 pb-2 text-xs font-bold border-b-2 transition-all ${
-            activeTab === "saved" ? "border-pink-500 text-white" : "border-transparent text-slate-500"
+            activeTab === "saved" ? "border-pink-500 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
           🔖 Сохраненное
@@ -743,18 +714,18 @@ export function ProfileView({
           <span className="text-xs">Загрузка контента...</span>
         </div>
       ) : displayList.length === 0 ? (
-        <div className="py-12 px-4 text-center bg-slate-900/40 border border-slate-800/80 rounded-2xl my-2">
+        <div className="py-12 px-4 text-center bg-slate-50 border border-slate-200 rounded-2xl my-2">
           <span className="text-3xl block mb-2">
             {activeTab === "reels" ? "🎬" : activeTab === "saved" ? "🔖" : "📸"}
           </span>
-          <p className="text-xs font-bold text-white mb-1">
+          <p className="text-xs font-bold text-slate-900 mb-1">
             {activeTab === "reels"
               ? "У вас пока нет Reels"
               : activeTab === "saved"
               ? "У вас пока нет сохраненных публикаций"
               : "У вас пока нет публикаций"}
           </p>
-          <p className="text-[11px] text-slate-400 mb-3 max-w-xs mx-auto">
+          <p className="text-[11px] text-slate-500 mb-3 max-w-xs mx-auto">
             {activeTab === "reels"
               ? "Загрузите первое видео, чтобы набрать просмотры и попасть в рекомендации!"
               : activeTab === "saved"
@@ -862,17 +833,17 @@ export function ProfileView({
 
       {/* Settings Modal (Three Dots Menu ⋯) */}
       {settingsOpen && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 animate-in fade-in duration-150">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-3 animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl text-slate-900">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center space-x-2">
                 <span className="text-xl">⚙️</span>
-                <h3 className="text-base font-black text-white">Меню и настройки</h3>
+                <h3 className="text-base font-black text-slate-900">Меню и настройки</h3>
               </div>
               <button
                 onClick={() => setSettingsOpen(false)}
-                className="text-slate-400 hover:text-white text-lg p-1"
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition"
               >
                 ✕
               </button>
@@ -880,23 +851,23 @@ export function ProfileView({
 
             {/* Quick Actions */}
             <div className="space-y-2">
-              <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider block">
+              <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">
                 Быстрые действия
               </span>
 
               {/* Share My Profile Button */}
               <div
                 onClick={handleShareMyProfile}
-                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-pink-500/50 transition-all"
+                className="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl border border-slate-200 flex items-center justify-between cursor-pointer transition-all"
               >
                 <div className="flex items-center space-x-2.5">
                   <span className="text-lg">🔗</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">Поделиться профилем</span>
-                    <span className="text-[10px] text-slate-400">Скопировать ссылку для друзей</span>
+                    <span className="text-xs font-bold text-slate-900 block">Поделиться профилем</span>
+                    <span className="text-[10px] text-slate-500">Скопировать ссылку для друзей</span>
                   </div>
                 </div>
-                <span className="text-pink-400 text-xs font-bold">Копировать</span>
+                <span className="text-pink-600 text-xs font-bold">Копировать</span>
               </div>
 
               {/* Founder VIP Theme Gifting */}
@@ -907,29 +878,29 @@ export function ProfileView({
                     setSettingsOpen(false);
                     setGiftThemeModalOpen(true);
                   }}
-                  className="bg-gradient-to-r from-amber-950/60 via-yellow-950/40 to-slate-950 p-3 rounded-2xl border border-amber-500/50 flex items-center justify-between cursor-pointer hover:border-amber-400 transition-all shadow-md shadow-amber-500/10 active:scale-98"
+                  className="bg-gradient-to-r from-amber-50 to-yellow-50 p-3 rounded-2xl border border-amber-300 flex items-center justify-between cursor-pointer hover:border-amber-400 transition-all shadow-sm active:scale-98"
                 >
                   <div className="flex items-center space-x-2.5">
                     <span className="text-xl">🎁</span>
                     <div>
-                      <span className="text-xs font-bold text-amber-300 block">Подарить VIP дизайн</span>
-                      <span className="text-[10px] text-amber-200/70">Подарите блогеру или пользователю эксклюзивное оформление</span>
+                      <span className="text-xs font-bold text-amber-900 block">Подарить VIP дизайн</span>
+                      <span className="text-[10px] text-amber-700">Подарите блогеру эксклюзивное оформление</span>
                     </div>
                   </div>
-                  <span className="text-amber-400 text-xs font-bold">Выбрать ↵</span>
+                  <span className="text-amber-600 text-xs font-bold">Выбрать ↵</span>
                 </div>
               )}
 
               {/* Venstogram Verified Buy/Status Option */}
-              <div className="bg-gradient-to-r from-sky-950/80 via-blue-900/40 to-slate-950 p-3 rounded-2xl border border-sky-500/40 space-y-2">
+              <div className="bg-gradient-to-r from-sky-50 to-blue-50 p-3 rounded-2xl border border-sky-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <div className="w-6 h-6 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xs">
+                    <div className="w-6 h-6 rounded-full bg-sky-500/20 text-sky-600 flex items-center justify-center font-bold text-xs">
                       ✓
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-white block">Синяя галочка верификации</span>
-                      <span className="text-[10px] text-sky-300">
+                      <span className="text-xs font-bold text-slate-900 block">Синяя галочка верификации</span>
+                      <span className="text-[10px] text-sky-600 font-medium">
                         {user.is_verified ? "✅ Активна (3x - 5x буст охватов)" : "3x - 5x охваты и топ в ленте"}
                       </span>
                     </div>
@@ -946,30 +917,11 @@ export function ProfileView({
                 </div>
               </div>
 
-              {/* Founder League Blogger Quest */}
-              <div
-                onClick={() => {
-                  triggerHaptic("medium");
-                  setSettingsOpen(false);
-                  setFounderQuestModalOpen(true);
-                }}
-                className="bg-gradient-to-r from-amber-950/70 via-slate-950 to-amber-950/70 p-3 rounded-2xl border border-amber-500/40 flex items-center justify-between cursor-pointer hover:border-amber-400 transition-all"
-              >
-                <div className="flex items-center space-x-2.5">
-                  <span className="text-lg">👑</span>
-                  <div>
-                    <span className="text-xs font-bold text-white block">Лига блогеров от Основателя</span>
-                    <span className="text-[10px] text-amber-300">Квест, рефералы и Золотая Галочка</span>
-                  </div>
-                </div>
-                <span className="text-amber-400 text-sm">→</span>
-              </div>
-
               {/* Wallet & Coins Card */}
-              <div className="bg-gradient-to-tr from-amber-600/20 via-slate-950 to-yellow-600/10 p-3 rounded-2xl border border-amber-500/30 flex items-center justify-between">
+              <div className="bg-gradient-to-tr from-amber-50 via-white to-yellow-50 p-3 rounded-2xl border border-amber-300 flex items-center justify-between shadow-sm">
                 <div>
-                  <span className="text-[10px] text-amber-300 font-bold block">👛 Баланс:</span>
-                  <span className="text-lg font-black text-white">
+                  <span className="text-[10px] text-amber-700 font-bold block">👛 Баланс кошелька:</span>
+                  <span className="text-lg font-black text-slate-900">
                     {(user.wallet_coins || 0).toLocaleString()} 🪙
                   </span>
                 </div>
@@ -978,7 +930,7 @@ export function ProfileView({
                     setSettingsOpen(false);
                     onOpenWallet();
                   }}
-                  className="bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 text-white font-black text-xs px-3 py-2 rounded-xl shadow-md transition-transform active:scale-95"
+                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-white font-black text-xs px-3 py-2 rounded-xl shadow-md transition-transform active:scale-95"
                 >
                   ➕ Пополнить
                 </button>
@@ -987,23 +939,23 @@ export function ProfileView({
 
             {/* Privacy & Confidentiality */}
             <div className="space-y-2">
-              <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider block">
+              <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">
                 Конфиденциальность и приватность
               </span>
 
               {/* Incognito Stealth Mode */}
-              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 flex items-center justify-between">
                 <div className="flex items-center space-x-2.5">
                   <span className="text-lg">🕶️</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">Режим невидимка</span>
-                    <span className="text-[10px] text-slate-400">Скрыть онлайн и время активности</span>
+                    <span className="text-xs font-bold text-slate-900 block">Режим невидимка</span>
+                    <span className="text-[10px] text-slate-500">Скрыть онлайн и время активности</span>
                   </div>
                 </div>
                 <button
                   onClick={handleToggleIncognito}
                   className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
-                    user?.is_incognito ? "bg-pink-600" : "bg-slate-700"
+                    user?.is_incognito ? "bg-pink-600" : "bg-slate-300"
                   }`}
                 >
                   <div
@@ -1015,18 +967,18 @@ export function ProfileView({
               </div>
 
               {/* Private Profile Toggle */}
-              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 flex items-center justify-between">
                 <div className="flex items-center space-x-2.5">
                   <span className="text-lg">🔒</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">Закрытый аккаунт</span>
-                    <span className="text-[10px] text-slate-400">Только подписчики видят публикации</span>
+                    <span className="text-xs font-bold text-slate-900 block">Закрытый аккаунт</span>
+                    <span className="text-[10px] text-slate-500">Только подписчики видят публикации</span>
                   </div>
                 </div>
                 <button
                   onClick={handleTogglePrivate}
                   className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
-                    user?.is_private ? "bg-emerald-500" : "bg-slate-700"
+                    user?.is_private ? "bg-emerald-500" : "bg-slate-300"
                   }`}
                 >
                   <div
@@ -1043,13 +995,13 @@ export function ProfileView({
                   setSettingsOpen(false);
                   setSecurityModalOpen(true);
                 }}
-                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-all"
+                className="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl border border-slate-200 flex items-center justify-between cursor-pointer transition-all"
               >
                 <div className="flex items-center space-x-2.5">
                   <span className="text-lg">🛡️</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">Защитить аккаунт</span>
-                    <span className="text-[10px] text-slate-400">PIN-код, Face ID и биометрия</span>
+                    <span className="text-xs font-bold text-slate-900 block">Защитить аккаунт</span>
+                    <span className="text-[10px] text-slate-500">PIN-код, Face ID и биометрия</span>
                   </div>
                 </div>
                 <span className="text-slate-400 text-sm">→</span>
@@ -1061,22 +1013,22 @@ export function ProfileView({
                   setSettingsOpen(false);
                   setCloseFriendsModalOpen(true);
                 }}
-                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-emerald-500/50 transition-all"
+                className="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl border border-slate-200 flex items-center justify-between cursor-pointer transition-all"
               >
                 <div className="flex items-center space-x-2.5">
                   <span className="text-lg">💚</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">Близкие друзья</span>
-                    <span className="text-[10px] text-emerald-400">Список для приватных Stories</span>
+                    <span className="text-xs font-bold text-slate-900 block">Близкие друзья</span>
+                    <span className="text-[10px] text-emerald-600 font-medium">Список для приватных Stories</span>
                   </div>
                 </div>
-                <span className="text-emerald-400 text-xs font-bold">Настроить</span>
+                <span className="text-emerald-600 text-xs font-bold">Настроить</span>
               </div>
             </div>
 
             {/* Content & Archive */}
             <div className="space-y-2">
-              <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider block">
+              <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">
                 Контент и история
               </span>
 
@@ -1086,13 +1038,13 @@ export function ProfileView({
                   setSettingsOpen(false);
                   setStoriesArchiveOpen(true);
                 }}
-                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-all"
+                className="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl border border-slate-200 flex items-center justify-between cursor-pointer transition-all"
               >
                 <div className="flex items-center space-x-2.5">
                   <span className="text-lg">📦</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">Архив историй</span>
-                    <span className="text-[10px] text-slate-400">Все ваши прошлые Stories</span>
+                    <span className="text-xs font-bold text-slate-900 block">Архив историй</span>
+                    <span className="text-[10px] text-slate-500">Все ваши прошлые Stories</span>
                   </div>
                 </div>
                 <span className="text-slate-400 text-sm">→</span>
@@ -1104,13 +1056,13 @@ export function ProfileView({
                   setSettingsOpen(false);
                   setActivityModalOpen(true);
                 }}
-                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-all"
+                className="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl border border-slate-200 flex items-center justify-between cursor-pointer transition-all"
               >
                 <div className="flex items-center space-x-2.5">
                   <span className="text-lg">❤️</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">Ваши действия</span>
-                    <span className="text-[10px] text-slate-400">Понравившиеся посты и комментарии</span>
+                    <span className="text-xs font-bold text-slate-900 block">Ваши действия</span>
+                    <span className="text-[10px] text-slate-500">Понравившиеся посты и комментарии</span>
                   </div>
                 </div>
                 <span className="text-slate-400 text-sm">→</span>
@@ -1119,13 +1071,13 @@ export function ProfileView({
 
             {/* App Preferences */}
             <div className="space-y-2">
-              <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider block">
+              <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">
                 Настройки приложения
               </span>
 
               {/* Language Switcher */}
               <div className="space-y-1.5">
-                <span className="text-xs font-bold text-white block">🌐 Язык интерфейса:</span>
+                <span className="text-xs font-bold text-slate-900 block">🌐 Язык интерфейса:</span>
                 <div className="grid grid-cols-2 gap-1.5">
                   {[
                     { code: "ru", label: "🇷🇺 Русский" },
@@ -1142,7 +1094,7 @@ export function ProfileView({
                       className={`py-1.5 px-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between ${
                         lang === l.code
                           ? "bg-pink-600 text-white border-pink-500 shadow-md shadow-pink-600/30"
-                          : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
+                          : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
                       }`}
                     >
                       <span>{l.label}</span>
@@ -1158,31 +1110,31 @@ export function ProfileView({
                   setSettingsOpen(false);
                   setCountryModalOpen(true);
                 }}
-                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700"
+                className="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl border border-slate-200 flex items-center justify-between cursor-pointer"
               >
                 <div className="flex items-center space-x-2.5">
                   <span className="text-lg">📍</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">Страна / Регион:</span>
-                    <span className="text-[10px] text-slate-400">{selectedCountry}</span>
+                    <span className="text-xs font-bold text-slate-900 block">Страна / Регион:</span>
+                    <span className="text-[10px] text-slate-500">{selectedCountry}</span>
                   </div>
                 </div>
-                <span className="text-sky-400 text-xs font-bold">Изменить ↗</span>
+                <span className="text-sky-600 text-xs font-bold">Изменить ↗</span>
               </div>
 
               {/* Push Notifications Toggle */}
-              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 flex items-center justify-between">
                 <div className="flex items-center space-x-2.5">
                   <span className="text-lg">🔔</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">Уведомления</span>
-                    <span className="text-[10px] text-slate-400">Push-сообщения о лайках и ответах</span>
+                    <span className="text-xs font-bold text-slate-900 block">Уведомления</span>
+                    <span className="text-[10px] text-slate-500">Push-сообщения о лайках и ответах</span>
                   </div>
                 </div>
                 <button
                   onClick={handleTogglePush}
                   className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
-                    pushEnabled ? "bg-pink-600" : "bg-slate-700"
+                    pushEnabled ? "bg-pink-600" : "bg-slate-300"
                   }`}
                 >
                   <div
@@ -1194,12 +1146,12 @@ export function ProfileView({
               </div>
 
               {/* Data Saver Toggle */}
-              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 flex items-center justify-between">
                 <div className="flex items-center space-x-2.5">
                   <span className="text-lg">⚡</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">Экономия трафика</span>
-                    <span className="text-[10px] text-slate-400">Сжимать фото и видео</span>
+                    <span className="text-xs font-bold text-slate-900 block">Экономия трафика</span>
+                    <span className="text-[10px] text-slate-500">Сжимать фото и видео</span>
                   </div>
                 </div>
                 <button
@@ -1208,7 +1160,7 @@ export function ProfileView({
                     onToggleDataSaver();
                   }}
                   className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
-                    dataSaver ? "bg-emerald-500" : "bg-slate-700"
+                    dataSaver ? "bg-emerald-500" : "bg-slate-300"
                   }`}
                 >
                   <div
@@ -1226,47 +1178,77 @@ export function ProfileView({
                   setSettingsOpen(false);
                   setEmailAuthModalOpen(true);
                 }}
-                className="bg-slate-950 p-3 rounded-2xl border border-pink-500/30 flex items-center justify-between cursor-pointer hover:border-pink-500/60 transition-colors"
+                className="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl border border-pink-200 flex items-center justify-between cursor-pointer transition-colors"
               >
                 <div className="flex items-center space-x-2.5">
                   <span className="text-lg">✉️</span>
                   <div>
-                    <span className="text-xs font-bold text-white block">Email и пароль</span>
-                    <span className="text-[10px] text-pink-400">Резервный вход и безопасность</span>
+                    <span className="text-xs font-bold text-slate-900 block">Email и пароль</span>
+                    <span className="text-[10px] text-pink-600 font-medium">Резервный вход и безопасность</span>
                   </div>
                 </div>
-                <span className="text-pink-400 text-sm">→</span>
+                <span className="text-pink-600 text-sm font-bold">→</span>
               </div>
             </div>
 
             {/* Support and Legal */}
             <div className="space-y-2">
-              <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider block">
-                Помощь и контакты
+              <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">
+                Лига блогеров и поддержка
               </span>
 
+              {/* Founder League & Blogger Quest next to Tech Support */}
+              <div
+                onClick={() => {
+                  triggerHaptic("medium");
+                  setSettingsOpen(false);
+                  setFounderQuestModalOpen(true);
+                }}
+                className="bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/10 border border-amber-300 hover:border-amber-400 p-3.5 rounded-2xl flex items-center justify-between cursor-pointer transition shadow-sm active:scale-98"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-600 text-slate-950 flex items-center justify-center text-lg font-black shadow-md shadow-amber-500/20">
+                    👑
+                  </div>
+                  <div>
+                    <div className="text-xs font-black text-slate-900 flex items-center space-x-1.5">
+                      <span>Лига Блогеров & Квест Основателя</span>
+                      {user.badge_type === "gold_founder" ? (
+                        <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded border border-amber-300">Победитель 👑</span>
+                      ) : (
+                        <span className="text-[9px] bg-pink-100 text-pink-700 font-bold px-1.5 py-0.5 rounded border border-pink-200">Состязание</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      Приглашай друзей, набирай охваты и получи Золотую Галочку!
+                    </p>
+                  </div>
+                </div>
+                <span className="text-amber-600 font-bold text-sm">→</span>
+              </div>
+
               {/* Support Card */}
-              <div className="bg-gradient-to-r from-emerald-950/80 via-slate-950 to-teal-950/80 p-3 rounded-2xl border border-emerald-500/40 space-y-2">
+              <div className="bg-gradient-to-r from-emerald-50 via-white to-teal-50 p-3 rounded-2xl border border-emerald-300 space-y-2">
                 <div className="flex items-center space-x-2">
                   <span className="text-lg">🛠️</span>
                   <div>
-                    <span className="text-xs font-black text-white block">Служба техподдержки</span>
-                    <span className="text-[10px] text-emerald-300">Помощь 24/7, вопросы по аккаунту</span>
+                    <span className="text-xs font-black text-slate-900 block">Служба техподдержки</span>
+                    <span className="text-[10px] text-emerald-700 font-medium">Помощь 24/7, вопросы по аккаунту</span>
                   </div>
                 </div>
-                <div className="bg-slate-950/80 rounded-xl p-2 border border-slate-800 space-y-1.5 text-xs">
+                <div className="bg-white rounded-xl p-2 border border-emerald-100 space-y-1.5 text-xs shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400 text-[11px]">📞 Телефон:</span>
-                    <a href="tel:+998507775152" className="text-emerald-400 font-mono font-bold hover:underline">
+                    <span className="text-slate-500 text-[11px]">📞 Телефон:</span>
+                    <a href="tel:+998507775152" className="text-emerald-600 font-mono font-bold hover:underline">
                       +998 50 777 51 52
                     </a>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400 text-[11px]">💬 Telegram:</span>
+                    <span className="text-slate-500 text-[11px]">💬 Telegram:</span>
                     <button
                       type="button"
                       onClick={() => openTelegramChannel("@yuksak_it")}
-                      className="text-sky-400 font-mono font-bold hover:underline"
+                      className="text-sky-600 font-mono font-bold hover:underline"
                     >
                       @yuksak_it ↗
                     </button>
@@ -1280,13 +1262,13 @@ export function ProfileView({
                   setSettingsOpen(false);
                   setLegalModalOpen(true);
                 }}
-                className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700"
+                className="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl border border-slate-200 flex items-center justify-between cursor-pointer transition-all"
               >
                 <div className="flex items-center space-x-2.5">
                   <span className="text-base">⚖️</span>
-                  <span className="text-xs font-bold text-slate-300">Законы РУз и правила платформы</span>
+                  <span className="text-xs font-bold text-slate-800">Законы РУз и правила платформы</span>
                 </div>
-                <span className="text-slate-400 text-xs">Читать ↗</span>
+                <span className="text-slate-500 text-xs font-bold">Читать ↗</span>
               </div>
             </div>
 
@@ -1303,7 +1285,7 @@ export function ProfileView({
                     setEmailAuthModalOpen(true);
                   }
                 }}
-                className="w-full py-2.5 bg-slate-950 hover:bg-slate-900 border border-pink-500/30 text-pink-400 rounded-2xl text-xs font-bold transition flex items-center justify-center space-x-1.5"
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-pink-600 rounded-2xl text-xs font-bold transition flex items-center justify-center space-x-1.5"
               >
                 <span>🔑</span>
                 <span>Войти под другим логином / Email</span>
@@ -1316,7 +1298,7 @@ export function ProfileView({
                   setSettingsOpen(false);
                   if (onLogout) onLogout();
                 }}
-                className="w-full py-2.5 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-500/30 text-rose-400 font-bold text-xs rounded-2xl flex items-center justify-center space-x-1.5 transition active:scale-95"
+                className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 font-bold text-xs rounded-2xl flex items-center justify-center space-x-1.5 transition active:scale-95"
               >
                 <span>🚪</span>
                 <span>Выйти из профиля (Logout)</span>
@@ -1324,18 +1306,18 @@ export function ProfileView({
             </div>
 
             {/* Account Info */}
-            <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-1.5 text-xs">
-              <div className="flex justify-between text-slate-400">
+            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-1.5 text-xs">
+              <div className="flex justify-between text-slate-500">
                 <span>Роль в системе:</span>
-                <span className="text-amber-400 font-bold capitalize">{user.role}</span>
+                <span className="text-amber-700 font-bold capitalize">{user.role}</span>
               </div>
-              <div className="flex justify-between text-slate-400">
+              <div className="flex justify-between text-slate-500">
                 <span>Telegram ID:</span>
-                <span className="text-slate-200 font-mono">{user.telegram_id}</span>
+                <span className="text-slate-800 font-mono">{user.telegram_id}</span>
               </div>
-              <div className="flex justify-between text-slate-400">
+              <div className="flex justify-between text-slate-500">
                 <span>Платформа:</span>
-                <span className="text-slate-500">VENSTOGRAM v2.5 Live</span>
+                <span className="text-slate-600 font-medium">VENSTOGRAM v2.5 Live</span>
               </div>
             </div>
           </div>

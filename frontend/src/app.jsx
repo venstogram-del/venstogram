@@ -40,17 +40,18 @@ export function App() {
   const [storiesGroups, setStoriesGroups] = useState([]);
   const [reels, setReels] = useState([]);
 
-  // Theme is strictly Dark / OLED Black - Light / White theme completely removed
-  const theme = "dark";
+  // Theme: Ultra-Modern Clean White Theme with Crisp Black Text
+  const theme = "light";
+  const toggleTheme = () => {};
 
   useEffect(() => {
     if (typeof document !== "undefined") {
-      document.documentElement.classList.remove("light");
-      document.documentElement.classList.add("dark");
-      document.body.style.backgroundColor = "#020617";
-      document.body.style.color = "#ffffff";
+      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
+      document.body.style.backgroundColor = "#ffffff";
+      document.body.style.color = "#0f172a";
       try {
-        localStorage.setItem("vensto_theme", "dark");
+        localStorage.setItem("vensto_theme", "light");
       } catch (e) {}
     }
   }, []);
@@ -67,6 +68,7 @@ export function App() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [emailAuthOpen, setEmailAuthOpen] = useState(false);
+  const [emailAuthMode, setEmailAuthMode] = useState("login");
 
   const handleLogout = () => {
     if (!confirm("Вы уверены, что хотите выйти из профиля?")) return;
@@ -432,12 +434,15 @@ export function App() {
   // Mandatory initial registration and account creation view
   if (!isRegistered) {
     return (
-      <div className={`min-h-screen ${theme === "light" ? "bg-slate-50 text-slate-900" : "bg-slate-950 text-white"}`}>
+      <div className="min-h-screen bg-slate-50 text-slate-900">
         <RegistrationModal
           user={user}
           lang={lang}
           onLanguageChange={handleLanguageChange}
-          onOpenEmailAuth={() => setEmailAuthOpen(true)}
+          onOpenEmailAuth={(mode = "login") => {
+            setEmailAuthMode(mode);
+            setEmailAuthOpen(true);
+          }}
           onComplete={(updatedUser) => {
             setUser(updatedUser);
             setIsRegistered(true);
@@ -447,6 +452,7 @@ export function App() {
         />
         {emailAuthOpen && (
           <EmailAuthModal
+            initialMode={emailAuthMode}
             onClose={() => setEmailAuthOpen(false)}
             onAuthSuccess={(u) => {
               setUser(u);
@@ -462,7 +468,7 @@ export function App() {
   }
 
   return (
-    <div className={`min-h-screen ${theme === "light" ? "bg-slate-50 text-slate-900" : "bg-slate-950 text-white"} font-sans flex flex-col select-none`}>
+    <div className="min-h-screen bg-white text-slate-900 font-sans flex flex-col select-none">
       {/* Offline Alert Banner */}
       {isOffline && (
         <div className="bg-amber-600/90 text-white text-[11px] font-bold px-3 py-1 text-center sticky top-0 z-50">
@@ -832,6 +838,7 @@ export function App() {
       {/* Email Login & Password Recovery Modal */}
       {emailAuthOpen && (
         <EmailAuthModal
+          initialMode={emailAuthMode}
           onClose={() => setEmailAuthOpen(false)}
           onAuthSuccess={(u) => {
             setUser(u);

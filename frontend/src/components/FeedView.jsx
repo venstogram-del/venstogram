@@ -192,7 +192,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
     <div className="space-y-4 pb-20">
       {posts.map((post, index) => (
         <React.Fragment key={post.id}>
-          <article className="bg-slate-950 border-b border-slate-900 pb-3">
+          <article className="bg-white border-b border-slate-100 pb-4">
             {/* Post Header */}
             <div className="flex items-center justify-between px-4 py-2.5">
               <div
@@ -206,15 +206,15 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
                 />
                 <div>
                   <div className="flex items-center space-x-1">
-                    <span className="text-xs font-bold text-white tracking-tight">
+                    <span className="text-xs font-bold text-slate-900 tracking-tight">
                       {post.author.username}
                     </span>
                     {post.author.badge_type === "gold_founder" ? (
-                      <span className="text-amber-400 text-xs font-bold" title="Золотая Галочка Основателя">
+                      <span className="text-amber-500 text-xs font-bold" title="Золотая Галочка Основателя">
                         👑
                       </span>
                     ) : post.author.is_verified ? (
-                      <span className="text-sky-400 text-xs" title="Venstogram Verified">
+                      <span className="text-sky-500 text-xs" title="Venstogram Verified">
                         ✓
                       </span>
                     ) : null}
@@ -226,7 +226,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
                         triggerHaptic("light");
                         setSelectedLocation(post.location);
                       }}
-                      className="text-[10px] text-sky-400 hover:text-sky-300 font-semibold block -mt-0.5 cursor-pointer hover:underline"
+                      className="text-[10px] text-sky-600 hover:text-sky-700 font-semibold block -mt-0.5 cursor-pointer hover:underline"
                     >
                       📍 {post.location.replace(/^📍\s*/, "")}
                     </span>
@@ -242,13 +242,13 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
                     e.stopPropagation();
                     handleDeletePost(post.id);
                   }}
-                  className="text-rose-500 hover:text-rose-400 p-1 text-sm font-bold transition-transform active:scale-90"
+                  className="text-rose-500 hover:text-rose-600 p-1 text-sm font-bold transition-transform active:scale-90"
                   title="Удалить публикацию"
                 >
                   🗑️
                 </button>
               )}
-              <button className="text-slate-400 hover:text-white p-1">
+              <button className="text-slate-400 hover:text-slate-600 p-1">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="1.5" />
                   <circle cx="6" cy="12" r="1.5" />
@@ -260,7 +260,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
 
           {/* Media Content with Double Tap / Click to Inspect */}
           <div
-            className="relative w-full aspect-square bg-slate-900 overflow-hidden select-none cursor-pointer"
+            className="relative w-full aspect-square bg-slate-100 overflow-hidden select-none cursor-pointer"
             onClick={() => setInspectPost(post)}
             onDoubleClick={(e) => {
               e.stopPropagation();
@@ -287,7 +287,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
                 />
               )
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-500">
+              <div className="w-full h-full flex items-center justify-center text-slate-400">
                 <span>Медиа недоступно</span>
               </div>
             )}
@@ -306,7 +306,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
               {/* Like Button */}
               <button
                 onClick={() => handleLike(post)}
-                className="flex items-center space-x-1 text-slate-300 hover:text-pink-500 transition-colors"
+                className="flex items-center space-x-1 text-slate-700 hover:text-pink-500 transition-colors"
               >
                 <svg
                   className={`w-6 h-6 transition-transform active:scale-125 ${
@@ -326,7 +326,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
               {/* Comment Button */}
               <button
                 onClick={() => openComments(post.id)}
-                className="text-slate-300 hover:text-white transition-colors"
+                className="text-slate-700 hover:text-slate-900 transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path
@@ -340,7 +340,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
               {/* Share via Telegram switchInlineQuery */}
               <button
                 onClick={() => handleShare(post)}
-                className="text-slate-300 hover:text-sky-400 transition-colors"
+                className="text-slate-700 hover:text-sky-500 transition-colors"
               >
                 <svg className="w-6 h-6 -rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -349,7 +349,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
             </div>
 
             {/* Bookmark */}
-            <button className="text-slate-400 hover:text-amber-400 transition-colors">
+            <button className="text-slate-400 hover:text-amber-500 transition-colors">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
               </svg>
@@ -358,7 +358,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
 
           {/* Likes & Views / Analytics Count */}
           <div className="px-4 mt-2 flex items-center justify-between">
-            <span className="text-xs font-bold text-white">
+            <span className="text-xs font-bold text-slate-900">
               {post.likes_count.toLocaleString()} {t.likes}
             </span>
             <button
@@ -367,7 +367,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
                 triggerHaptic("light");
                 setSelectedStatsPost(post);
               }}
-              className="text-[11px] text-pink-400 hover:text-pink-300 font-bold flex items-center space-x-1 bg-pink-500/10 border border-pink-500/30 px-2.5 py-1 rounded-xl active:scale-95 transition"
+              className="text-[11px] text-pink-600 hover:text-pink-700 font-bold flex items-center space-x-1 bg-pink-50 border border-pink-200 px-2.5 py-1 rounded-xl active:scale-95 transition"
             >
               <span>👁️ {post.views_count?.toLocaleString() || 120}</span>
               <span className="text-[10px]">📊 {t.statsAndAge || "Статистика"}</span>
@@ -375,8 +375,8 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
           </div>
 
           {/* Caption & Hashtags */}
-          <div className="px-4 mt-1 text-xs text-slate-300 leading-relaxed">
-            <span className="font-bold text-white mr-1.5">{post.author.username}</span>
+          <div className="px-4 mt-1 text-xs text-slate-700 leading-relaxed">
+            <span className="font-bold text-slate-900 mr-1.5">{post.author.username}</span>
             <span>{post.caption}</span>
           </div>
 
@@ -384,7 +384,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
           {post.comments_count > 0 && (
             <button
               onClick={() => openComments(post.id)}
-              className="px-4 mt-1 text-[11px] text-slate-400 hover:text-slate-200 block"
+              className="px-4 mt-1 text-[11px] text-slate-500 hover:text-slate-800 block"
             >
               {t.viewAllComments || "Посмотреть все"} {post.comments_count} {t.comments}
             </button>

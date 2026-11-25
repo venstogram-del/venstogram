@@ -113,6 +113,14 @@ export function RegistrationModal({ user, onComplete, onOpenEmailAuth, lang = "u
   const [sendingCode, setSendingCode] = useState(false);
   const [codeTimer, setCodeTimer] = useState(0);
 
+  // Login & Recovery state
+  const [viewMode, setViewMode] = useState("register"); // 'register', 'login', 'forgot', 'reset'
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [resetCode, setResetCode] = useState("");
+  const [newResetPassword, setNewResetPassword] = useState("");
+
   // Initial username candidate
   const initialUsername = (user?.username && !user.username.startsWith("user_"))
     ? user.username
@@ -164,6 +172,102 @@ export function RegistrationModal({ user, onComplete, onOpenEmailAuth, lang = "u
       triggerHaptic("error");
     } finally {
       setSendingCode(false);
+    }
+  };
+
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+    const cleanMail = (loginEmail || email).trim().toLowerCase();
+    if (!cleanMail || !cleanMail.includes("@")) {
+      setErrorMsg("Укажите корректный адрес электронной почты");
+      triggerHaptic("error");
+      return;
+    }
+    if (!loginPassword) {
+      setErrorMsg("Введите пароль");
+      triggerHaptic("error");
+      return;
+    }
+
+    setLoggingIn(true);
+    triggerHaptic("medium");
+    try {
+      const res = await Api.post("/auth/login-email", {
+        email: cleanMail,
+        password: loginPassword
+      });
+      Api.setToken(res.access_token);
+      SoundEngine.playFanfare();
+      triggerHaptic("success");
+      try {
+        localStorage.setItem(`vensto_account_created_${res.user?.id || 1}`, "true");
+        localStorage.setItem("vensto_lang", currentLang);
+      } catch (e) {}
+      if (onComplete) onComplete(res.user);
+    } catch (err) {
+      setErrorMsg(err.message || "Неверный Email или пароль");
+      triggerHaptic("error");
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+    const cleanMail = (loginEmail || email).trim().toLowerCase();
+    if (!cleanMail || !cleanMail.includes("@")) {
+      setErrorMsg("Укажите ваш Email");
+      return;
+    }
+    setLoggingIn(true);
+    triggerHaptic("light");
+    try {
+      const res = await Api.post("/auth/forgot-password", { email: cleanMail });
+      if (res.debug_code) setResetCode(res.debug_code);
+      setViewMode("reset");
+      alert(res.message || "Код сброса отправлен на вашу почту!");
+    } catch (err) {
+      setErrorMsg(err.message || "Ошибка отправки кода сброса");
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleResetSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+    const cleanMail = (loginEmail || email).trim().toLowerCase();
+    if (!resetCode.trim()) {
+      setErrorMsg("Введите 6-значный код из письма");
+      return;
+    }
+    if (!newResetPassword || newResetPassword.length < 4) {
+      setErrorMsg("Новый пароль должен содержать от 4 символов");
+      return;
+    }
+    setLoggingIn(true);
+    triggerHaptic("heavy");
+    try {
+      const res = await Api.post("/auth/reset-password", {
+        email: cleanMail,
+        code: resetCode.trim(),
+        new_password: newResetPassword.trim()
+      });
+      Api.setToken(res.access_token);
+      SoundEngine.playFanfare();
+      triggerHaptic("success");
+      alert("Пароль успешно обновлен! Добро пожаловать.");
+      try {
+        localStorage.setItem(`vensto_account_created_${res.user?.id || 1}`, "true");
+        localStorage.setItem("vensto_lang", currentLang);
+      } catch (e) {}
+      if (onComplete) onComplete(res.user);
+    } catch (err) {
+      setErrorMsg(err.message || "Неверный код сброса");
+    } finally {
+      setLoggingIn(false);
     }
   };
 
@@ -296,7 +400,7 @@ export function RegistrationModal({ user, onComplete, onOpenEmailAuth, lang = "u
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-100/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 overflow-y-auto text-slate-900 font-sans">
       <div className="w-full max-w-md mx-auto space-y-4 my-auto py-4">
         
         {/* Language switch selector */}
@@ -316,8 +420,8 @@ export function RegistrationModal({ user, onComplete, onOpenEmailAuth, lang = "u
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                 currentLang === l.code
-                  ? "bg-pink-600 text-white shadow-md shadow-pink-600/30 ring-1 ring-white/20"
-                  : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                  ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-500/25 ring-1 ring-white/20"
+                  : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm"
               }`}
             >
               {l.label}
@@ -327,231 +431,416 @@ export function RegistrationModal({ user, onComplete, onOpenEmailAuth, lang = "u
 
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 flex items-center justify-center mx-auto shadow-2xl shadow-pink-500/40">
+          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 flex items-center justify-center mx-auto shadow-xl shadow-pink-500/30">
             <span className="text-white font-black text-3xl tracking-tighter">V</span>
           </div>
           <div>
-            <h1 className="text-xl font-black bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
-              {tr.welcomeTitle}
+            <h1 className="text-xl font-black text-slate-900">
+              {viewMode === "login" ? "Вход в Venstogram" : viewMode === "forgot" ? "Восстановление пароля" : viewMode === "reset" ? "Новый пароль" : tr.welcomeTitle}
             </h1>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              {tr.welcomeSubtitle}
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              {viewMode === "login" ? "Введите Email и пароль для входа в свой профиль" : viewMode === "forgot" ? "Введите Email для получения кода сброса пароля" : viewMode === "reset" ? "Введите 6 цифр из письма и новый пароль" : tr.welcomeSubtitle}
             </p>
           </div>
         </div>
 
         {errorMsg && (
-          <div className="bg-rose-950/80 border border-rose-500/60 p-3 rounded-2xl text-xs text-rose-200 animate-in shake">
+          <div className="bg-rose-50 border border-rose-200 p-3 rounded-2xl text-xs text-rose-700 animate-in shake font-medium shadow-sm">
             ⚠️ {errorMsg}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4 bg-slate-900/90 border border-slate-800 p-5 rounded-3xl shadow-xl">
-          {/* Step 1: Personal Information */}
-          <div className="border-b border-slate-800/80 pb-3">
-            <span className="text-[10px] text-pink-400 uppercase tracking-wider font-extrabold block mb-2">
-              {tr.step1}
-            </span>
-            <div className="grid grid-cols-2 gap-2.5">
-              {/* First Name */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                  {tr.firstName} <span className="text-pink-400">*</span>
+        {/* 1. LOGIN VIEW */}
+        {viewMode === "login" && (
+          <form onSubmit={handleLoginSubmit} className="space-y-4 bg-white border border-slate-200 p-5 rounded-3xl shadow-xl shadow-slate-200/50 text-slate-900">
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                Электронная почта (Email):
+              </label>
+              <input
+                type="email"
+                required
+                value={loginEmail || email}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="name@gmail.com"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-pink-500 shadow-sm transition"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                Пароль:
+              </label>
+              <input
+                type="password"
+                required
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-pink-500 shadow-sm transition"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loggingIn}
+              className="w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-xl bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:from-pink-600 hover:to-amber-500 text-white shadow-pink-500/25 active:scale-98 flex items-center justify-center space-x-2"
+            >
+              <span>{loggingIn ? "Вход в аккаунт..." : "🚀 Войти в свой аккаунт"}</span>
+            </button>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic("light");
+                  setViewMode("forgot");
+                  setErrorMsg("");
+                }}
+                className="text-amber-600 hover:text-amber-700 hover:underline"
+              >
+                Забыли пароль?
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic("light");
+                  setViewMode("register");
+                  setErrorMsg("");
+                }}
+                className="text-pink-600 hover:text-pink-700 hover:underline"
+              >
+                ← Создать новый аккаунт
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* 2. FORGOT PASSWORD VIEW */}
+        {viewMode === "forgot" && (
+          <form onSubmit={handleForgotSubmit} className="space-y-4 bg-white border border-slate-200 p-5 rounded-3xl shadow-xl shadow-slate-200/50 text-slate-900">
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                Введите ваш Email для сброса пароля:
+              </label>
+              <input
+                type="email"
+                required
+                value={loginEmail || email}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="name@gmail.com"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-pink-500 shadow-sm transition"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loggingIn}
+              className="w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-bold shadow-amber-500/20 active:scale-98 flex items-center justify-center"
+            >
+              <span>{loggingIn ? "Отправка..." : "Получить код для сброса пароля →"}</span>
+            </button>
+
+            <div className="text-center pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic("light");
+                  setViewMode("login");
+                  setErrorMsg("");
+                }}
+                className="text-xs text-slate-600 hover:text-slate-900 font-bold hover:underline"
+              >
+                ← Вернуться ко входу
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* 3. RESET PASSWORD VIEW */}
+        {viewMode === "reset" && (
+          <form onSubmit={handleResetSubmit} className="space-y-4 bg-white border border-slate-200 p-5 rounded-3xl shadow-xl shadow-slate-200/50 text-slate-900">
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                6-значный код из письма:
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                required
+                value={resetCode}
+                onChange={(e) => setResetCode(e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="123456"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono text-center tracking-widest text-slate-900 placeholder-slate-400 focus:outline-none focus:border-pink-500 shadow-sm transition"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                Новый пароль:
+              </label>
+              <input
+                type="password"
+                required
+                value={newResetPassword}
+                onChange={(e) => setNewResetPassword(e.target.value)}
+                placeholder="Придумайте новый пароль"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-pink-500 shadow-sm transition"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loggingIn || !resetCode.trim() || !newResetPassword}
+              className="w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold shadow-emerald-500/20 active:scale-98 flex items-center justify-center"
+            >
+              <span>{loggingIn ? "Сохранение..." : "✓ Сохранить новый пароль и войти"}</span>
+            </button>
+
+            <div className="text-center pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic("light");
+                  setViewMode("login");
+                  setErrorMsg("");
+                }}
+                className="text-xs text-slate-600 hover:text-slate-900 font-bold hover:underline"
+              >
+                ← Вернуться ко входу
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* 4. REGISTRATION VIEW */}
+        {viewMode === "register" && (
+          <form onSubmit={handleSubmit} className="space-y-4 bg-white border border-slate-200 p-5 rounded-3xl shadow-xl shadow-slate-200/50 text-slate-900">
+            {/* Step 1: Personal Information */}
+            <div className="border-b border-slate-100 pb-3">
+              <span className="text-[10px] text-pink-600 uppercase tracking-wider font-extrabold block mb-2">
+                {tr.step1}
+              </span>
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* First Name */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    {tr.firstName} <span className="text-pink-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Azizbek"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-pink-500 shadow-sm transition"
+                  />
+                </div>
+
+                {/* Last Name */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    {tr.lastName}
+                  </label>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Karimov"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-pink-500 shadow-sm transition"
+                  />
+                </div>
+              </div>
+
+              {/* Birth Year */}
+              <div className="mt-2.5">
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  {tr.birthYear} <span className="text-pink-500">*</span>
                 </label>
+                <input
+                  type="number"
+                  required
+                  min="1940"
+                  max={new Date().getFullYear() - 6}
+                  value={birthYear}
+                  onChange={(e) => setBirthYear(e.target.value)}
+                  placeholder={tr.birthYearPlaceholder}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-pink-500 shadow-sm transition font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Step 2: Account Creation & Nickname */}
+            <div>
+              <span className="text-[10px] text-amber-600 uppercase tracking-wider font-extrabold block mb-2">
+                {tr.step2}
+              </span>
+              <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between mb-1">
+                <span>{tr.chooseUsername} <span className="text-pink-500">*</span></span>
+                {checking && <span className="text-[10px] text-slate-500 animate-pulse">{tr.checking}</span>}
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-2 text-slate-400 text-xs font-mono font-bold">@</span>
                 <input
                   type="text"
                   required
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="Azizbek"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                  placeholder="username"
+                  className={`w-full bg-white border rounded-xl pl-8 pr-3.5 py-2 text-xs font-mono text-slate-900 placeholder-slate-400 focus:outline-none transition shadow-sm ${
+                    available === true
+                      ? "border-emerald-500 focus:border-emerald-500 shadow-emerald-500/10"
+                      : available === false
+                      ? "border-rose-500 focus:border-rose-500 shadow-rose-500/10"
+                      : "border-slate-300 focus:border-pink-500"
+                  }`}
                 />
               </div>
 
-              {/* Last Name */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                  {tr.lastName}
-                </label>
-                <input
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  placeholder="Karimov"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition"
-                />
-              </div>
-            </div>
+              {/* Status message */}
+              {statusMsg && (
+                <p className={`text-[10px] mt-1 font-bold ${available ? "text-emerald-600" : "text-rose-600"}`}>
+                  {available ? "✓ " : "✕ "} {statusMsg}
+                </p>
+              )}
 
-            {/* Birth Year */}
-            <div className="mt-2.5">
-              <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                {tr.birthYear} <span className="text-pink-400">*</span>
-              </label>
-              <input
-                type="number"
-                required
-                min="1940"
-                max={new Date().getFullYear() - 6}
-                value={birthYear}
-                onChange={(e) => setBirthYear(e.target.value)}
-                placeholder={tr.birthYearPlaceholder}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition font-mono"
-              />
-            </div>
-          </div>
-
-          {/* Step 2: Account Creation & Nickname */}
-          <div>
-            <span className="text-[10px] text-amber-400 uppercase tracking-wider font-extrabold block mb-2">
-              {tr.step2}
-            </span>
-            <label className="text-[11px] font-bold text-slate-300 flex items-center justify-between mb-1">
-              <span>{tr.chooseUsername} <span className="text-pink-400">*</span></span>
-              {checking && <span className="text-[10px] text-slate-400 animate-pulse">{tr.checking}</span>}
-            </label>
-            <div className="relative">
-              <span className="absolute left-3.5 top-2.5 text-slate-400 text-xs font-mono font-bold">@</span>
-              <input
-                type="text"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-                placeholder="username"
-                className={`w-full bg-slate-950 border rounded-xl pl-8 pr-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none transition ${
-                  available === true
-                    ? "border-emerald-500 focus:border-emerald-400 shadow-sm shadow-emerald-500/20"
-                    : available === false
-                    ? "border-rose-500 focus:border-rose-400 shadow-sm shadow-rose-500/20"
-                    : "border-slate-800 focus:border-pink-500"
-                }`}
-              />
-            </div>
-
-            {/* Status message */}
-            {statusMsg && (
-              <p className={`text-[10px] mt-1.5 font-bold ${available ? "text-emerald-400" : "text-rose-400"}`}>
-                {available ? "✓ " : "✕ "} {statusMsg}
-              </p>
-            )}
-
-            {/* Numeric suggestion chips if username is taken */}
-            {suggestions && suggestions.length > 0 && (
-              <div className="mt-2.5 bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800 space-y-1.5">
-                <span className="text-[10px] text-slate-400 block font-semibold">
-                  {tr.suggestionsTitle}
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {suggestions.map((sug) => (
-                    <button
-                      key={sug}
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic("selection");
-                        setUsername(sug);
-                      }}
-                      className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition flex items-center space-x-1"
-                    >
-                      <span>@{sug}</span>
-                      <span className="text-[9px]">➕</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Step 3: Email Security & Code */}
-          <div className="border-t border-slate-800/80 pt-3">
-            <span className="text-[10px] text-sky-400 uppercase tracking-wider font-extrabold block mb-1">
-              {tr.step3}
-            </span>
-            <div className="space-y-2">
-              <div className="flex space-x-2">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={tr.emailPlaceholder}
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition"
-                />
-                <button
-                  type="button"
-                  onClick={handleSendCode}
-                  disabled={sendingCode || codeTimer > 0 || !email.includes("@")}
-                  className="bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-bold text-xs px-3 py-2 rounded-xl transition shrink-0"
-                >
-                  {sendingCode ? "..." : codeTimer > 0 ? `${codeTimer}s` : tr.getCode}
-                </button>
-              </div>
-
-              {codeSent && (
-                <div className="space-y-1 animate-in fade-in">
-                  <span className="text-[10px] text-emerald-400 block font-semibold">
-                    ✓ {tr.codeSentTo} {email}
+              {/* Numeric suggestion chips if username is taken */}
+              {suggestions && suggestions.length > 0 && (
+                <div className="mt-2.5 bg-slate-50 p-2.5 rounded-2xl border border-slate-200 space-y-1.5">
+                  <span className="text-[10px] text-slate-600 block font-semibold">
+                    {tr.suggestionsTitle}
                   </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestions.map((sug) => (
+                      <button
+                        key={sug}
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic("selection");
+                          setUsername(sug);
+                        }}
+                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition flex items-center space-x-1"
+                      >
+                        <span>@{sug}</span>
+                        <span className="text-[9px]">➕</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Step 3: Email Security & Code */}
+            <div className="border-t border-slate-100 pt-3">
+              <span className="text-[10px] text-sky-600 uppercase tracking-wider font-extrabold block mb-1">
+                {tr.step3}
+              </span>
+              <div className="space-y-2.5">
+                {/* Email Input & Send Code Button */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    Электронная почта (Email):
+                  </label>
+                  <div className="flex space-x-2">
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={tr.emailPlaceholder}
+                      className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-pink-500 shadow-sm transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendCode}
+                      disabled={sendingCode || codeTimer > 0 || !email.includes("@")}
+                      className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 disabled:opacity-40 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-md shadow-pink-500/20 shrink-0"
+                    >
+                      {sendingCode ? "..." : codeTimer > 0 ? `${codeTimer}s` : tr.getCode}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 6-Digit Email Code - ALWAYS VISIBLE */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1 flex items-center justify-between">
+                    <span>📩 {tr.enterCode}:</span>
+                    {codeSent && (
+                      <span className="text-[10px] text-emerald-600 font-bold animate-pulse">
+                        ✓ {tr.codeSentTo} {email}
+                      </span>
+                    )}
+                  </label>
                   <input
                     type="text"
                     maxLength={6}
                     value={emailCode}
                     onChange={(e) => setEmailCode(e.target.value.replace(/[^0-9]/g, ""))}
-                    placeholder={tr.enterCode}
-                    className="w-full bg-slate-950 border border-emerald-500/60 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none font-mono text-center tracking-widest text-sm"
+                    placeholder={codeSent ? tr.enterCode : (currentLang === "uz_latn" ? "Emailga yuborilgan 6 ta raqam" : "Введите 6 цифр из письма")}
+                    className={`w-full border rounded-xl px-3 py-2 text-xs font-mono text-center tracking-widest text-slate-900 placeholder-slate-400 focus:outline-none transition shadow-sm ${
+                      codeSent
+                        ? "bg-emerald-50/80 border-emerald-400 text-slate-950 font-bold focus:border-emerald-500 ring-2 ring-emerald-400/20"
+                        : "bg-white border-slate-300 focus:border-pink-500"
+                    }`}
                   />
                 </div>
-              )}
 
-              {/* Password creation */}
-              <div className="pt-2">
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                  🔑 {tr.passwordTitle}
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={tr.passwordPlaceholder}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition"
-                />
+                {/* Password creation */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    🔑 {tr.passwordTitle}
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={tr.passwordPlaceholder}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-pink-500 transition shadow-sm"
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Feature highlights unlock */}
-          <div className="bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80 text-[10px] text-slate-400 space-y-1">
-            <span className="text-white font-bold block">{tr.featuresTitle}</span>
-            <div className="flex items-center space-x-2">
-              <span>{tr.featuresList}</span>
+            {/* Feature highlights unlock */}
+            <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-200 text-[10px] text-slate-600 space-y-1">
+              <span className="text-slate-900 font-bold block">{tr.featuresTitle}</span>
+              <div className="flex items-center space-x-2">
+                <span>{tr.featuresList}</span>
+              </div>
             </div>
-          </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={saving || available === false || !firstName.trim() || !birthYear || !username.trim()}
-            className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-xl flex items-center justify-center space-x-2 ${
-              saving || available === false || !firstName.trim() || !birthYear || !username.trim()
-                ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50"
-                : "bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:from-pink-400 hover:to-amber-400 text-white shadow-pink-500/30 active:scale-98"
-            }`}
-          >
-            <span>{saving ? tr.submitting : tr.submitBtn}</span>
-          </button>
-
-          {/* Account recovery / login link */}
-          <div className="text-center pt-2 border-t border-slate-800/60">
+            {/* Submit Button */}
             <button
-              type="button"
-              onClick={() => {
-                triggerHaptic("light");
-                if (onOpenEmailAuth) onOpenEmailAuth();
-              }}
-              className="text-xs text-pink-400 hover:text-pink-300 font-bold hover:underline"
+              type="submit"
+              disabled={saving || available === false || !firstName.trim() || !birthYear || !username.trim()}
+              className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-xl flex items-center justify-center space-x-2 ${
+                saving || available === false || !firstName.trim() || !birthYear || !username.trim()
+                  ? "bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-200"
+                  : "bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:from-pink-600 hover:to-amber-500 text-white shadow-pink-500/25 active:scale-98"
+              }`}
             >
-              Уже есть аккаунт? Войти или восстановить пароль ↵
+              <span>{saving ? tr.submitting : tr.submitBtn}</span>
             </button>
-          </div>
-        </form>
+
+            {/* Account recovery / login link */}
+            <div className="text-center pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic("light");
+                  setErrorMsg("");
+                  setViewMode("login");
+                  if (email && !loginEmail) setLoginEmail(email);
+                  if (onOpenEmailAuth) {
+                    try { onOpenEmailAuth("login"); } catch (e) {}
+                  }
+                }}
+                className="text-xs text-pink-600 hover:text-pink-700 font-bold hover:underline"
+              >
+                Уже есть аккаунт? Войти или восстановить пароль ↵
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

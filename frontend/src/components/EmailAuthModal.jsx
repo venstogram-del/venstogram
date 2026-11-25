@@ -3,8 +3,8 @@ import { triggerHaptic } from "../telegram.js";
 import { SoundEngine } from "../sound.js";
 import { Api } from "../api.js";
 
-export function EmailAuthModal({ onClose, onAuthSuccess }) {
-  const [mode, setMode] = useState("register"); // 'register', 'verify_code', 'login', 'forgot', 'reset_password'
+export function EmailAuthModal({ onClose, onAuthSuccess, initialMode = "login" }) {
+  const [mode, setMode] = useState(initialMode || "login"); // 'register', 'verify_code', 'login', 'forgot', 'reset_password'
   
   // Registration fields
   const [email, setEmail] = useState("");
