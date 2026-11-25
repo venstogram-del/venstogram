@@ -396,6 +396,26 @@ export function App() {
     } catch (e) {}
   };
 
+  const handlePostCreated = (newPost, newReel) => {
+    if (newPost) {
+      setPosts((prev) => [newPost, ...prev]);
+    }
+    if (newReel) {
+      setReels((prev) => [newReel, ...prev]);
+    }
+    loadAllContent();
+  };
+
+  useEffect(() => {
+    if (activeTab === "reels") {
+      Api.get("/reels").then((data) => {
+        if (data && Array.isArray(data) && data.length > 0) {
+          setReels(data);
+        }
+      }).catch(() => {});
+    }
+  }, [activeTab]);
+
   const handleLanguageChange = (newLang) => {
     setLang(newLang);
     safeSetItem("vensto_lang", newLang);
@@ -585,7 +605,7 @@ export function App() {
           t={t}
           dataSaver={dataSaver}
           onClose={() => setCreatePostOpen(false)}
-          onPostCreated={loadAllContent}
+          onPostCreated={handlePostCreated}
         />
       )}
 

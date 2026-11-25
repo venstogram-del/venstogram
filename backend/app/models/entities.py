@@ -50,6 +50,7 @@ class User(Base):
     is_incognito = Column(Boolean, default=False) # Режим невидимка (скрыть активность / онлайн)
     is_private = Column(Boolean, default=False) # Закрытый аккаунт
     profile_theme = Column(String(32), default="default") # default, gold_founder, cyber_neon, royal_emerald, ruby_luxury
+    allow_calls = Column(String(32), default="all") # all (все), followers (только взаимные), none (отключить звонки)
     
     # Founder Quest & Referrals
     referred_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -293,6 +294,18 @@ class CallSession(Base):
 
     caller = relationship("User", foreign_keys=[caller_id], lazy="joined")
     receiver = relationship("User", foreign_keys=[receiver_id], lazy="joined")
+
+
+class ArchivedChat(Base):
+    __tablename__ = "archived_chats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    partner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, default=utcnow)
+
+    user = relationship("User", foreign_keys=[user_id])
+    partner = relationship("User", foreign_keys=[partner_id])
 
 
 class UsernameListing(Base):

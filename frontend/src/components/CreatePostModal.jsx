@@ -129,14 +129,18 @@ export function CreatePostModal({ t, onClose, onPostCreated, dataSaver }) {
       });
 
       // 4. If video, automatically publish to Reels too for algorithmic discovery
+      let createdReel = null;
       if (isVideo) {
         try {
-          await Api.post("/reels", {
+          const reelRes = await Api.post("/reels", {
             video_url: uploadRes.url,
             caption: caption,
             audio_title: "Original Sound",
             thumbnail_url: ""
           });
+          if (reelRes && reelRes.reel) {
+            createdReel = reelRes.reel;
+          }
         } catch (e) {
           console.warn("Reel sync error", e);
         }
@@ -144,7 +148,9 @@ export function CreatePostModal({ t, onClose, onPostCreated, dataSaver }) {
 
       SoundEngine.playFanfare();
       alert(postRes.message || "Muvaffaqiyatli chop etildi! / Опубликовано!");
-      onPostCreated();
+      if (onPostCreated) {
+        onPostCreated(postRes.post, createdReel);
+      }
       onClose();
     } catch (err) {
       triggerHaptic("error");

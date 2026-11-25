@@ -74,4 +74,17 @@ class WebSocketConnectionManager:
             if ws in self.rooms.get(room_name, set()):
                 self.rooms[room_name].remove(ws)
 
+    async def broadcast(self, message: Dict[str, Any]):
+        """Broadcasts a JSON message to all connected users."""
+        payload = json.dumps(message)
+        seen_sockets = set()
+        for user_id, sockets in list(self.active_user_connections.items()):
+            for ws in list(sockets):
+                if ws not in seen_sockets:
+                    seen_sockets.add(ws)
+                    try:
+                        await ws.send_text(payload)
+                    except Exception:
+                        pass
+
 ws_manager = WebSocketConnectionManager()

@@ -43,6 +43,32 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
     setVideoBuffering(false);
   }, [currentIndex]);
 
+  // Real-time Reels auto-discovery: auto-fetch on mount and live WebSocket broadcast
+  useEffect(() => {
+    Api.get("/reels").then((fresh) => {
+      if (fresh && Array.isArray(fresh) && fresh.length > 0) {
+        setReels(fresh);
+      }
+    }).catch(() => {});
+
+    const handleReelWs = (data) => {
+      if (data && data.event === "new_reel" && data.reel) {
+        setReels((prev) => {
+          if (prev.some((r) => r.id === data.reel.id)) return prev;
+          return [data.reel, ...prev];
+        });
+      }
+    };
+
+    let unsub = null;
+    if (window.__vensto_socket) {
+      unsub = window.__vensto_socket.addListener(handleReelWs);
+    }
+    return () => {
+      if (unsub) unsub();
+    };
+  }, []);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => {

@@ -48,12 +48,54 @@ async def get_dialogs(
                     "is_read": m.is_read,
                     "created_at": m.created_at.isoformat() if m.created_at else None
                 },
-                "unread_count": 0
+                "unread_count": 0,
+                "is_archived": False
             }
         elif m.recipient_id == current_user.id and not m.is_read:
             dialog_partners[partner_id]["unread_count"] += 1
 
+    # Check which partners are archived by current user
+    from app.models.entities import ArchivedChat
+    arch_res = await db.execute(select(ArchivedChat.partner_id).where(ArchivedChat.user_id == current_user.id))
+    archived_ids = set(arch_res.scalars().all())
+    for pid, d in dialog_partners.items():
+        if pid in archived_ids:
+            d["is_archived"] = True
+
     return list(dialog_partners.values())
+
+
+@router.post("/{partner_id}/archive")
+async def archive_dialog(
+    partner_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from app.models.entities import ArchivedChat
+    chk = await db.execute(
+        select(ArchivedChat).where(ArchivedChat.user_id == current_user.id, ArchivedChat.partner_id == partner_id)
+    )
+    if not chk.scalars().first():
+        db.add(ArchivedChat(user_id=current_user.id, partner_id=partner_id))
+        await db.commit()
+    return {"status": "ok", "partner_id": partner_id, "is_archived": True}
+
+
+@router.post("/{partner_id}/unarchive")
+async def unarchive_dialog(
+    partner_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from app.models.entities import ArchivedChat
+    chk = await db.execute(
+        select(ArchivedChat).where(ArchivedChat.user_id == current_user.id, ArchivedChat.partner_id == partner_id)
+    )
+    row = chk.scalars().first()
+    if row:
+        await db.delete(row)
+        await db.commit()
+    return {"status": "ok", "partner_id": partner_id, "is_archived": False}
 
 
 @router.get("/{partner_id}/messages")
@@ -124,26 +166,31 @@ async def send_message(
 
     # Deliver via WebSocket if active inside Web App
     from app.websocket.manager import ws_manager
+    msg_dict = {
+        "id": msg.id,
+        "sender_id": current_user.id,
+        "recipient_id": recipient.id,
+        "content": msg.content,
+        "media_url": msg.media_url,
+        "media_type": msg.media_type,
+        "created_at": msg.created_at.isoformat(),
+        "is_read": False,
+        "sender": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "first_name": current_user.first_name,
+            "avatar_url": current_user.avatar_url
+        }
+    }
     msg_event = {
         "event": "new_message",
-        "message": {
-            "id": msg.id,
-            "sender_id": current_user.id,
-            "content": msg.content,
-            "media_url": msg.media_url,
-            "media_type": msg.media_type,
-            "created_at": msg.created_at.isoformat(),
-            "sender": {
-                "id": current_user.id,
-                "username": current_user.username,
-                "first_name": current_user.first_name,
-                "avatar_url": current_user.avatar_url
-            }
-        }
+        "message": msg_dict
     }
     delivered = await ws_manager.send_personal_message(recipient.id, msg_event)
     if not delivered and recipient.telegram_id:
         delivered = await ws_manager.send_personal_message(recipient.telegram_id, msg_event)
+    # Also notify sender's own sessions
+    await ws_manager.send_personal_message(current_user.id, msg_event)
 
     # Fallback push to bot PM ONLY if user is completely offline / closed the Web App
     if not delivered and recipient.telegram_id:
@@ -156,7 +203,7 @@ async def send_message(
             start_param=f"chat_{current_user.id}"
         )
 
-    return {"status": "ok", "message_id": msg.id}
+    return {"status": "ok", "message_id": msg.id, "message": msg_dict}
 
 
 # ============================================================================
@@ -169,6 +216,7 @@ async def start_call(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    from app.core.config import settings
     recipient_id = req.get("recipient_id")
     call_type = req.get("call_type", "video") # "audio" or "video"
 
@@ -178,14 +226,41 @@ async def start_call(
         raise HTTPException(status_code=404, detail="Собеседник не найден")
 
     # Protection: Nobody can call the Founder/Director, but Founder can call anyone!
-    is_recipient_founder = recipient.role == "director" or recipient.telegram_id in settings.ADMIN_TELEGRAM_IDS
-    is_caller_founder = current_user.role == "director" or current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS
+    is_recipient_founder = (
+        recipient.role == "director" or
+        recipient.telegram_id in settings.ADMIN_TELEGRAM_IDS or
+        (recipient.username and recipient.username.lower() in ["sherzodbek", "venstogram", "admin"])
+    )
+    is_caller_founder = (
+        current_user.role == "director" or
+        current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS or
+        (current_user.username and current_user.username.lower() in ["sherzodbek", "venstogram", "admin"])
+    )
 
     if is_recipient_founder and not is_caller_founder:
         raise HTTPException(
             status_code=403,
-            detail="Звонки Основателю платформы ограничены настройками приватности. Вы можете отправить текстовое сообщение в личные сообщения."
+            detail="Основатель платформы принимает звонки только по личному приглашению. Вы можете отправить текстовое сообщение в личные сообщения."
         )
+
+    # Privacy check for regular users & bloggers (Founder is completely unrestricted!)
+    if not is_caller_founder:
+        recipient_allow = getattr(recipient, "allow_calls", "all") or "all"
+        if recipient_allow == "none":
+            raise HTTPException(
+                status_code=403,
+                detail=f"Пользователь @{recipient.username} отключил(а) входящие звонки в настройках приватности."
+            )
+        elif recipient_allow == "followers":
+            from app.models.entities import Follow
+            f_res = await db.execute(
+                select(Follow.id).where(Follow.follower_id == recipient.id, Follow.following_id == current_user.id)
+            )
+            if not f_res.scalars().first():
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Пользователь @{recipient.username} принимает звонки только от взаимных подписок."
+                )
 
     # Create new call session in ringing state
     call = CallSession(
@@ -216,16 +291,19 @@ async def start_call(
     if not delivered and recipient.telegram_id:
         delivered = await ws_manager.send_personal_message(recipient.telegram_id, call_payload)
 
-    # If recipient not actively in Web App, send Telegram push notification
-    if not delivered and recipient.telegram_id:
-        from app.bot.bot import send_bot_push_notification
-        call_icon = "📹 Видеозвонок" if call_type == "video" else "📞 Аудиозвонок"
-        await send_bot_push_notification(
-            telegram_id=recipient.telegram_id,
-            text=f"📲 <b>Входящий {call_icon} от @{current_user.username}</b>!\n\nОткройте приложение Venstogram, чтобы ответить на звонок.",
-            button_text="Принять звонок в приложении",
-            start_param=f"chat_{current_user.id}"
-        )
+    # Send Telegram push notification to ensure recipient never misses the call
+    if recipient.telegram_id:
+        try:
+            from app.bot.bot import send_bot_push_notification
+            call_icon = "📹 Видеозвонок" if call_type == "video" else "📞 Аудиозвонок"
+            await send_bot_push_notification(
+                telegram_id=recipient.telegram_id,
+                text=f"📲 <b>Входящий {call_icon} от @{current_user.username}</b>!\n\nОткройте приложение Venstogram, чтобы ответить на звонок.",
+                button_text="Принять звонок в приложении",
+                start_param=f"chat_{current_user.id}"
+            )
+        except Exception as e:
+            print(f"[Bot Call Push Note] {e}")
 
     return {
         "status": "ok",

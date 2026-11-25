@@ -192,6 +192,7 @@ async def get_me(current_user: User = Depends(get_current_user), db: AsyncSessio
         "has_pin": bool(current_user.wallet_pin),
         "email": current_user.email,
         "is_email_verified": getattr(current_user, "is_email_verified", False),
+        "allow_calls": getattr(current_user, "allow_calls", "all") or "all",
         "followers_count": followers_count,
         "following_count": following_count,
         "posts_count": posts_count,
@@ -297,6 +298,9 @@ async def update_profile(
         current_user.is_private = req.is_private
     if req.profile_theme is not None:
         current_user.profile_theme = req.profile_theme
+    if req.allow_calls is not None:
+        if req.allow_calls in ["all", "followers", "none"]:
+            current_user.allow_calls = req.allow_calls
     if req.email is not None:
         clean_email = req.email.lower().strip()
         if clean_email and "@" in clean_email:

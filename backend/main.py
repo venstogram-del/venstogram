@@ -186,7 +186,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from datetime import datetime, timezone
 
 server_start_time = datetime.now(timezone.utc).isoformat()
-BOT_VERSION = "v1.5.0-cities-marketplace-director-reserve"
+BOT_VERSION = "v1.6.0-instant-reels-chat-archive-calls"
 
 @app.get("/health")
 @app.get("/api/health")

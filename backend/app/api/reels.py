@@ -119,7 +119,37 @@ async def create_reel(
     await db.commit()
     await db.refresh(reel)
 
-    return {"status": "ok", "reel_id": reel.id}
+    reel_data = {
+        "id": reel.id,
+        "video_url": reel.video_url,
+        "thumbnail_url": reel.thumbnail_url or "",
+        "caption": reel.caption or "",
+        "audio_title": reel.audio_title,
+        "audio_author": reel.audio_author,
+        "likes_count": reel.likes_count,
+        "views_count": reel.views_count,
+        "comments_count": reel.comments_count,
+        "shares_count": reel.shares_count,
+        "is_liked": False,
+        "is_saved": False,
+        "created_at": reel.created_at.isoformat() if reel.created_at else None,
+        "author": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "first_name": current_user.first_name,
+            "avatar_url": current_user.avatar_url,
+            "is_verified": current_user.is_verified
+        }
+    }
+
+    # Real-time WebSocket broadcast so everyone sees the new reel immediately without reloading
+    try:
+        from app.websocket.manager import ws_manager
+        await ws_manager.broadcast({"event": "new_reel", "reel": reel_data})
+    except Exception as e:
+        print(f"[WebSocket Reel Broadcast Error] {e}")
+
+    return {"status": "ok", "reel_id": reel.id, "reel": reel_data}
 
 
 @router.post("/{reel_id}/like")
