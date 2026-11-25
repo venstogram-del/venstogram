@@ -209,9 +209,9 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                 {[
                   { id: "all", label: "🌟 Все" },
                   { id: "ultra_rare", label: "💎 Эксклюзив & 2-значные ($30,000)" },
+                  { id: "uzbek_cities", label: "🏛️ Города ($3,000+)" },
                   { id: "uzbek_names", label: "🇺🇿 Узбекские имена ($500)" },
-                  { id: "vip_brands", label: "👑 VIP Бренды ($10k-$20k)" },
-                  { id: "uzbek_cities", label: "🏛️ Города ($10k)" }
+                  { id: "vip_brands", label: "👑 VIP Бренды ($10k-$20k)" }
                 ].map((cat) => (
                   <button
                     key={cat.id}
@@ -256,9 +256,9 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                         <div>
                           <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                             <span className="text-xl font-black text-slate-900 tracking-tight">@{item.username}</span>
-                            {(item.category === "ultra_rare" || item.username === "ou") && (
+                            {(item.category === "ultra_rare" || item.username === "ou" || item.username === "uz" || item.username === "uzb") && (
                               <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300 shadow-sm">
-                                💎 2-ЗНАЧНЫЙ РЕДКИЙ ($30,000)
+                                💎 ЭКСКЛЮЗИВ ({item.username.length <= 2 ? "$30,000" : "$5,000"})
                               </span>
                             )}
                             {item.category === "vip_brands" && (
@@ -268,12 +268,17 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                             )}
                             {item.category === "uzbek_cities" && (
                               <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-300 shadow-sm">
-                                🏛️ ГОРОД
+                                🏛️ ГОРОД ($3,000+)
                               </span>
                             )}
                             {item.category === "uzbek_names" && (
                               <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-pink-100 text-pink-900 border border-pink-300 shadow-sm">
                                 🇺🇿 ИМЯ
+                              </span>
+                            )}
+                            {item.username === "hamrohim" && (
+                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-sm">
+                                ✨ ОСОБЫЙ
                               </span>
                             )}
                           </div>

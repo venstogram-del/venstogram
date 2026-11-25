@@ -43,7 +43,7 @@ async def get_username_listings(
     query = (
         select(UsernameListing)
         .options(selectinload(UsernameListing.seller), selectinload(UsernameListing.highest_bidder))
-        .where(UsernameListing.is_sold == False)
+        .where(UsernameListing.is_sold == False, UsernameListing.category != "reserved")
     )
     if category != "all":
         if category in ("vip_brands", "ultra_rare"):
@@ -89,6 +89,8 @@ async def create_username_order(
     listing = res.scalars().first()
     if not listing or listing.is_sold:
         raise HTTPException(status_code=400, detail="Этот юзернейм недоступен для покупки")
+    if listing.category == "reserved":
+        raise HTTPException(status_code=400, detail="Этот юзернейм находится в закрытом резерве Администрации и не продаётся.")
 
     # Check if existing pending order by this user
     existing_order = await db.execute(

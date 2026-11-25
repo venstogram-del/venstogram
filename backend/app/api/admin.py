@@ -750,6 +750,43 @@ async def gift_username_free(
     }
 
 
+@router.get("/reserved-usernames")
+async def get_reserved_usernames(
+    admin_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Returns list of Director's reserved names that are NOT for sale, but can be gifted.
+    """
+    reserved_names = [
+        "sherzodbek",
+        "kamolov",
+        "abdulazizbek",
+        "habibahon",
+        "sohibahon",
+        "shodmonoy",
+        "abdullohbek"
+    ]
+    res = await db.execute(select(User).where(func.lower(User.username).in_(reserved_names)))
+    users_by_name = {u.username.lower(): u for u in res.scalars().all()}
+    
+    result = []
+    for name in reserved_names:
+        holder = users_by_name.get(name)
+        result.append({
+            "username": name,
+            "status": "gifted" if holder else "reserved",
+            "is_available_to_gift": True,
+            "holder": {
+                "id": holder.id,
+                "first_name": holder.first_name,
+                "username": holder.username,
+                "telegram_id": holder.telegram_id
+            } if holder else None
+        })
+    return result
+
+
 # ============================================================================
 # Sponsored Commercial Ads Management ("Крутые рекламы")
 # ============================================================================

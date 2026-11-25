@@ -71,13 +71,18 @@ async def seed_demo_data():
 
         director_id = director.id
 
-        # 2. Ensure @uzbekiston, @uzbekistan and 2-letter ultra-rare @ou ($30,000) are listed
-        for un, cat, pr_usd in [
+        # 2. Seed Special High-Value Usernames on Sale (starts from $500, up to $30,000)
+        SPECIAL_SALE_USERNAMES = [
             ("ou", "ultra_rare", 30000),
+            ("uz", "ultra_rare", 30000),
+            ("uzb", "ultra_rare", 5000),
+            ("uzbek", "vip_brands", 1500),
+            ("hamrohim", "uzbek_names", 500),
             ("uzbekiston", "exclusive", 999999),
             ("uzbekistan", "exclusive", 999999)
-        ]:
-            chk = await session.execute(select(UsernameListing).where(UsernameListing.username == un))
+        ]
+        for un, cat, pr_usd in SPECIAL_SALE_USERNAMES:
+            chk = await session.execute(select(UsernameListing).where(func.lower(UsernameListing.username) == un.lower()))
             existing = chk.scalars().first()
             pr_uzs = float(pr_usd * 13000)
             if not existing:
@@ -100,6 +105,108 @@ async def seed_demo_data():
                 existing.seller_id = director_id
                 existing.is_sold = False
 
+        # 2b. Seed Uzbek Cities on Sale (from $3,000+)
+        CITIES_SALE = [
+            ("tashkent", 10000),
+            ("toshkent", 10000),
+            ("samarkand", 5000),
+            ("samarqand", 5000),
+            ("bukhara", 5000),
+            ("buxoro", 5000),
+            ("andijan", 3000),
+            ("andijon", 3000),
+            ("fergana", 3000),
+            ("fargona", 3000),
+            ("namangan", 3000),
+            ("nukus", 3000),
+            ("karshi", 3000),
+            ("qarshi", 3000),
+            ("termez", 3000),
+            ("termiz", 3000),
+            ("urgench", 3000),
+            ("urganch", 3000),
+            ("navoi", 3000),
+            ("navoiy", 3000),
+            ("jizzakh", 3000),
+            ("jizzax", 3000),
+            ("gulistan", 3000),
+            ("guliston", 3000),
+            ("kokand", 3000),
+            ("qoqon", 3000),
+            ("margilan", 3000),
+            ("margilon", 3000),
+            ("asaka", 3000),
+            ("chirchik", 3000),
+            ("chirchiq", 3000),
+            ("almalyk", 3000),
+            ("olmaliq", 3000),
+            ("angren", 3000),
+            ("shakhrisabz", 3000),
+            ("shahrisabz", 3000),
+            ("khiva", 3000),
+            ("xiva", 3000),
+            ("denau", 3000),
+            ("denov", 3000),
+            ("chust", 3000),
+            ("zarafshan", 3000),
+            ("zarafshon", 3000)
+        ]
+        for city_name, city_price in CITIES_SALE:
+            chk = await session.execute(select(UsernameListing).where(func.lower(UsernameListing.username) == city_name.lower()))
+            existing_city = chk.scalars().first()
+            c_uzs = float(city_price * 13000)
+            if not existing_city:
+                nl = UsernameListing(
+                    username=city_name,
+                    seller_id=director_id,
+                    category="uzbek_cities",
+                    price_usd=city_price,
+                    price_uzs=c_uzs,
+                    current_price_coins=city_price * 10,
+                    buyout_price_coins=city_price * 10,
+                    is_sold=False,
+                    expires_at=datetime.now(timezone.utc) + timedelta(days=3650)
+                )
+                session.add(nl)
+            else:
+                existing_city.price_usd = city_price
+                existing_city.price_uzs = c_uzs
+                existing_city.category = "uzbek_cities"
+                existing_city.seller_id = director_id
+                existing_city.is_sold = False
+
+        # 2c. Seed Director's Reserved Names (NOT FOR SALE, Gift Only)
+        DIRECTOR_RESERVED_NAMES = [
+            "sherzodbek",
+            "kamolov",
+            "abdulazizbek",
+            "habibahon",
+            "sohibahon",
+            "shodmonoy",
+            "abdullohbek"
+        ]
+        for res_name in DIRECTOR_RESERVED_NAMES:
+            chk = await session.execute(select(UsernameListing).where(func.lower(UsernameListing.username) == res_name.lower()))
+            existing_res = chk.scalars().first()
+            if not existing_res:
+                nl = UsernameListing(
+                    username=res_name,
+                    seller_id=director_id,
+                    category="reserved",
+                    price_usd=0,
+                    price_uzs=0.0,
+                    current_price_coins=0,
+                    buyout_price_coins=0,
+                    is_sold=False,
+                    expires_at=datetime.now(timezone.utc) + timedelta(days=3650)
+                )
+                session.add(nl)
+            else:
+                existing_res.category = "reserved"
+                existing_res.price_usd = 0
+                existing_res.price_uzs = 0.0
+                existing_res.seller_id = director_id
+
         # 3. Seed Uzbek male & female names ($500+)
         combined_raw = NAMES_RAW + "," + FEMALE_NAMES_RAW
         raw_list = [clean_name(n) for n in combined_raw.split(",") if clean_name(n)]
@@ -111,6 +218,8 @@ async def seed_demo_data():
                 names.append(n)
 
         for name in names:
+            if name in DIRECTOR_RESERVED_NAMES:
+                continue
             chk = await session.execute(select(UsernameListing).where(UsernameListing.username == name))
             listing = chk.scalars().first()
             price_usd = 1000 if name in TOP_SHORT_NAMES else (750 if len(name) <= 4 else 500)

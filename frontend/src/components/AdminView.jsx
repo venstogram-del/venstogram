@@ -48,6 +48,7 @@ export function AdminView({ user, t }) {
   const [giftTargetInput, setGiftTargetInput] = useState("");
   const [giftUsernameInput, setGiftUsernameInput] = useState("");
   const [giftingUsername, setGiftingUsername] = useState(false);
+  const [reservedUsernames, setReservedUsernames] = useState([]);
 
   useEffect(() => {
     loadOverview();
@@ -57,7 +58,15 @@ export function AdminView({ user, t }) {
     loadAuditLogs();
     loadPolicies();
     loadAds();
+    loadReservedUsernames();
   }, []);
+
+  const loadReservedUsernames = async () => {
+    try {
+      const data = await Api.get("/admin/reserved-usernames");
+      setReservedUsernames(data || []);
+    } catch (e) {}
+  };
 
   const loadAds = async () => {
     try {
@@ -523,6 +532,19 @@ export function AdminView({ user, t }) {
         <button
           onClick={() => {
             triggerHaptic("light");
+            setActiveSubTab("reserved");
+            loadReservedUsernames();
+          }}
+          className={`py-2 px-3 rounded-xl whitespace-nowrap transition-all flex items-center space-x-1 ${
+            activeSubTab === "reserved" ? "bg-amber-500 text-slate-950 font-black shadow-md" : "text-slate-400"
+          }`}
+        >
+          <span>👑 Резерв Директора ({reservedUsernames.length || 7})</span>
+        </button>
+
+        <button
+          onClick={() => {
+            triggerHaptic("light");
             setActiveSubTab("users");
           }}
           className={`py-2 px-3 rounded-xl whitespace-nowrap transition-all ${
@@ -839,6 +861,95 @@ export function AdminView({ user, t }) {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* Reserved Director's Usernames Tab */}
+      {activeSubTab === "reserved" && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-amber-500/20 border border-amber-500/40 p-4 rounded-2xl space-y-2">
+            <div className="flex items-center space-x-2">
+              <span className="text-2xl">👑</span>
+              <div>
+                <h4 className="text-sm font-black text-amber-300">Золотой резерв Основателя / Директора</h4>
+                <p className="text-[11px] text-slate-300">
+                  Эти эксклюзивные никнеймы <b>запрещены к продаже</b> в маркетплейсе. Они находятся в личном резерве Директора и могут быть только <b>вручены в подарок</b> избранным пользователям.
+                </p>
+              </div>
+            </div>
+            <div className="pt-2 flex flex-wrap gap-2 text-[10px] text-amber-200">
+              <span className="bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">🔒 Не продаются</span>
+              <span className="bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">🎁 Доступны для подарка</span>
+              <span className="bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">⭐ Telegram бот: /reserved</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {(reservedUsernames && reservedUsernames.length > 0
+              ? reservedUsernames
+              : [
+                  { username: "sherzodbek", status: "reserved" },
+                  { username: "kamolov", status: "reserved" },
+                  { username: "abdulazizbek", status: "reserved" },
+                  { username: "habibahon", status: "reserved" },
+                  { username: "sohibahon", status: "reserved" },
+                  { username: "shodmonoy", status: "reserved" },
+                  { username: "abdullohbek", status: "reserved" }
+                ]
+            ).map((item) => {
+              const isGifted = item.status === "gifted" || item.is_sold;
+              return (
+                <div
+                  key={item.username}
+                  className="bg-slate-900 border border-amber-500/30 hover:border-amber-500/60 transition p-4 rounded-2xl flex flex-col justify-between space-y-3 shadow-lg shadow-black/20"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-amber-400 font-black text-base">@{item.username}</span>
+                        <span className="text-xs">✨</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {isGifted ? (
+                          <span className="text-emerald-400 font-bold">
+                            🎁 Вручен пользователю {item.owner_name ? `${item.owner_name} (@${item.owner_username || ''})` : ""}
+                          </span>
+                        ) : (
+                          <span className="text-amber-300 font-medium">🔒 В закрытом золотом резерве</span>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                        isGifted
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                          : "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                      }`}
+                    >
+                      {isGifted ? "Вручен" : "Резерв"}
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                    <div className="text-[11px] text-slate-400">
+                      Цена: <b className="text-white">Бесценно</b>
+                    </div>
+                    <button
+                      onClick={() => {
+                        triggerHaptic("medium");
+                        setGiftUsernameInput(item.username);
+                        setShowGiftModal(true);
+                      }}
+                      className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-xl shadow-md shadow-amber-500/20 transition active:scale-95 flex items-center space-x-1"
+                    >
+                      <span>🎁</span>
+                      <span>Подарить</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

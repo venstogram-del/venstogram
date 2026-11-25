@@ -36,6 +36,8 @@ const files = [
 
 let combined = `
 const { useState, useEffect, useRef } = React;
+var toggleTheme = function() {};
+window.toggleTheme = toggleTheme;
 `;
 
 for (const f of files) {
@@ -78,8 +80,8 @@ class ErrorBoundary extends React.Component {
           </p>
           <button
             onClick={() => {
-              try { localStorage.clear(); } catch(e) {}
-              window.location.reload();
+              try { localStorage.clear(); sessionStorage.clear(); } catch(e) {}
+              window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now();
             }}
             className="bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold text-xs px-6 py-3 rounded-xl shadow-lg shadow-pink-500/30 active:scale-95 transition-transform"
           >

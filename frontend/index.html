@@ -20,6 +20,8 @@
 
   <!-- Global Error Handler to eliminate white screen -->
   <script>
+    window.toggleTheme = function() {};
+    var toggleTheme = window.toggleTheme;
     window.onerror = function(msg, url, line, col, error) {
       console.error("[Window Error]", msg, url, line, col, error);
       var errEl = document.getElementById("debug-error");
@@ -99,6 +101,6 @@
   <div id="debug-error" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#ffffff;color:#ef4444;padding:20px;z-index:99999;font-family:sans-serif;overflow:auto;"></div>
 
   <!-- Compiled Standalone Bundle with cache busting -->
-  <script src="./app.bundle.js?v=20261125_20"></script>
+  <script src="./app.bundle.js?v=20261125_22_stable"></script>
 </body>
 </html>

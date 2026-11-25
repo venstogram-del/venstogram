@@ -151,6 +151,12 @@ async def security_and_alias_middleware(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
+    # Ensure frontend files are never cached stale by Telegram WebApp webview
+    if path.startswith("/app") or path.endswith(".js") or path.endswith(".html"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+
     return response
 
 # Ensure uploads directory exists
@@ -180,7 +186,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from datetime import datetime, timezone
 
 server_start_time = datetime.now(timezone.utc).isoformat()
-BOT_VERSION = "v1.4.0-dark-theme-deletion-fix"
+BOT_VERSION = "v1.5.0-cities-marketplace-director-reserve"
 
 @app.get("/health")
 @app.get("/api/health")

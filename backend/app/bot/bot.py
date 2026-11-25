@@ -415,6 +415,50 @@ if dp is not None:
             parse_mode=ParseMode.HTML
         )
 
+    @dp.message(Command("reserved"))
+    async def cmd_reserved(message: types.Message):
+        """Displays Director's reserved usernames and status."""
+        tg_id = message.from_user.id
+        if tg_id != 1477103854 and tg_id not in settings.ADMIN_TELEGRAM_IDS:
+            await message.answer("⛔ Доступ разрешен только Директору платформы.")
+            return
+
+        from app.database.session import AsyncSessionLocal
+        from app.models.entities import User
+        from sqlalchemy import select, func
+
+        reserved_list = [
+            "sherzodbek",
+            "kamolov",
+            "abdulazizbek",
+            "habibahon",
+            "sohibahon",
+            "shodmonoy",
+            "abdullohbek"
+        ]
+
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(User).where(func.lower(User.username).in_(reserved_list)))
+            users_by_name = {u.username.lower(): u for u in res.scalars().all()}
+
+        lines = []
+        for name in reserved_list:
+            holder = users_by_name.get(name)
+            if holder:
+                lines.append(f"• <b>@{name}</b> — 🎁 Вручен: {holder.first_name} (ID: <code>{holder.id}</code>, TG: <code>{holder.telegram_id}</code>)")
+            else:
+                lines.append(f"• <b>@{name}</b> — 🔒 <i>В резерве Директора (готов к подарку)</i>")
+
+        reply_text = (
+            "👑 <b>ЗАКРЫТЫЙ РЕЗЕРВ НИКНЕЙМОВ ДИРЕКТОРА</b>\n\n"
+            "Эти имена <b>не продаются</b> в общем маркетплейсе и закреплены за вами. Вы можете подарить любое из них бесплатно в любой момент:\n\n"
+            + "\n".join(lines) + "\n\n"
+            "<b>Как подарить через бота:</b>\n"
+            "<code>/grant &lt;никнейм&gt; &lt;ID или @юзер&gt;</code>\n"
+            "<i>Пример: <code>/grant sherzodbek 1477103854</code></i>"
+        )
+        await message.answer(reply_text, parse_mode=ParseMode.HTML)
+
     @dp.message(Command("help"))
     async def cmd_help(message: types.Message):
         await message.answer(
