@@ -250,7 +250,6 @@ async def seed_demo_data():
 
         # 4. Seed initial Posts and Reels so feed and reels are never empty
         from app.models.entities import Post, Reel
-        from sqlalchemy import func
         post_count = (await session.execute(select(func.count(Post.id)))).scalar() or 0
         if post_count == 0:
             p1 = Post(
