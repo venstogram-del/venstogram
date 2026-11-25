@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
 import random
 import re
@@ -12,7 +13,7 @@ from app.schemas.all_schemas import (
     EmailRegisterRequest, EmailVerifyCodeRequest, EmailLoginRequest,
     ForgotPasswordRequest, ResetPasswordRequest
 )
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_user_optional
 from app.core.config import settings
 from app.core.email import send_verification_email
 
@@ -313,18 +314,109 @@ async def update_profile(
 # Email Registration, SMS/Email Code Verification & Password Recovery
 # ============================================================================
 
+@router.post("/send-verification")
+async def send_verification(
+    req: dict,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Sends a 6-digit confirmation code to email.
+    If called by an authenticated user (e.g. from RegistrationModal in WebApp),
+    links the pending verification directly to their current account so NO phantom
+    virtual accounts are spawned.
+    """
+    raw_email = req.get("email", "")
+    clean_email = str(raw_email).lower().strip()
+    if not clean_email or "@" not in clean_email:
+        raise HTTPException(status_code=400, detail="To'g'ri email manzilini kiriting / Укажите корректный email.")
+
+    # Check if another verified user already has this email
+    chk_res = await db.execute(select(User).where(User.email == clean_email, User.is_email_verified == True))
+    other_verified = chk_res.scalars().first()
+    if other_verified and (not current_user or other_verified.id != current_user.id):
+        raise HTTPException(
+            status_code=400,
+            detail="Ushbu email bilan boshqa foydalanuvchi ro'yxatdan o'tgan / Пользователь с таким Email уже зарегистрирован."
+        )
+
+    code = f"{random.randint(100000, 999999)}"
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    now = datetime.now(timezone.utc)
+
+    # Send verification email FIRST
+    email_sent, email_err = await send_verification_email(
+        to_email=clean_email,
+        code=code,
+        username=current_user.username if current_user else req.get("username", "foydalanuvchi"),
+        purpose="registration"
+    )
+
+    if not email_sent:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Emailga tasdiqlash kodi yuborilmadi: {email_err}. Iltimos, pochtangiz to'g'riligini tekshiring."
+        )
+
+    if current_user:
+        current_user.email = clean_email
+        current_user.email_verification_code = code
+        current_user.email_code_expires_at = expires_at
+        current_user.is_email_verified = False
+        await db.commit()
+    else:
+        # Check existing unverified user by email
+        res_email = await db.execute(select(User).where(User.email == clean_email))
+        user = res_email.scalars().first()
+        if user:
+            user.email_verification_code = code
+            user.email_code_expires_at = expires_at
+        else:
+            virtual_tg_id = random.randint(9000000000, 9999999999)
+            user = User(
+                telegram_id=virtual_tg_id,
+                email=clean_email,
+                username=req.get("username", f"u_{int(now.timestamp())}").lower().strip().replace("@", "")[:32],
+                first_name=req.get("first_name", "User"),
+                last_name=req.get("last_name", ""),
+                birth_year=req.get("birth_year", 2000),
+                password_hash=hash_password(req.get("password", "VenstoPassword2026!")),
+                role="user",
+                wallet_coins=0,
+                email_verification_code=code,
+                email_code_expires_at=expires_at,
+                is_email_verified=False,
+                is_registered=False,
+                created_at=now,
+                last_active=now
+            )
+            db.add(user)
+        await db.commit()
+
+    return {
+        "status": "code_sent",
+        "email": clean_email,
+        "message": f"Tasdiqlash kodi {clean_email} pochtasiga yuborildi. Kod 15 daqiqa amal qiladi.",
+        "email_delivered": True
+    }
+
+
 @router.post("/register-email")
 @router.post("/send-code")
 @router.post("/email-code")
-async def register_email(req: EmailRegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register_email(
+    req: EmailRegisterRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
     """
     Step 1 of Email Registration:
-    Validates username availability (free & not in reserved list),
-    checks email uniqueness, stores details, and generates a 6-digit confirmation code.
+    Validates username availability, checks email uniqueness, sends 6-digit confirmation code.
+    If user already authenticated in WebApp, delegates safely without spawning ghost account.
     """
     clean_username = req.username.lower().strip().replace("@", "")
     if len(clean_username) < 3:
-        raise HTTPException(status_code=400, detail="Никнейм должен содержать минимум 3 символа.")
+        raise HTTPException(status_code=400, detail="Nikneym kamida 3 ta belgidan iborat bo'lishi kerak / Никнейм должен содержать минимум 3 символа.")
 
     # 1. Check if username is in reserved marketplace listings
     res_listing = await db.execute(
@@ -333,26 +425,32 @@ async def register_email(req: EmailRegisterRequest, db: AsyncSession = Depends(g
     if res_listing.scalars().first():
         raise HTTPException(
             status_code=400,
-            detail=f"Никнейм @{clean_username} зарезервирован платформой Venstogram и продается в Маркетплейсе за $500! Пожалуйста, придумайте свободный никнейм."
+            detail=f"@{clean_username} nikneymi Venstogram platformasida zaxiraga olingan va Marketpleysda sotiladi! / Никнейм @{clean_username} зарезервирован платформой Venstogram."
         )
 
-    # 2. Check if username is already taken by another user
-    res_user = await db.execute(select(User).where(User.username == clean_username))
-    existing_user_by_name = res_user.scalars().first()
-    if existing_user_by_name:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Никнейм @{clean_username} уже занят. Выберите другой никнейм."
-        )
-
-    # 3. Check if email is already in use
     clean_email = req.email.lower().strip()
-    res_email = await db.execute(select(User).where(User.email == clean_email))
-    existing_by_email = res_email.scalars().first()
-    if existing_by_email and existing_by_email.is_email_verified:
+
+    # 2. Check if username is already taken by another active/verified user
+    res_user = await db.execute(
+        select(User).where(
+            User.username == clean_username,
+            or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+        )
+    )
+    existing_user_by_name = res_user.scalars().first()
+    if existing_user_by_name and (not current_user or existing_user_by_name.id != current_user.id):
         raise HTTPException(
             status_code=400,
-            detail="Пользователь с таким Email уже зарегистрирован. Войдите через форму входа."
+            detail=f"@{clean_username} nikneymi allaqachon band. Boshqa nikneym tanlang / Никнейм @{clean_username} уже занят."
+        )
+
+    # 3. Check if email is already in use by a verified user
+    res_email = await db.execute(select(User).where(User.email == clean_email, User.is_email_verified == True))
+    existing_by_email = res_email.scalars().first()
+    if existing_by_email and (not current_user or existing_by_email.id != current_user.id):
+        raise HTTPException(
+            status_code=400,
+            detail="Ushbu Email bilan allaqachon ro'yxatdan o'tilgan. Kirish oynasi orqali kiring / Пользователь с таким Email уже зарегистрирован."
         )
 
     # 4. Generate 6-digit verification code
@@ -360,45 +458,7 @@ async def register_email(req: EmailRegisterRequest, db: AsyncSession = Depends(g
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
     now = datetime.now(timezone.utc)
 
-    if existing_by_email:
-        # Update existing unverified user
-        user = existing_by_email
-        user.username = clean_username
-        user.password_hash = hash_password(req.password)
-        user.first_name = req.first_name
-        user.last_name = req.last_name or ""
-        user.middle_name = req.middle_name or ""
-        user.birth_year = req.birth_year
-        user.birth_date = req.birth_date or (str(req.birth_year) if req.birth_year else "")
-        user.gender = req.gender or "Мужской"
-        user.email_verification_code = code
-        user.email_code_expires_at = expires_at
-    else:
-        # Create new user staged for verification
-        virtual_tg_id = random.randint(9000000000, 9999999999)
-        user = User(
-            telegram_id=virtual_tg_id,
-            email=clean_email,
-            password_hash=hash_password(req.password),
-            username=clean_username,
-            first_name=req.first_name,
-            last_name=req.last_name or "",
-            middle_name=req.middle_name or "",
-            birth_year=req.birth_year,
-            birth_date=req.birth_date or (str(req.birth_year) if req.birth_year else ""),
-            gender=req.gender or "Мужской",
-            role="user",
-            wallet_coins=0, # No free coins for regular users
-            email_verification_code=code,
-            email_code_expires_at=expires_at,
-            is_email_verified=False,
-            created_at=now,
-            last_active=now
-        )
-        db.add(user)
-
-    await db.commit()
-    
+    # 5. Send verification email BEFORE committing to avoid phantom accounts on failure
     email_sent, email_err = await send_verification_email(
         to_email=clean_email,
         code=code,
@@ -406,60 +466,111 @@ async def register_email(req: EmailRegisterRequest, db: AsyncSession = Depends(g
         purpose="registration"
     )
 
-    # Optional Telegram bot instant delivery if user has a real Telegram account
-    if user.telegram_id and user.telegram_id < 9000000000:
-        try:
-            from app.bot.bot import send_bot_push_notification
-            await send_bot_push_notification(
-                telegram_id=user.telegram_id,
-                text=f"🔐 <b>Код подтверждения Venstogram</b>: <code>{code}</code>\n\nКод отправлен на почту: {clean_email}.",
-                button_text="Подтвердить",
-                start_param="verify_email"
-            )
-        except Exception:
-            pass
+    if not email_sent:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Emailga tasdiqlash kodi yuborilmadi: {email_err}. Iltimos, emailingizni to'g'ri kiritganingizni tekshiring."
+        )
 
-    msg_text = f"Код подтверждения отправлен на почту {clean_email}." if email_sent else (
-        f"Код сгенерирован: {code}. (Для реальной отправки укажите данные SMTP в файле .env)"
-        if settings.DEBUG else f"Код отправлен на адрес {clean_email}."
-    )
+    # If current Telegram/authenticated user is completing registration:
+    if current_user:
+        current_user.email = clean_email
+        current_user.username = clean_username
+        current_user.email_verification_code = code
+        current_user.email_code_expires_at = expires_at
+        current_user.is_email_verified = False
+        await db.commit()
+    else:
+        # Check existing unverified user by email
+        res_unverified = await db.execute(select(User).where(User.email == clean_email))
+        unverified_user = res_unverified.scalars().first()
+
+        if unverified_user:
+            user = unverified_user
+            user.username = clean_username
+            user.password_hash = hash_password(req.password)
+            user.first_name = req.first_name
+            user.last_name = req.last_name or ""
+            user.middle_name = req.middle_name or ""
+            user.birth_year = req.birth_year
+            user.birth_date = req.birth_date or (str(req.birth_year) if req.birth_year else "")
+            user.gender = req.gender or "Мужской"
+            user.email_verification_code = code
+            user.email_code_expires_at = expires_at
+            user.is_email_verified = False
+            user.is_registered = False
+        else:
+            virtual_tg_id = random.randint(9000000000, 9999999999)
+            user = User(
+                telegram_id=virtual_tg_id,
+                email=clean_email,
+                password_hash=hash_password(req.password),
+                username=clean_username,
+                first_name=req.first_name,
+                last_name=req.last_name or "",
+                middle_name=req.middle_name or "",
+                birth_year=req.birth_year,
+                birth_date=req.birth_date or (str(req.birth_year) if req.birth_year else ""),
+                gender=req.gender or "Мужской",
+                role="user",
+                wallet_coins=0,
+                email_verification_code=code,
+                email_code_expires_at=expires_at,
+                is_email_verified=False,
+                is_registered=False,
+                created_at=now,
+                last_active=now
+            )
+            db.add(user)
+
+        await db.commit()
 
     return {
         "status": "code_sent",
         "email": clean_email,
         "from_email": settings.EMAILS_FROM_EMAIL or settings.OFFICIAL_EMAIL,
-        "message": msg_text,
-        "email_delivered": email_sent,
-        "debug_code": code if (settings.DEBUG or not email_sent) else None
+        "message": f"Tasdiqlash kodi {clean_email} pochtasiga yuborildi. Kod 15 daqiqa amal qiladi.",
+        "email_delivered": True,
+        "debug_code": code if settings.DEBUG else None
     }
 
 
 @router.post("/verify-email-code", response_model=AuthResponse)
 @router.post("/verify-code", response_model=AuthResponse)
-async def verify_email_code(req: EmailVerifyCodeRequest, db: AsyncSession = Depends(get_db)):
+async def verify_email_code(
+    req: EmailVerifyCodeRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
     """
     Step 2 of Email Registration:
-    Validates the 6-digit confirmation code and logs the user in.
+    Validates the 6-digit confirmation code and activates the account.
     """
     clean_email = req.email.lower().strip()
-    res = await db.execute(select(User).where(User.email == clean_email))
-    user = res.scalars().first()
+    user = None
+
+    if current_user and current_user.email and current_user.email.lower() == clean_email:
+        user = current_user
+    else:
+        res = await db.execute(select(User).where(User.email == clean_email))
+        user = res.scalars().first()
 
     if not user:
-        raise HTTPException(status_code=404, detail="Пользователь с таким Email не найден.")
+        raise HTTPException(status_code=404, detail="Ushbu Email bilan foydalanuvchi topilmadi / Пользователь с таким Email не найден.")
 
-    if not user.email_verification_code or user.email_verification_code != req.code.strip():
-        raise HTTPException(status_code=400, detail="Неверный код подтверждения из письма.")
+    if not user.email_verification_code or user.email_verification_code.strip() != req.code.strip():
+        raise HTTPException(status_code=400, detail="Xatdagi tasdiqlash kodi noto'g'ri / Неверный код подтверждения из письма.")
 
     # Check expiration
     if user.email_code_expires_at:
         now = datetime.now(timezone.utc)
         expires = user.email_code_expires_at.replace(tzinfo=timezone.utc) if user.email_code_expires_at.tzinfo is None else user.email_code_expires_at
         if now > expires:
-            raise HTTPException(status_code=400, detail="Срок действия кода истек. Запросите новый код.")
+            raise HTTPException(status_code=400, detail="Kod amal qilish muddati tugagan. Yangi kod so'rang / Срок действия кода истек.")
 
     # Activate user
     user.is_email_verified = True
+    user.is_registered = True
     user.email_verification_code = None
     user.email_code_expires_at = None
     await db.commit()
@@ -484,7 +595,7 @@ async def verify_email_code(req: EmailVerifyCodeRequest, db: AsyncSession = Depe
             "is_verified": user.is_verified,
             "birth_year": user.birth_year,
             "birth_date": user.birth_date,
-            "is_registered": bool(user.is_registered or user.birth_year or (user.username and not user.username.startswith("user_"))),
+            "is_registered": True,
             "wallet_coins": user.wallet_coins,
             "wallet_uzs": user.wallet_uzs,
             "language_code": user.language_code

@@ -117,7 +117,7 @@ if dp is not None:
                             last_name=message.from_user.last_name or "",
                             language_code=message.from_user.language_code or "ru",
                             wallet_coins=100000 if is_admin else 0,
-                            referred_by_id=referrer_user.id if referrer_user and referrer_user.id != tg_id else None,
+                            referred_by_id=referrer_user.id if referrer_user and referrer_user.telegram_id != tg_id else None,
                             referral_code=f"ref_{tg_id}",
                             is_registered=True if is_admin else False
                         )
@@ -126,7 +126,7 @@ if dp is not None:
                             await session.commit()
                         except Exception:
                             await session.rollback()
-                    elif referrer_user and not user.referred_by_id and referrer_user.id != user.id:
+                    elif referrer_user and not user.referred_by_id and referrer_user.id != user.id and referrer_user.telegram_id != tg_id:
                         user.referred_by_id = referrer_user.id
                         try:
                             await session.commit()

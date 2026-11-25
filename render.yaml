@@ -33,7 +33,7 @@ services:
       - key: SMTP_USER
         value: venstogram@gmail.com
       - key: SMTP_PASSWORD
-        sync: false
+        value: puqbadqkgkbshauz
       - key: SMTP_USE_SSL
         value: "True"
       - key: SMTP_USE_TLS

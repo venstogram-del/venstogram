@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     # SMTP Configuration for sending email verification codes
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "465"))
-    SMTP_USER: str = os.getenv("SMTP_USER", "")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_USER: str = os.getenv("SMTP_USER", "venstogram@gmail.com")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "puqbadqkgkbshauz")
     SMTP_USE_SSL: bool = os.getenv("SMTP_USE_SSL", "True").lower() in ("true", "1", "t")
     SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "False").lower() in ("true", "1", "t")
     

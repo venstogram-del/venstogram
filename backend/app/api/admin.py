@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, or_
 from typing import Optional
 import os, sys, psutil, platform
 from datetime import datetime, timezone, timedelta
@@ -43,7 +43,8 @@ async def get_admin_overview(
     """
     Returns consolidated platform metrics depending on admin role.
     """
-    users_count = (await db.execute(select(func.count(User.id)))).scalar() or 0
+    active_filter = or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+    users_count = (await db.execute(select(func.count(User.id)).where(active_filter))).scalar() or 0
     posts_count = (await db.execute(select(func.count(Post.id)))).scalar() or 0
     reels_count = (await db.execute(select(func.count(Reel.id)))).scalar() or 0
     battles_count = (await db.execute(select(func.count(LiveBattle.id)))).scalar() or 0
@@ -59,10 +60,10 @@ async def get_admin_overview(
     # Visitor and Activity Statistics (Сколько человек зашло)
     now = datetime.now(timezone.utc)
     today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
-    users_today = (await db.execute(select(func.count(User.id)).where(User.last_active >= today_start))).scalar() or 0
-    new_users_today = (await db.execute(select(func.count(User.id)).where(User.created_at >= today_start))).scalar() or 0
+    users_today = (await db.execute(select(func.count(User.id)).where(User.last_active >= today_start, active_filter))).scalar() or 0
+    new_users_today = (await db.execute(select(func.count(User.id)).where(User.created_at >= today_start, active_filter))).scalar() or 0
     recent_15m = now - timedelta(minutes=15)
-    online_count = (await db.execute(select(func.count(User.id)).where(User.last_active >= recent_15m))).scalar() or 0
+    online_count = (await db.execute(select(func.count(User.id)).where(User.last_active >= recent_15m, active_filter))).scalar() or 0
 
     from app.websocket.manager import ws_manager
     ws_count = len(ws_manager.active_user_connections)

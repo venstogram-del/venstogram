@@ -23,6 +23,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
   const [ads, setAds] = useState([]);
   const [selectedStatsPost, setSelectedStatsPost] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [suggestedUsers, setSuggestedUsers] = useState([]);
   const commentInputRef = useRef(null);
 
   useEffect(() => {
@@ -31,7 +32,28 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
         if (Array.isArray(data)) setAds(data);
       })
       .catch((err) => console.log("Failed to load active ads:", err));
+
+    Api.get("/users/suggested")
+      .then((data) => {
+        if (Array.isArray(data)) setSuggestedUsers(data);
+      })
+      .catch(() => {});
   }, []);
+
+  const handleFollowSuggested = async (author) => {
+    triggerHaptic("medium");
+    try {
+      const res = await Api.post(`/users/${author.id}/follow`, {});
+      setSuggestedUsers((prev) =>
+        prev.map((u) => (u.id === author.id ? { ...u, is_following: res.is_following } : u))
+      );
+      if (res?.is_following) {
+        alert(`✓ Obuna bo'lindi: @${author.username}`);
+      }
+    } catch (err) {
+      alert(err.message || "Xatolik yuz berdi");
+    }
+  };
 
   const handleAdClick = (ad) => {
     triggerHaptic("medium");
@@ -420,49 +442,57 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
           </div>
 
           {/* Suggested Bloggers */}
-          <div className="space-y-2 pt-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-pink-400 block">
-              Tavsiya etilgan mualliflar / Рекомендованные авторы:
-            </span>
-            <div className="flex flex-col space-y-2">
-              {[
-                { id: 5, username: "oqyolai", name: "Abdulazizbek (Oснователь)", is_verified: true, badge: "👑" },
-                { id: 2, username: "tashkent_live", name: "Toshkent Yangiliklari", is_verified: true },
-                { id: 3, username: "samarkand_vibes", name: "Samarqand Sayyohlik", is_verified: true }
-              ].map((author) => (
-                <div
-                  key={author.id}
-                  className="flex items-center justify-between p-2.5 bg-slate-950/80 rounded-2xl border border-slate-800"
-                >
-                  <div
-                    onClick={() => onOpenProfile && onOpenProfile(author.id)}
-                    className="flex items-center space-x-2.5 cursor-pointer text-left"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-amber-500 flex items-center justify-center text-white font-bold text-sm">
-                      {author.badge || author.name[0]}
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-1">
-                        <span className="text-xs font-bold text-white">{author.name}</span>
-                        {author.is_verified && <span className="text-sky-400 text-[10px]">✓</span>}
+          {suggestedUsers && suggestedUsers.filter((u) => u.id !== user?.id).length > 0 && (
+            <div className="space-y-2 pt-2 text-left">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-pink-400 block px-1">
+                Tavsiya etilgan mualliflar / Рекомендованные авторы:
+              </span>
+              <div className="flex flex-col space-y-2">
+                {suggestedUsers
+                  .filter((author) => author.id !== user?.id)
+                  .map((author) => (
+                    <div
+                      key={author.id}
+                      className="flex items-center justify-between p-2.5 bg-slate-950/80 rounded-2xl border border-slate-800"
+                    >
+                      <div
+                        onClick={() => onOpenProfile && onOpenProfile(author.id)}
+                        className="flex items-center space-x-2.5 cursor-pointer text-left min-w-0"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-amber-500 flex items-center justify-center text-white font-bold text-sm overflow-hidden flex-shrink-0">
+                          {author.avatar_url ? (
+                            <img src={author.avatar_url} className="w-full h-full object-cover" />
+                          ) : (
+                            (author.first_name?.[0] || author.username?.[0] || "V").toUpperCase()
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center space-x-1">
+                            <span className="text-xs font-bold text-white truncate">
+                              {author.name || author.first_name || author.username}
+                            </span>
+                            {author.is_verified && <span className="text-sky-400 text-[10px]">✓</span>}
+                          </div>
+                          <span className="text-[11px] text-pink-400 font-medium block truncate">
+                            @{author.username}
+                          </span>
+                        </div>
                       </div>
-                      <span className="text-[11px] text-pink-400 font-medium">@{author.username}</span>
+                      <button
+                        onClick={() => handleFollowSuggested(author)}
+                        className={`px-3 py-1.5 font-bold text-xs rounded-xl shadow-sm transition active:scale-95 flex-shrink-0 ${
+                          author.is_following
+                            ? "bg-slate-800 text-slate-300 border border-slate-700"
+                            : "bg-gradient-to-r from-pink-600 to-rose-500 text-white shadow-pink-500/20"
+                        }`}
+                      >
+                        {author.is_following ? "Obunadasiz ✓" : "+ Obuna"}
+                      </button>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      triggerHaptic("medium");
-                      Api.post(`/users/${author.id}/follow`, {}).catch(() => {});
-                      alert(`✓ Obuna bo'lindi: @${author.username}`);
-                    }}
-                    className="px-3 py-1.5 bg-gradient-to-r from-pink-600 to-rose-500 text-white font-bold text-xs rounded-xl shadow-sm active:scale-95"
-                  >
-                    + Obuna
-                  </button>
-                </div>
-              ))}
+                  ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

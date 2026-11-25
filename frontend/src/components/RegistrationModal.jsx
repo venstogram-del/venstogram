@@ -139,13 +139,12 @@ export function RegistrationModal({ user, onComplete, lang = "uz_latn", onLangua
     setErrorMsg("");
     triggerHaptic("light");
     try {
-      const res = await Api.post("/auth/send-code", {
+      const res = await Api.post("/auth/send-verification", {
         email: cleanEmail,
-        username: username.trim().toLowerCase().replace(/^@/, "") || `u_${Date.now()}`,
-        first_name: firstName.trim() || "User",
-        last_name: lastName.trim() || "",
-        password: "VenstoPassword2026!",
-        birth_year: parseInt(birthYear) || 2000
+        username: username.trim().toLowerCase().replace(/^@/, "") || (user?.username || `u_${Date.now()}`),
+        first_name: firstName.trim() || user?.first_name || "User",
+        last_name: lastName.trim() || user?.last_name || "",
+        birth_year: parseInt(birthYear) || user?.birth_year || 2000
       });
       setCodeSent(true);
       setCodeTimer(60);

@@ -52,8 +52,11 @@ async def check_username(
             "suggestions": [f"{cleaned}1", f"{cleaned}2", f"{cleaned}_1", f"{cleaned}77"]
         }
 
-    # Check users table
-    u_stmt = select(User.id).where(func.lower(User.username) == cleaned)
+    # Check users table (only active/verified accounts take usernames)
+    u_stmt = select(User.id).where(
+        func.lower(User.username) == cleaned,
+        or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+    )
     if current_user:
         u_stmt = u_stmt.where(User.id != current_user.id)
     u_res = await db.execute(u_stmt)
@@ -108,7 +111,10 @@ async def search_users(
     """
     Search users by @username, first name, last name, or bio (Лупа / поиск друзей).
     """
-    query = select(User).where(User.is_banned == False)
+    query = select(User).where(
+        User.is_banned == False,
+        or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+    )
     raw_q = q.strip()
     if raw_q:
         clean_q = raw_q.lower().lstrip("@")
@@ -168,8 +174,8 @@ async def get_user_public_profile(
 ):
     res = await db.execute(select(User).where(User.id == user_id))
     u = res.scalars().first()
-    if not u:
-        raise HTTPException(status_code=404, detail="User not found")
+    if not u or (u.telegram_id >= 9000000000 and not u.is_email_verified):
+        raise HTTPException(status_code=404, detail="Profil topilmadi yoki tasdiqlanmagan / Пользователь не найден")
 
     posts_count = (await db.execute(select(func.count(Post.id)).where(Post.user_id == u.id))).scalar() or 0
     reels_count = (await db.execute(select(func.count(Reel.id)).where(Reel.user_id == u.id))).scalar() or 0
@@ -312,6 +318,56 @@ async def get_user_reels_full(
     ]
 
 
+@router.get("/suggested")
+async def get_suggested_users(
+    limit: int = 8,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Returns verified & active users to follow, excluding current user and already followed users.
+    """
+    cur_id = current_user.id if current_user else 0
+    
+    # IDs already followed + self
+    excluded_ids = set()
+    if cur_id:
+        excluded_ids.add(cur_id)
+        f_res = await db.execute(select(Follow.following_id).where(Follow.follower_id == cur_id))
+        excluded_ids.update(f_res.scalars().all())
+    
+    stmt = (
+        select(User)
+        .where(
+            User.id.notin_(list(excluded_ids) if excluded_ids else [0]),
+            User.is_banned == False,
+            or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+        )
+        .order_by(User.is_verified.desc(), User.last_active.desc())
+        .limit(limit)
+    )
+    res = await db.execute(stmt)
+    users = res.scalars().all()
+    
+    output = []
+    for u in users:
+        f_count = (await db.execute(select(func.count(Follow.id)).where(Follow.following_id == u.id))).scalar() or 0
+        output.append({
+            "id": u.id,
+            "username": u.username or f"user_{u.id}",
+            "name": f"{u.first_name} {u.last_name or ''}".strip() or u.username or "Vensto User",
+            "first_name": u.first_name,
+            "last_name": u.last_name,
+            "avatar_url": u.avatar_url,
+            "is_verified": u.is_verified,
+            "badge_type": getattr(u, "badge_type", "blue"),
+            "followers_count": f_count,
+            "is_following": False,
+            "is_me": False
+        })
+    return output
+
+
 @router.post("/{user_id}/follow")
 async def toggle_follow(
     user_id: int,
@@ -319,7 +375,12 @@ async def toggle_follow(
     db: AsyncSession = Depends(get_db)
 ):
     if user_id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot follow yourself")
+        raise HTTPException(status_code=400, detail="O'zingizga obuna bo'la olmaysiz / Cannot follow yourself")
+
+    target_res = await db.execute(select(User).where(User.id == user_id))
+    target_u = target_res.scalars().first()
+    if not target_u or (target_u.telegram_id >= 9000000000 and not target_u.is_email_verified):
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi yoki tasdiqlanmagan / Пользователь не найден")
 
     res = await db.execute(
         select(Follow).where(Follow.follower_id == current_user.id, Follow.following_id == user_id)
@@ -347,7 +408,10 @@ async def get_user_followers(
     stmt = (
         select(User)
         .join(Follow, Follow.follower_id == User.id)
-        .where(Follow.following_id == user_id)
+        .where(
+            Follow.following_id == user_id,
+            or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+        )
         .limit(100)
     )
     res = await db.execute(stmt)
@@ -383,7 +447,10 @@ async def get_user_following(
     stmt = (
         select(User)
         .join(Follow, Follow.following_id == User.id)
-        .where(Follow.follower_id == user_id)
+        .where(
+            Follow.follower_id == user_id,
+            or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+        )
         .limit(100)
     )
     res = await db.execute(stmt)
