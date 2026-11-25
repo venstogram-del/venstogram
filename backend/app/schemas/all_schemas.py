@@ -63,6 +63,8 @@ class UserProfileUpdate(BaseModel):
     is_incognito: Optional[bool] = None
     is_private: Optional[bool] = None
     profile_theme: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
 
 class GiftThemeRequest(BaseModel):
     user_id: int

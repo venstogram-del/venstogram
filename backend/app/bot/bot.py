@@ -71,70 +71,108 @@ async def send_bot_push_notification(
         return False
 
 
-if dp is not None:
-    @dp.message(CommandStart())
-    async def cmd_start(message: types.Message):
+_known_telegram_ids: set[int] = set()
+_db_semaphore = asyncio.Semaphore(15)
+
+async def init_bot_cache():
+    """Pre-loads known telegram user IDs into memory for sub-millisecond bot response times under massive load."""
+    try:
+        from app.database.session import AsyncSessionLocal
+        from app.models.entities import User
+        from sqlalchemy import select
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(User.telegram_id).where(User.telegram_id.is_not(None)))
+            ids = res.scalars().all()
+            _known_telegram_ids.update(ids)
+            print(f"[Bot Cache] Pre-warmed {len(_known_telegram_ids)} known telegram IDs in memory.")
+    except Exception as e:
+        print(f"[Bot Cache Warning] {e}")
+
+async def _process_user_start(tg_id: int, username: Optional[str], first_name: str, last_name: str, language_code: str, start_param: str, is_admin: bool):
+    """Asynchronous background worker: non-blocking DB user and referral sync with concurrency control."""
+    if tg_id in _known_telegram_ids and not start_param.startswith("ref_"):
+        return
+
+    async with _db_semaphore:
         try:
             from app.database.session import AsyncSessionLocal
             from app.models.entities import User
             from sqlalchemy import select
 
+            async with AsyncSessionLocal() as session:
+                res = await session.execute(select(User).where(User.telegram_id == tg_id))
+                user = res.scalars().first()
+
+                referrer_user = None
+                if start_param.startswith("ref_"):
+                    ref_val = start_param[4:].strip()
+                    if ref_val.isdigit():
+                        ref_int = int(ref_val)
+                        ref_res = await session.execute(
+                            select(User).where((User.id == ref_int) | (User.telegram_id == ref_int))
+                        )
+                        referrer_user = ref_res.scalars().first()
+
+                if not user:
+                    base_username = username or f"user_{tg_id}"
+                    existing_u = (await session.execute(select(User.id).where(User.username == base_username))).scalars().first()
+                    final_username = f"user_{tg_id}" if existing_u else base_username
+
+                    user = User(
+                        telegram_id=tg_id,
+                        username=final_username,
+                        first_name=first_name or "",
+                        last_name=last_name or "",
+                        language_code=language_code or "ru",
+                        wallet_coins=100000 if is_admin else 0,
+                        referred_by_id=referrer_user.id if referrer_user and referrer_user.telegram_id != tg_id else None,
+                        referral_code=f"ref_{tg_id}",
+                        is_registered=True if is_admin else False
+                    )
+                    session.add(user)
+                    try:
+                        await session.commit()
+                        _known_telegram_ids.add(tg_id)
+                    except Exception:
+                        await session.rollback()
+                else:
+                    _known_telegram_ids.add(tg_id)
+                    if referrer_user and not user.referred_by_id and referrer_user.id != user.id and referrer_user.telegram_id != tg_id:
+                        user.referred_by_id = referrer_user.id
+                        try:
+                            await session.commit()
+                        except Exception:
+                            await session.rollback()
+        except Exception as err:
+            if settings.DEBUG:
+                print(f"[Bot Background User Start Error] {err}")
+
+if dp is not None:
+    @dp.message(CommandStart())
+    async def cmd_start(message: types.Message):
+        try:
             # Extract deep link payload (e.g. ref_123, post_45, battle_10)
-            command_args = message.text.split(maxsplit=1)
+            command_args = (message.text or "").split(maxsplit=1)
             start_param = command_args[1] if len(command_args) > 1 else ""
 
             user_name = message.from_user.first_name or "друг"
             tg_id = message.from_user.id
             is_admin = tg_id in settings.ADMIN_TELEGRAM_IDS
 
-            # Check and register / update user and referrals safely under heavy concurrent traffic
-            referrer_user = None
-            try:
-                async with AsyncSessionLocal() as session:
-                    res = await session.execute(select(User).where(User.telegram_id == tg_id))
-                    user = res.scalars().first()
+            # 1. Non-blocking background persistence queue
+            asyncio.create_task(
+                _process_user_start(
+                    tg_id=tg_id,
+                    username=message.from_user.username,
+                    first_name=message.from_user.first_name or "",
+                    last_name=message.from_user.last_name or "",
+                    language_code=message.from_user.language_code or "ru",
+                    start_param=start_param,
+                    is_admin=is_admin
+                )
+            )
 
-                    # Handle referral link e.g. ref_1477103854 or ref_5
-                    if start_param.startswith("ref_"):
-                        ref_val = start_param[4:].strip()
-                        if ref_val.isdigit():
-                            ref_int = int(ref_val)
-                            ref_res = await session.execute(
-                                select(User).where((User.id == ref_int) | (User.telegram_id == ref_int))
-                            )
-                            referrer_user = ref_res.scalars().first()
-
-                    if not user:
-                        base_username = message.from_user.username or f"user_{tg_id}"
-                        # Check collision if another user has this username
-                        existing_u = (await session.execute(select(User.id).where(User.username == base_username))).scalars().first()
-                        final_username = f"user_{tg_id}" if existing_u else base_username
-
-                        user = User(
-                            telegram_id=tg_id,
-                            username=final_username,
-                            first_name=message.from_user.first_name or "",
-                            last_name=message.from_user.last_name or "",
-                            language_code=message.from_user.language_code or "ru",
-                            wallet_coins=100000 if is_admin else 0,
-                            referred_by_id=referrer_user.id if referrer_user and referrer_user.telegram_id != tg_id else None,
-                            referral_code=f"ref_{tg_id}",
-                            is_registered=True if is_admin else False
-                        )
-                        session.add(user)
-                        try:
-                            await session.commit()
-                        except Exception:
-                            await session.rollback()
-                    elif referrer_user and not user.referred_by_id and referrer_user.id != user.id and referrer_user.telegram_id != tg_id:
-                        user.referred_by_id = referrer_user.id
-                        try:
-                            await session.commit()
-                        except Exception:
-                            await session.rollback()
-            except Exception as db_err:
-                print(f"[Bot cmd_start safe DB handler] {db_err}")
-            
+            # 2. Instant greeting response (< 2ms) without waiting for database
             greeting = (
                 "👋 <b>Добро пожаловать в Venstogram</b> — первая социальная сеть и медиаэкосистема нового поколения."
             )
@@ -152,7 +190,10 @@ if dp is not None:
                 )
         except Exception as e:
             print(f"[Bot cmd_start Error] {e}")
-            await message.answer(f"Привет, {message.from_user.first_name}! Venstogram активен.")
+            try:
+                await message.answer(f"Привет, {message.from_user.first_name}! Venstogram активен.")
+            except Exception:
+                pass
 
     @dp.message(Command("quest"))
     async def cmd_quest(message: types.Message):

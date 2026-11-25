@@ -93,7 +93,7 @@ const regTexts = {
   }
 };
 
-export function RegistrationModal({ user, onComplete, lang = "uz_latn", onLanguageChange }) {
+export function RegistrationModal({ user, onComplete, onOpenEmailAuth, lang = "uz_latn", onLanguageChange }) {
   const [currentLang, setCurrentLang] = useState(lang || "uz_latn");
   const tr = regTexts[currentLang] || regTexts.uz_latn;
 
@@ -101,6 +101,7 @@ export function RegistrationModal({ user, onComplete, lang = "uz_latn", onLangua
   const [lastName, setLastName] = useState(user?.last_name || "");
   const [birthYear, setBirthYear] = useState(user?.birth_year || "");
   const [email, setEmail] = useState(user?.email || "");
+  const [password, setPassword] = useState("");
   const [emailCode, setEmailCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
@@ -255,6 +256,9 @@ export function RegistrationModal({ user, onComplete, lang = "uz_latn", onLangua
       };
       if (email.trim()) {
         patchData.email = email.trim().toLowerCase();
+      }
+      if (password.trim()) {
+        patchData.password = password.trim();
       }
       const res = await Api.patch("/auth/me", patchData);
 
@@ -489,6 +493,20 @@ export function RegistrationModal({ user, onComplete, lang = "uz_latn", onLangua
                   />
                 </div>
               )}
+
+              {/* Password creation */}
+              <div className="pt-1">
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Придумайте пароль (для входа с любого телефона):
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Пароль для вашего аккаунта"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition"
+                />
+              </div>
             </div>
           </div>
 
@@ -512,6 +530,20 @@ export function RegistrationModal({ user, onComplete, lang = "uz_latn", onLangua
           >
             <span>{saving ? tr.submitting : tr.submitBtn}</span>
           </button>
+
+          {/* Account recovery / login link */}
+          <div className="text-center pt-2 border-t border-slate-800/60">
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic("light");
+                if (onOpenEmailAuth) onOpenEmailAuth();
+              }}
+              className="text-xs text-pink-400 hover:text-pink-300 font-bold hover:underline"
+            >
+              Уже есть аккаунт? Войти или восстановить пароль ↵
+            </button>
+          </div>
         </form>
       </div>
     </div>

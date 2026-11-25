@@ -9,7 +9,11 @@ export function Header({
   onOpenCreate,
   onOpenChat,
   onOpenNotifications,
-  unreadNotificationsCount = 0
+  unreadNotificationsCount = 0,
+  theme = "dark",
+  onToggleTheme,
+  onLogout,
+  onOpenEmailAuth
 }) {
   const [supportOpen, setSupportOpen] = useState(false);
 
@@ -50,6 +54,18 @@ export function Header({
 
       {/* Right Action Bar */}
       <div className="flex items-center space-x-2">
+        {/* Light / Dark Theme Switcher Button */}
+        <button
+          onClick={() => {
+            triggerHaptic("selection");
+            if (onToggleTheme) onToggleTheme();
+          }}
+          className="p-1.5 text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-colors shadow-sm"
+          title={theme === "light" ? "Включить темную тему" : "Включить светлую тему"}
+        >
+          <span className="text-sm block">{theme === "light" ? "🌙" : "☀️"}</span>
+        </button>
+
         {/* Fast Language Toggle */}
         <button
           onClick={() => {
@@ -149,6 +165,43 @@ export function Header({
               </button>
             </div>
 
+            {/* Theme Selector (White / Black) */}
+            <div className="space-y-2 border-b border-slate-800 pb-3">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Тема оформления / Theme
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    triggerHaptic("selection");
+                    if (theme !== "light" && onToggleTheme) onToggleTheme();
+                  }}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                    theme === "light"
+                      ? "bg-amber-400 text-slate-950 shadow-md font-black"
+                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  }`}
+                >
+                  <span>☀️</span>
+                  <span>Светлая (Белая)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    triggerHaptic("selection");
+                    if (theme !== "dark" && onToggleTheme) onToggleTheme();
+                  }}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                    theme === "dark"
+                      ? "bg-pink-600 text-white shadow-md font-black"
+                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  }`}
+                >
+                  <span>🌙</span>
+                  <span>Темная (Черная)</span>
+                </button>
+              </div>
+            </div>
+
             {/* Language Selector */}
             <div className="space-y-2 border-b border-slate-800 pb-3">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
@@ -220,6 +273,33 @@ export function Header({
               >
                 <span>💬</span>
                 <span>Написать</span>
+              </button>
+            </div>
+
+            {/* Account & Logout */}
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              <button
+                onClick={() => {
+                  triggerHaptic("medium");
+                  setSupportOpen(false);
+                  if (onOpenEmailAuth) onOpenEmailAuth();
+                }}
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-pink-400 font-bold text-xs rounded-xl flex items-center justify-center space-x-2 transition"
+              >
+                <span>🔑</span>
+                <span>Вход / Смена аккаунта по Email</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  triggerHaptic("heavy");
+                  setSupportOpen(false);
+                  if (onLogout) onLogout();
+                }}
+                className="w-full py-2 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-500/30 text-rose-400 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 transition active:scale-95"
+              >
+                <span>🚪</span>
+                <span>Выйти из профиля</span>
               </button>
             </div>
           </div>

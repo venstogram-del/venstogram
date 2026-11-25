@@ -20,6 +20,7 @@ import { RegistrationModal } from "./components/RegistrationModal.jsx";
 import { UserProfileModal } from "./components/UserProfileModal.jsx";
 import { PostModal } from "./components/PostModal.jsx";
 import { NotificationsModal } from "./components/NotificationsModal.jsx";
+import { EmailAuthModal } from "./components/EmailAuthModal.jsx";
 
 export function App() {
   const safeGetItem = (k) => { try { return localStorage.getItem(k); } catch(e) { return null; } };
@@ -34,10 +35,31 @@ export function App() {
   const [isOffline, setIsOffline] = useState(typeof navigator !== "undefined" ? !navigator.onLine : false);
   const [dataSaver, setDataSaver] = useState(safeGetItem("vensto_data_saver") === "true");
 
-  // Data states
-  const [posts, setPosts] = useState([]);
-  const [storiesGroups, setStoriesGroups] = useState([]);
-  const [reels, setReels] = useState([]);
+  // Theme state: dark / light
+  const [theme, setTheme] = useState(safeGetItem("vensto_theme") || "dark");
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      if (theme === "light") {
+        document.documentElement.classList.remove("dark");
+        document.documentElement.classList.add("light");
+        document.body.style.backgroundColor = "#ffffff";
+        document.body.style.color = "#0f172a";
+      } else {
+        document.documentElement.classList.remove("light");
+        document.documentElement.classList.add("dark");
+        document.body.style.backgroundColor = "#020617";
+        document.body.style.color = "#ffffff";
+      }
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    triggerHaptic("selection");
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    safeSetItem("vensto_theme", nextTheme);
+  };
 
   // Modals
   const [walletOpen, setWalletOpen] = useState(false);
@@ -50,6 +72,22 @@ export function App() {
   const [selectedPostModal, setSelectedPostModal] = useState(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [emailAuthOpen, setEmailAuthOpen] = useState(false);
+
+  const handleLogout = () => {
+    if (!confirm("Вы уверены, что хотите выйти из профиля?")) return;
+    triggerHaptic("heavy");
+    try {
+      localStorage.removeItem("vensto_token");
+      if (user?.id) {
+        localStorage.removeItem(`vensto_account_created_${user.id}`);
+      }
+    } catch (e) {}
+    Api.setToken("");
+    setUser(null);
+    setIsRegistered(false);
+    setEmailAuthOpen(true);
+  };
 
   // Sync unread notifications count
   useEffect(() => {
@@ -397,22 +435,37 @@ export function App() {
   // Mandatory initial registration and account creation view
   if (!isRegistered) {
     return (
-      <RegistrationModal
-        user={user}
-        lang={lang}
-        onLanguageChange={handleLanguageChange}
-        onComplete={(updatedUser) => {
-          setUser(updatedUser);
-          setIsRegistered(true);
-          safeSetItem(`vensto_account_created_${updatedUser?.id || user?.id || 1}`, "true");
-          loadAllContent();
-        }}
-      />
+      <div className={`min-h-screen ${theme === "light" ? "bg-slate-50 text-slate-900" : "bg-slate-950 text-white"}`}>
+        <RegistrationModal
+          user={user}
+          lang={lang}
+          onLanguageChange={handleLanguageChange}
+          onOpenEmailAuth={() => setEmailAuthOpen(true)}
+          onComplete={(updatedUser) => {
+            setUser(updatedUser);
+            setIsRegistered(true);
+            safeSetItem(`vensto_account_created_${updatedUser?.id || user?.id || 1}`, "true");
+            loadAllContent();
+          }}
+        />
+        {emailAuthOpen && (
+          <EmailAuthModal
+            onClose={() => setEmailAuthOpen(false)}
+            onAuthSuccess={(u) => {
+              setUser(u);
+              setIsRegistered(true);
+              safeSetItem(`vensto_account_created_${u?.id || 1}`, "true");
+              setEmailAuthOpen(false);
+              loadAllContent();
+            }}
+          />
+        )}
+      </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-sans flex flex-col select-none">
+    <div className={`min-h-screen ${theme === "light" ? "bg-slate-50 text-slate-900" : "bg-slate-950 text-white"} font-sans flex flex-col select-none`}>
       {/* Offline Alert Banner */}
       {isOffline && (
         <div className="bg-amber-600/90 text-white text-[11px] font-bold px-3 py-1 text-center sticky top-0 z-50">
@@ -425,6 +478,10 @@ export function App() {
         user={user}
         t={t}
         lang={lang}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onLogout={handleLogout}
+        onOpenEmailAuth={() => setEmailAuthOpen(true)}
         onLanguageChange={handleLanguageChange}
         onOpenCreate={() => setCreatePostOpen(true)}
         onOpenChat={() => setChatOpen(true)}
@@ -484,6 +541,10 @@ export function App() {
             user={user}
             t={t}
             lang={lang}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onLogout={handleLogout}
+            onOpenEmailAuth={() => setEmailAuthOpen(true)}
             onLanguageChange={handleLanguageChange}
             dataSaver={dataSaver}
             onToggleDataSaver={toggleDataSaver}
@@ -763,6 +824,20 @@ export function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Email Login & Password Recovery Modal */}
+      {emailAuthOpen && (
+        <EmailAuthModal
+          onClose={() => setEmailAuthOpen(false)}
+          onAuthSuccess={(u) => {
+            setUser(u);
+            setIsRegistered(true);
+            safeSetItem(`vensto_account_created_${u?.id || 1}`, "true");
+            setEmailAuthOpen(false);
+            loadAllContent();
+          }}
+        />
       )}
     </div>
   );

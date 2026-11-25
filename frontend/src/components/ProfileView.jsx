@@ -16,7 +16,11 @@ export function ProfileView({
   onToggleDataSaver,
   onOpenWallet,
   onUpdateUser,
-  onOpenProfile
+  onOpenProfile,
+  theme = "dark",
+  onToggleTheme,
+  onLogout,
+  onOpenEmailAuth
 }) {
   const [activeTab, setActiveTab] = useState("posts"); // posts, reels, saved
   const [isEditing, setIsEditing] = useState(false);
@@ -1271,6 +1275,78 @@ export function ProfileView({
                 </div>
                 <span className="text-slate-400 text-xs">Читать ↗</span>
               </div>
+            </div>
+
+            {/* Theme Selector (White / Black) */}
+            <div className="space-y-2">
+              <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider block">
+                Тема оформления (Дизайн)
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("selection");
+                    if (theme !== "light" && onToggleTheme) onToggleTheme();
+                  }}
+                  className={`p-2.5 rounded-2xl border text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                    theme === "light"
+                      ? "bg-amber-400 text-slate-950 font-black shadow-md border-amber-300"
+                      : "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700"
+                  }`}
+                >
+                  <span>☀️</span>
+                  <span>Светлая (Белая)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("selection");
+                    if (theme !== "dark" && onToggleTheme) onToggleTheme();
+                  }}
+                  className={`p-2.5 rounded-2xl border text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                    theme === "dark"
+                      ? "bg-pink-600 text-white font-black shadow-md border-pink-500"
+                      : "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700"
+                  }`}
+                >
+                  <span>🌙</span>
+                  <span>Темная (Черная)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Account & Logout */}
+            <div className="pt-1 space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic("light");
+                  setSettingsOpen(false);
+                  if (onOpenEmailAuth) {
+                    onOpenEmailAuth();
+                  } else {
+                    setEmailAuthModalOpen(true);
+                  }
+                }}
+                className="w-full py-2.5 bg-slate-950 hover:bg-slate-900 border border-pink-500/30 text-pink-400 rounded-2xl text-xs font-bold transition flex items-center justify-center space-x-1.5"
+              >
+                <span>🔑</span>
+                <span>Войти под другим логином / Email</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic("heavy");
+                  setSettingsOpen(false);
+                  if (onLogout) onLogout();
+                }}
+                className="w-full py-2.5 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-500/30 text-rose-400 font-bold text-xs rounded-2xl flex items-center justify-center space-x-1.5 transition active:scale-95"
+              >
+                <span>🚪</span>
+                <span>Выйти из профиля (Logout)</span>
+              </button>
             </div>
 
             {/* Account Info */}

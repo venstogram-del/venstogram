@@ -290,6 +290,12 @@ async def update_profile(
         current_user.is_private = req.is_private
     if req.profile_theme is not None:
         current_user.profile_theme = req.profile_theme
+    if req.email is not None:
+        clean_email = req.email.lower().strip()
+        if clean_email and "@" in clean_email:
+            current_user.email = clean_email
+    if req.password is not None and len(req.password.strip()) >= 4:
+        current_user.password_hash = hash_password(req.password.strip())
 
     await db.commit()
     await db.refresh(current_user)
@@ -610,14 +616,19 @@ async def verify_email_code(
 @router.post("/login-email", response_model=AuthResponse)
 async def login_email(req: EmailLoginRequest, db: AsyncSession = Depends(get_db)):
     """
-    Login with Email and Password.
+    Login with Email or Username and Password.
+    Allows login from any device or phone with either email or @username.
     """
-    clean_email = req.email.lower().strip()
-    res = await db.execute(select(User).where(User.email == clean_email))
+    clean_login = req.email.lower().strip().replace("@", "")
+    res = await db.execute(
+        select(User).where(
+            or_(func.lower(User.email) == clean_login, func.lower(User.username) == clean_login)
+        )
+    )
     user = res.scalars().first()
 
     if not user or not user.password_hash or not verify_password(req.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Неверный Email или пароль.")
+        raise HTTPException(status_code=401, detail="Неверный логин (Email / @username) или пароль.")
 
     token = create_access_token({"sub": str(user.telegram_id), "role": user.role})
     return {
@@ -650,14 +661,23 @@ async def login_email(req: EmailLoginRequest, db: AsyncSession = Depends(get_db)
 async def forgot_password(req: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
     """
     Generates a 6-digit recovery code for password reset.
+    Accepts either Email or Username.
     """
-    clean_email = req.email.lower().strip()
-    res = await db.execute(select(User).where(User.email == clean_email))
+    clean_target = req.email.lower().strip().replace("@", "")
+    res = await db.execute(
+        select(User).where(
+            or_(func.lower(User.email) == clean_target, func.lower(User.username) == clean_target)
+        )
+    )
     user = res.scalars().first()
 
     if not user:
-        raise HTTPException(status_code=404, detail="Пользователь с таким Email не зарегистрирован.")
+        raise HTTPException(status_code=404, detail="Пользователь с таким Email или никнеймом не зарегистрирован.")
 
+    if not user.email or "@" not in user.email:
+        raise HTTPException(status_code=400, detail="К данному аккаунту не привязан подтвержденный Email адрес.")
+
+    clean_email = user.email.lower().strip()
     code = f"{random.randint(100000, 999999)}"
     user.email_verification_code = code
     user.email_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
@@ -683,12 +703,13 @@ async def forgot_password(req: ForgotPasswordRequest, db: AsyncSession = Depends
             pass
 
     msg_text = f"Код для сброса пароля отправлен на {clean_email}." if email_sent else (
-        f"Код сгенерирован: {code}. (Для реальной отправки укажите данные SMTP в файле .env)"
+        f"Код сгенерирован: {code}. (Для отправки проверьте настройки почты)"
         if settings.DEBUG else f"Код отправлен на {clean_email}."
     )
 
     return {
         "status": "ok",
+        "email": clean_email,
         "message": msg_text,
         "email_delivered": email_sent,
         "debug_code": code if (settings.DEBUG or not email_sent) else None
@@ -699,27 +720,34 @@ async def forgot_password(req: ForgotPasswordRequest, db: AsyncSession = Depends
 async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
     """
     Resets password using the 6-digit email code and returns active session.
+    Accepts either Email or Username.
     """
-    clean_email = req.email.lower().strip()
-    res = await db.execute(select(User).where(User.email == clean_email))
+    clean_target = req.email.lower().strip().replace("@", "")
+    res = await db.execute(
+        select(User).where(
+            or_(func.lower(User.email) == clean_target, func.lower(User.username) == clean_target)
+        )
+    )
     user = res.scalars().first()
 
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден.")
 
-    if not user.email_verification_code or user.email_verification_code != req.code.strip():
-        raise HTTPException(status_code=400, detail="Неверный код восстановления.")
+    if not user.email_verification_code or user.email_verification_code.strip() != req.code.strip():
+        raise HTTPException(status_code=400, detail="Неверный код восстановления из письма.")
 
     # Check expiration
     if user.email_code_expires_at:
         now = datetime.now(timezone.utc)
         expires = user.email_code_expires_at.replace(tzinfo=timezone.utc) if user.email_code_expires_at.tzinfo is None else user.email_code_expires_at
         if now > expires:
-            raise HTTPException(status_code=400, detail="Срок действия кода истек.")
+            raise HTTPException(status_code=400, detail="Срок действия кода истек. Запросите новый код.")
 
     user.password_hash = hash_password(req.new_password)
     user.email_verification_code = None
     user.email_code_expires_at = None
+    user.is_email_verified = True
+    user.is_registered = True
     await db.commit()
     await db.refresh(user)
 

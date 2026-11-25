@@ -19,7 +19,7 @@ from app.api import (
     chat, wallet, marketplace, admin, upload, users
 )
 from app.websocket import endpoints as ws_endpoints
-from app.bot.bot import bot, dp
+from app.bot.bot import bot, dp, init_bot_cache
 
 bot_polling_task: asyncio.Task = None
 keepalive_task: asyncio.Task = None
@@ -71,6 +71,7 @@ async def lifespan(app: FastAPI):
     # 1. Initialize DB and seed demo content
     await init_models()
     await seed_demo_data()
+    await init_bot_cache()
 
     # 2. Ensure uploads directory exists
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
