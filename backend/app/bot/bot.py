@@ -172,7 +172,7 @@ if dp is not None:
                 )
             )
 
-            # 2. Instant greeting response (< 2ms) without waiting for database
+            # 2. Instant greeting response (< 2ms) without inline button
             greeting = (
                 "👋 <b>Добро пожаловать в Venstogram</b> — первая социальная сеть и медиаэкосистема нового поколения."
             )
@@ -180,13 +180,11 @@ if dp is not None:
             try:
                 await message.answer(
                     text=greeting,
-                    reply_markup=get_webapp_keyboard(start_param, is_admin=is_admin),
                     parse_mode=ParseMode.HTML
                 )
             except Exception:
                 await message.answer(
-                    text=greeting + f"\n\n🔗 Ссылка на приложение: {settings.WEBAPP_URL}",
-                    parse_mode=ParseMode.HTML
+                    text="👋 Добро пожаловать в Venstogram — первая социальная сеть и медиаэкосистема нового поколения."
                 )
         except Exception as e:
             print(f"[Bot cmd_start Error] {e}")
