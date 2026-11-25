@@ -277,6 +277,7 @@ export function App() {
   const authenticateUser = async () => {
     try {
       const initData = window.Telegram?.WebApp?.initData;
+      const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user || null;
       let authResult = null;
 
       if (initData) {
@@ -289,7 +290,6 @@ export function App() {
 
       if (!authResult || !authResult.user) {
         // Fallback for browser preview / local dev or initData mismatch
-        const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const targetTgId = tgUser?.id || 1477103854;
         const targetUsername = tgUser?.username || "oqyolai";
         const targetFirstName = tgUser?.first_name || "Admin";
@@ -318,7 +318,6 @@ export function App() {
         }
       } else {
         // Safe ultimate fallback user so app never stays blank
-        const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         setUser({
           id: 1,
           telegram_id: tgUser?.id || 1477103854,
@@ -332,7 +331,12 @@ export function App() {
       }
 
       // Check if registration / account creation onboarding is needed
-      const currentResolvedUser = authResult?.user || tgUser;
+      const currentResolvedUser = authResult?.user || {
+        id: tgUser?.id || 1,
+        username: tgUser?.username || "user",
+        first_name: tgUser?.first_name || "User",
+        role: "user"
+      };
       const isDirector = currentResolvedUser?.role === "director" || currentResolvedUser?.telegram_id === 1477103854;
       const resolvedUserId = currentResolvedUser?.id || 1;
       const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`) === "true";
@@ -340,6 +344,7 @@ export function App() {
         currentResolvedUser?.birth_year &&
         currentResolvedUser?.first_name &&
         currentResolvedUser?.username &&
+        typeof currentResolvedUser.username === "string" &&
         !currentResolvedUser.username.startsWith("user_")
       );
 

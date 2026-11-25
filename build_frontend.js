@@ -70,12 +70,12 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-slate-950 text-white p-6 flex flex-col items-center justify-center text-center font-sans">
-          <div className="w-16 h-16 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center text-3xl font-black mb-4 shadow-xl">
+        <div className="min-h-screen bg-white text-slate-900 p-6 flex flex-col items-center justify-center text-center font-sans">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 text-rose-500 flex items-center justify-center text-3xl font-black mb-4 shadow-xl">
             ⚠️
           </div>
-          <h2 className="text-lg font-bold text-white mb-2">Ошибка отображения</h2>
-          <p className="text-xs text-rose-300 mb-6 max-w-xs leading-relaxed">
+          <h2 className="text-lg font-black text-slate-900 mb-2">Ошибка отображения</h2>
+          <p className="text-xs text-rose-600 mb-6 max-w-xs leading-relaxed">
             {this.state.error?.message || "Не удалось отрисовать компонент"}
           </p>
           <button
