@@ -35,6 +35,11 @@ export function App() {
   const [isOffline, setIsOffline] = useState(typeof navigator !== "undefined" ? !navigator.onLine : false);
   const [dataSaver, setDataSaver] = useState(safeGetItem("vensto_data_saver") === "true");
 
+  // Content state
+  const [posts, setPosts] = useState([]);
+  const [storiesGroups, setStoriesGroups] = useState([]);
+  const [reels, setReels] = useState([]);
+
   // Theme state: dark / light
   const [theme, setTheme] = useState(safeGetItem("vensto_theme") || "dark");
 
