@@ -408,6 +408,9 @@ export function App() {
   const handleLanguageChange = (newLang) => {
     setLang(newLang);
     safeSetItem("vensto_lang", newLang);
+    if (user?.id) {
+      Api.patch("/users/me", { language_code: newLang }).catch(() => {});
+    }
   };
 
   const toggleDataSaver = () => {

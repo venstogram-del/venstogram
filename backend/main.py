@@ -180,7 +180,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from datetime import datetime, timezone
 
 server_start_time = datetime.now(timezone.utc).isoformat()
-BOT_VERSION = "v1.2.1-clean-start-no-inline-button"
+BOT_VERSION = "v1.3.0-multilang-and-compact-reels"
 
 @app.get("/health")
 @app.get("/api/health")

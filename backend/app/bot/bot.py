@@ -172,10 +172,20 @@ if dp is not None:
                 )
             )
 
-            # 2. Instant greeting response (< 2ms) without inline button
-            greeting = (
-                "👋 <b>Добро пожаловать в Venstogram</b> — первая социальная сеть и медиаэкосистема нового поколения."
-            )
+            # 2. Instant multi-language greeting response (< 2ms) without inline button
+            user_lang = (message.from_user.language_code or "ru").lower()
+            if user_lang.startswith("uz"):
+                greeting = (
+                    "👋 <b>Venstogram-ga xush kelibsiz</b> — yangi avlod ijtimoiy tarmog'i va media ekotizimi."
+                )
+            elif user_lang.startswith("en"):
+                greeting = (
+                    "👋 <b>Welcome to Venstogram</b> — the next-generation social network and media ecosystem."
+                )
+            else:
+                greeting = (
+                    "👋 <b>Добро пожаловать в Venstogram</b> — первая социальная сеть и медиаэкосистема нового поколения."
+                )
 
             try:
                 await message.answer(
@@ -184,7 +194,7 @@ if dp is not None:
                 )
             except Exception:
                 await message.answer(
-                    text="👋 Добро пожаловать в Venstogram — первая социальная сеть и медиаэкосистема нового поколения."
+                    text=greeting.replace("<b>", "").replace("</b>", "")
                 )
         except Exception as e:
             print(f"[Bot cmd_start Error] {e}")

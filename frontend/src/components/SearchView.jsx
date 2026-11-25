@@ -81,7 +81,7 @@ export function SearchView({ currentUser, t, onOpenChat, onOpenProfile }) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="🔍 Найти друга по имени или @никнейму..."
+            placeholder={t?.searchUsers || "🔍 Найти друга по имени или @никнейму..."}
             className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-11 pr-10 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all shadow-inner"
           />
           <div className="absolute left-3.5 top-3.5 text-slate-400">

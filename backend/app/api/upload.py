@@ -62,21 +62,10 @@ async def upload_file(
                 raise HTTPException(status_code=400, detail=f"Размер файла превышает лимит ({max_size // (1024*1024)} MB).")
             await out_file.write(chunk)
 
-    # Client / Backend Data Saver mode: compress image if needed
-    if ext in {".jpg", ".jpeg", ".png"} and (data_saver or os.path.getsize(file_path) > 2 * 1024 * 1024):
-        try:
-            with Image.open(file_path) as img:
-                img.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
-                compressed_name = f"opt_{unique_name}.webp"
-                compressed_path = os.path.join(settings.UPLOAD_DIR, compressed_name)
-                img.save(compressed_path, "WEBP", quality=75 if data_saver else 85)
-                unique_name = compressed_name
-        except Exception as e:
-            print(f"[Upload] Compression note: {e}")
-
+    # Preserve original high quality and fidelity without altering or degrading user media
     file_url = f"/uploads/{unique_name}"
     return {
         "url": file_url,
         "filename": unique_name,
-        "is_compressed": data_saver
+        "is_compressed": False
     }

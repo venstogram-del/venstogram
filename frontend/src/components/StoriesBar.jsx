@@ -190,7 +190,7 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
             </div>
           </div>
           <span className="text-[11px] text-slate-400 mt-1 max-w-[64px] truncate">
-            {uploadingStory ? "Загрузка..." : "Ваша история"}
+            {uploadingStory ? (t?.uploading || "Загрузка...") : (t?.yourStory || "Ваша история")}
           </span>
         </div>
 

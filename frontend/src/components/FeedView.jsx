@@ -365,7 +365,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
               className="text-[11px] text-pink-400 hover:text-pink-300 font-bold flex items-center space-x-1 bg-pink-500/10 border border-pink-500/30 px-2.5 py-1 rounded-xl active:scale-95 transition"
             >
               <span>👁️ {post.views_count?.toLocaleString() || 120}</span>
-              <span className="text-[10px]">📊 Yosh & Statistika</span>
+              <span className="text-[10px]">📊 {t.statsAndAge || "Статистика"}</span>
             </button>
           </div>
 
@@ -381,7 +381,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
               onClick={() => openComments(post.id)}
               className="px-4 mt-1 text-[11px] text-slate-400 hover:text-slate-200 block"
             >
-              Посмотреть все {post.comments_count} {t.comments}
+              {t.viewAllComments || "Посмотреть все"} {post.comments_count} {t.comments}
             </button>
           )}
           </article>
@@ -393,7 +393,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
                 <div className="flex items-center space-x-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded-full border border-indigo-500/30">
-                    Реклама / Спонсировано
+                    {t.sponsored || "Реклама"}
                   </span>
                 </div>
                 <span className="text-[11px] text-slate-400 font-medium">@{ads[index % ads.length].advertiser_name}</span>

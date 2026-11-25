@@ -556,27 +556,27 @@ export function ProfileView({
         <div className="flex-1 flex justify-around text-center">
           <div>
             <span className="text-base font-black text-white block">{userPosts.length + userReels.length}</span>
-            <span className="text-[11px] text-slate-400">Публикаций</span>
+            <span className="text-[11px] text-slate-400">{t?.postsCount || "Публикаций"}</span>
           </div>
           <div
             onClick={() => {
               triggerHaptic("light");
-              setFollowModal({ type: "followers", userId: user.id, title: "Мои подписчики" });
+              setFollowModal({ type: "followers", userId: user.id, title: t?.followers || "Мои подписчики" });
             }}
             className="cursor-pointer active:scale-95 transition hover:opacity-80"
           >
             <span className="text-base font-black text-white block">{user.followers_count || 0}</span>
-            <span className="text-[11px] text-pink-400 font-bold hover:underline">Подписчиков</span>
+            <span className="text-[11px] text-pink-400 font-bold hover:underline">{t?.followers || "Подписчиков"}</span>
           </div>
           <div
             onClick={() => {
               triggerHaptic("light");
-              setFollowModal({ type: "following", userId: user.id, title: "Мои подписки" });
+              setFollowModal({ type: "following", userId: user.id, title: t?.followingCount || "Мои подписки" });
             }}
             className="cursor-pointer active:scale-95 transition hover:opacity-80"
           >
             <span className="text-base font-black text-white block">{user.following_count || 0}</span>
-            <span className="text-[11px] text-pink-400 font-bold hover:underline">Подписок</span>
+            <span className="text-[11px] text-pink-400 font-bold hover:underline">{t?.followingCount || "Подписок"}</span>
           </div>
         </div>
       </div>
@@ -684,7 +684,7 @@ export function ProfileView({
           className="flex-1 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-2.5 rounded-xl border border-slate-700 transition-all flex items-center justify-center space-x-1"
         >
           <span>✏️</span>
-          <span>Редактировать профиль</span>
+          <span>{t?.editProfile || "Редактировать профиль"}</span>
         </button>
 
         <button
@@ -695,7 +695,7 @@ export function ProfileView({
           className="flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 text-xs font-black py-2.5 rounded-xl shadow-lg shadow-amber-500/20 flex items-center justify-center space-x-1.5 transition-transform active:scale-95"
         >
           <span>🪙</span>
-          <span>Баланс: {user.wallet_coins?.toLocaleString()}</span>
+          <span>{t?.wallet || "Баланс"}: {user.wallet_coins?.toLocaleString()}</span>
         </button>
       </div>
 
@@ -710,7 +710,7 @@ export function ProfileView({
             activeTab === "posts" ? "border-pink-500 text-white" : "border-transparent text-slate-500"
           }`}
         >
-          🖼️ Публикации
+          🖼️ {t?.postsCount || "Публикации"}
         </button>
         <button
           onClick={() => {

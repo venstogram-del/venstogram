@@ -168,7 +168,7 @@ export function Header({
             {/* Theme Selector (White / Black) */}
             <div className="space-y-2 border-b border-slate-800 pb-3">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Тема оформления / Theme
+                {t.theme || "Тема оформления"}
               </span>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -183,7 +183,7 @@ export function Header({
                   }`}
                 >
                   <span>☀️</span>
-                  <span>Светлая (Белая)</span>
+                  <span>{t.themeLight || "Светлая (Белая)"}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -197,7 +197,7 @@ export function Header({
                   }`}
                 >
                   <span>🌙</span>
-                  <span>Темная (Черная)</span>
+                  <span>{t.themeDark || "Темная (Черная)"}</span>
                 </button>
               </div>
             </div>
@@ -205,7 +205,7 @@ export function Header({
             {/* Language Selector */}
             <div className="space-y-2 border-b border-slate-800 pb-3">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                {lang === "uz_latn" ? "Tilni tanlash / Язык" : "Выбор языка / Language"}
+                {t.selectLanguage || "Выбор языка"}
               </span>
               <div className="grid grid-cols-3 gap-1.5">
                 {[
@@ -264,7 +264,7 @@ export function Header({
                 className="flex-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 py-2.5 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
               >
                 <span>📞</span>
-                <span>Позвонить</span>
+                <span>{t.liveCall || "Позвонить"}</span>
               </a>
               <button
                 type="button"
@@ -272,7 +272,7 @@ export function Header({
                 className="flex-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40 py-2.5 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
               >
                 <span>💬</span>
-                <span>Написать</span>
+                <span>{t.chats || "Написать"}</span>
               </button>
             </div>
 
@@ -287,7 +287,7 @@ export function Header({
                 className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-pink-400 font-bold text-xs rounded-xl flex items-center justify-center space-x-2 transition"
               >
                 <span>🔑</span>
-                <span>Вход / Смена аккаунта по Email</span>
+                <span>{t.changeAccount || "Вход / Смена аккаунта по Email"}</span>
               </button>
 
               <button
@@ -299,7 +299,7 @@ export function Header({
                 className="w-full py-2 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-500/30 text-rose-400 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 transition active:scale-95"
               >
                 <span>🚪</span>
-                <span>Выйти из профиля</span>
+                <span>{t.logout || "Выйти из профиля"}</span>
               </button>
             </div>
           </div>

@@ -21,6 +21,14 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
   const [videoBuffering, setVideoBuffering] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [doubleTapHeart, setDoubleTapHeart] = useState(false);
+  const [showReelOptionsMenu, setShowReelOptionsMenu] = useState(false);
+
+  const formatCompactCount = (num) => {
+    if (!num || num <= 0) return "0";
+    if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+    return num.toString();
+  };
 
   const touchStartY = useRef(0);
   const lastTapRef = useRef(0);
@@ -240,8 +248,8 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
     return (
       <div className="h-[80vh] flex flex-col items-center justify-center text-slate-400 space-y-2 select-none">
         <span className="text-4xl">🎬</span>
-        <span className="text-sm font-bold text-white">Нет доступных Reels</span>
-        <span className="text-xs text-slate-500">Опубликуйте первое видео через кнопку + вверху</span>
+        <span className="text-sm font-bold text-white">{t?.noReels || "Нет доступных Reels"}</span>
+        <span className="text-xs text-slate-500">{t?.publishFirstPost || "Опубликуйте первое видео через кнопку + вверху"}</span>
       </div>
     );
   }
@@ -272,7 +280,7 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
           className="pointer-events-auto bg-black/40 hover:bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-white text-xs border border-white/15 flex items-center space-x-1.5 transition active:scale-95 shadow-lg"
         >
           <span>{isMuted ? "🔇" : "🔊"}</span>
-          <span className="text-[10px] font-semibold">{isMuted ? "Без звука" : "Звук вкл"}</span>
+          <span className="text-[10px] font-semibold">{isMuted ? (t?.soundOff || "Без звука") : (t?.soundOn || "Звук вкл")}</span>
         </button>
       </div>
 
@@ -305,9 +313,9 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
       {videoError ? (
         <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-6 text-center space-y-3">
           <span className="text-4xl">📡</span>
-          <p className="text-sm font-bold text-white">Медленное интернет-соединение</p>
+          <p className="text-sm font-bold text-white">{t?.slowInternet || "Медленное интернет-соединение"}</p>
           <p className="text-xs text-slate-400 max-w-xs">
-            Не удалось быстро загрузить видео. Нажмите кнопку ниже для повторной попытки.
+            {t?.slowInternetDesc || "Не удалось быстро загрузить видео. Нажмите кнопку ниже для повторной попытки."}
           </p>
           <button
             onClick={() => {
@@ -320,7 +328,7 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
             }}
             className="px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 text-white text-xs font-bold rounded-xl shadow-lg active:scale-95 transition"
           >
-            🔄 Повторить загрузку
+            🔄 {t?.retryLoad || "Повторить загрузку"}
           </button>
         </div>
       ) : (
@@ -347,43 +355,19 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
         />
       )}
 
-      {/* Modern Instagram Right Floating Action Bar */}
-      <div className="absolute right-3 bottom-14 z-20 flex flex-col items-center space-y-4">
-        {/* Author Avatar with Instagram Follow Plus Badge */}
-        <div
-          className="relative cursor-pointer group"
-          onClick={() => {
-            triggerHaptic("light");
-            if (onOpenProfile && currentReel?.author?.id) onOpenProfile(currentReel.author.id);
-          }}
-        >
-          <img
-            src={currentReel.author?.avatar_url || DEFAULT_AVATAR}
-            alt="Author"
-            className="w-12 h-12 rounded-full border-2 border-white object-cover shadow-2xl"
-          />
-          {currentReel.author?.id !== user?.id && !currentReel.author?.is_following && (
-            <button
-              onClick={handleFollowAuthor}
-              className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-5 bg-pink-600 hover:bg-pink-500 rounded-full flex items-center justify-center text-white text-xs font-black shadow-md border border-slate-900 active:scale-125 transition-transform"
-              title="Подписаться"
-            >
-              +
-            </button>
-          )}
-        </div>
-
+      {/* Modern Sleek Instagram Reels Right Floating Action Bar */}
+      <div className="absolute right-2.5 bottom-6 z-20 flex flex-col items-center space-y-3 pointer-events-auto">
         {/* Like Button */}
         <button
           onClick={toggleLike}
           className="flex flex-col items-center space-y-0.5 active:scale-125 transition-transform"
-          title="Нравится"
+          title={t?.likes || "Нравится"}
         >
-          <div className="p-2.5 rounded-full bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 shadow-lg">
+          <div className="p-2 rounded-full bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 shadow-lg">
             <svg
-              className={`w-7 h-7 transition-colors ${
+              className={`w-6 h-6 transition-colors ${
                 currentReel.is_liked
-                  ? "text-rose-500 fill-rose-500 drop-shadow-[0_0_12px_rgba(244,63,94,0.7)]"
+                  ? "text-rose-500 fill-rose-500 drop-shadow-[0_0_10px_rgba(244,63,94,0.8)]"
                   : "text-white fill-none stroke-currentColor"
               }`}
               viewBox="0 0 24 24"
@@ -396,8 +380,8 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
               />
             </svg>
           </div>
-          <span className="text-white text-[11px] font-black drop-shadow-md">
-            {currentReel.likes_count || 0}
+          <span className="text-white text-[11px] font-bold drop-shadow">
+            {formatCompactCount(currentReel.likes_count || 0)}
           </span>
         </button>
 
@@ -405,15 +389,15 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
         <button
           onClick={openComments}
           className="flex flex-col items-center space-y-0.5 active:scale-125 transition-transform"
-          title="Комментарии"
+          title={t?.comments || "Комментарии"}
         >
-          <div className="p-2.5 rounded-full bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 shadow-lg">
-            <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <div className="p-2 rounded-full bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 shadow-lg">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
           </div>
-          <span className="text-white text-[11px] font-black drop-shadow-md">
-            {currentReel.comments_count || 0}
+          <span className="text-white text-[11px] font-bold drop-shadow">
+            {formatCompactCount(currentReel.comments_count || 0)}
           </span>
         </button>
 
@@ -421,29 +405,31 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
         <button
           onClick={handleShare}
           className="flex flex-col items-center space-y-0.5 active:scale-125 transition-transform"
-          title="Поделиться"
+          title={t?.share || "Поделиться"}
         >
-          <div className="p-2.5 rounded-full bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 shadow-lg">
-            <svg className="w-7 h-7 text-white -rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <div className="p-2 rounded-full bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 shadow-lg">
+            <svg className="w-6 h-6 text-white -rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
           </div>
-          <span className="text-white text-[11px] font-black drop-shadow-md">
-            {currentReel.shares_count || t.share}
-          </span>
+          {currentReel.shares_count > 0 && (
+            <span className="text-white text-[10px] font-bold drop-shadow">
+              {formatCompactCount(currentReel.shares_count)}
+            </span>
+          )}
         </button>
 
         {/* Bookmark / Save Reel Button */}
         <button
           onClick={toggleSave}
           className="flex flex-col items-center space-y-0.5 active:scale-125 transition-transform"
-          title={currentReel.is_saved ? "Сохранено" : "Сохранить"}
+          title={currentReel.is_saved ? (t?.saved || "Сохранено") : (t?.save || "Сохранить")}
         >
-          <div className="p-2.5 rounded-full bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 shadow-lg">
+          <div className="p-2 rounded-full bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 shadow-lg">
             <svg
-              className={`w-7 h-7 transition-colors ${
+              className={`w-6 h-6 transition-colors ${
                 currentReel.is_saved
-                  ? "text-amber-400 fill-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.8)]"
+                  ? "text-amber-400 fill-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.8)]"
                   : "text-white fill-none stroke-currentColor"
               }`}
               viewBox="0 0 24 24"
@@ -452,43 +438,61 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
             </svg>
           </div>
-          <span className="text-white text-[10px] font-bold drop-shadow-md">
-            {currentReel.is_saved ? "Сохранено" : "В закладки"}
-          </span>
         </button>
 
-        {/* Copy Link Quick Button */}
-        <button
-          onClick={handleCopyLink}
-          className="p-2.5 rounded-full bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 text-white shadow-lg active:scale-125 transition-transform"
-          title="Скопировать ссылку"
-        >
-          <span className="text-base block">🔗</span>
-        </button>
-
-        {/* Delete Reel Button for Author or Director */}
-        {(currentReel.author?.id === user?.id || currentReel.user_id === user?.id || user?.role === "director") && (
+        {/* More Options Menu (Copy link & Delete) */}
+        <div className="relative">
           <button
-            onClick={() => handleDeleteReel(currentReel.id)}
-            disabled={deletingReel}
-            className="p-2.5 rounded-full bg-rose-950/60 hover:bg-rose-900/80 backdrop-blur-md border border-rose-500/40 text-rose-400 shadow-lg active:scale-125 transition-transform"
-            title="Удалить Reel"
+            onClick={() => setShowReelOptionsMenu(!showReelOptionsMenu)}
+            className="p-2 rounded-full bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 text-white shadow-lg active:scale-125 transition-transform"
+            title="Опции"
           >
-            <span className="text-base block">🗑️</span>
+            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="2" />
+              <circle cx="12" cy="5" r="2" />
+              <circle cx="12" cy="19" r="2" />
+            </svg>
           </button>
-        )}
 
-        {/* Instagram Vinyl Music Disc Spin */}
-        <div className="w-10 h-10 rounded-full bg-slate-900 border-2 border-slate-700/80 p-1 animate-spin shadow-2xl relative">
+          {showReelOptionsMenu && (
+            <div className="absolute right-0 bottom-full mb-2 bg-slate-900/95 border border-slate-700/80 rounded-2xl p-1.5 shadow-2xl backdrop-blur-lg flex flex-col space-y-1 min-w-[140px] z-50 animate-in fade-in zoom-in-95">
+              <button
+                onClick={() => {
+                  setShowReelOptionsMenu(false);
+                  handleCopyLink();
+                }}
+                className="flex items-center space-x-2 px-3 py-2 hover:bg-white/10 rounded-xl text-xs text-white transition text-left"
+              >
+                <span>🔗</span>
+                <span>{t?.copyLink || "Ссылка"}</span>
+              </button>
+              {(currentReel.author?.id === user?.id || currentReel.user_id === user?.id || user?.role === "director") && (
+                <button
+                  onClick={() => {
+                    setShowReelOptionsMenu(false);
+                    handleDeleteReel(currentReel.id);
+                  }}
+                  className="flex items-center space-x-2 px-3 py-2 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs transition text-left"
+                >
+                  <span>🗑️</span>
+                  <span>{t?.delete || "Удалить"}</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Sleek Instagram Vinyl Music Disc */}
+        <div className="w-8 h-8 rounded-full bg-slate-900 border border-slate-700 p-0.5 animate-spin shadow-xl">
           <div className="w-full h-full rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center">
-            <div className="w-2.5 h-2.5 rounded-full bg-black" />
+            <div className="w-2 h-2 rounded-full bg-black" />
           </div>
         </div>
       </div>
 
       {/* Bottom Instagram Author & Caption Overlay */}
-      <div className="absolute left-3 right-20 bottom-3 z-20 text-white pointer-events-auto">
-        {/* Author Line */}
+      <div className="absolute left-3 right-16 bottom-3 z-20 text-white pointer-events-auto">
+        {/* Author Line with Avatar */}
         <div
           className="flex items-center space-x-2 mb-1.5 cursor-pointer w-max"
           onClick={() => {
@@ -496,7 +500,12 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
             if (onOpenProfile && currentReel?.author?.id) onOpenProfile(currentReel.author.id);
           }}
         >
-          <span className="font-black text-sm tracking-wide text-white drop-shadow">
+          <img
+            src={currentReel.author?.avatar_url || DEFAULT_AVATAR}
+            alt="Author"
+            className="w-8 h-8 rounded-full border border-white/30 object-cover shadow-md"
+          />
+          <span className="font-black text-xs tracking-wide text-white drop-shadow">
             @{currentReel.author?.username || "пользователь"}
           </span>
           {currentReel.author?.badge_type === "gold_founder" ? (
@@ -509,7 +518,7 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
               onClick={handleFollowAuthor}
               className="text-[11px] font-bold text-pink-400 hover:text-pink-300 ml-1 bg-pink-500/10 border border-pink-500/30 px-2 py-0.5 rounded-lg transition active:scale-95"
             >
-              Подписаться
+              {t?.follow || "Подписаться"}
             </button>
           )}
         </div>
