@@ -490,13 +490,13 @@ async def send_call_signal(
     from app.websocket.manager import ws_manager
     delivered = await ws_manager.send_personal_message(target_user_id, signal_data)
 
-    # 2. Store in pending queue for HTTP polling fallback
-    if target_user_id not in _pending_call_signals:
-        _pending_call_signals[target_user_id] = []
-
-    _pending_call_signals[target_user_id].append(signal_data)
-    if len(_pending_call_signals[target_user_id]) > 50:
-        _pending_call_signals[target_user_id] = _pending_call_signals[target_user_id][-50:]
+    # 2. Store in pending queue for HTTP polling fallback only if not delivered via WS
+    if not delivered:
+        if target_user_id not in _pending_call_signals:
+            _pending_call_signals[target_user_id] = []
+        _pending_call_signals[target_user_id].append(signal_data)
+        if len(_pending_call_signals[target_user_id]) > 50:
+            _pending_call_signals[target_user_id] = _pending_call_signals[target_user_id][-50:]
 
     return {"status": "ok", "delivered_ws": delivered}
 
