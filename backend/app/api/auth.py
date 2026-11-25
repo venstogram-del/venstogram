@@ -578,7 +578,10 @@ async def verify_email_code(
         if now > expires:
             raise HTTPException(status_code=400, detail="Kod amal qilish muddati tugagan. Yangi kod so'rang / Срок действия кода истек.")
 
-    # Activate user
+    # Activate user and set password if provided
+    if req.password and len(req.password.strip()) >= 4:
+        user.password_hash = hash_password(req.password.strip())
+
     user.is_email_verified = True
     user.is_registered = True
     user.email_verification_code = None

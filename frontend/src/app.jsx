@@ -40,31 +40,20 @@ export function App() {
   const [storiesGroups, setStoriesGroups] = useState([]);
   const [reels, setReels] = useState([]);
 
-  // Theme state: dark / light
-  const [theme, setTheme] = useState(safeGetItem("vensto_theme") || "dark");
+  // Theme is strictly Dark / OLED Black - Light / White theme completely removed
+  const theme = "dark";
 
   useEffect(() => {
     if (typeof document !== "undefined") {
-      if (theme === "light") {
-        document.documentElement.classList.remove("dark");
-        document.documentElement.classList.add("light");
-        document.body.style.backgroundColor = "#ffffff";
-        document.body.style.color = "#0f172a";
-      } else {
-        document.documentElement.classList.remove("light");
-        document.documentElement.classList.add("dark");
-        document.body.style.backgroundColor = "#020617";
-        document.body.style.color = "#ffffff";
-      }
+      document.documentElement.classList.remove("light");
+      document.documentElement.classList.add("dark");
+      document.body.style.backgroundColor = "#020617";
+      document.body.style.color = "#ffffff";
+      try {
+        localStorage.setItem("vensto_theme", "dark");
+      } catch (e) {}
     }
-  }, [theme]);
-
-  const toggleTheme = () => {
-    triggerHaptic("selection");
-    const nextTheme = theme === "dark" ? "light" : "dark";
-    setTheme(nextTheme);
-    safeSetItem("vensto_theme", nextTheme);
-  };
+  }, []);
 
   // Modals
   const [walletOpen, setWalletOpen] = useState(false);
@@ -747,6 +736,12 @@ export function App() {
           currentUser={user}
           t={t}
           onClose={() => setSelectedPostModal(null)}
+          onPostDeleted={(deletedId) => {
+            setSelectedPostModal(null);
+            setPosts((prev) => (Array.isArray(prev) ? prev.filter((p) => p.id !== deletedId) : []));
+            setReels((prev) => (Array.isArray(prev) ? prev.filter((r) => r.id !== deletedId) : []));
+            triggerHaptic("success");
+          }}
           onOpenChat={handleOpenUserChat}
         />
       )}

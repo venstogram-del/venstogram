@@ -31,12 +31,12 @@ export function EmailAuthModal({ onClose, onAuthSuccess }) {
 
     try {
       const res = await Api.post("/auth/register-email", {
-        email,
-        password,
-        username,
-        first_name: firstName,
-        last_name: lastName,
-        middle_name: middleName,
+        email: email.trim().toLowerCase(),
+        password: password.trim() || "VenstoPass2026!",
+        username: username.trim().toLowerCase().replace(/^@/, ""),
+        first_name: firstName.trim() || "User",
+        last_name: lastName.trim() || "",
+        middle_name: middleName.trim() || "",
         birth_year: parseInt(birthYear) || 2000,
         gender
       });
@@ -56,11 +56,33 @@ export function EmailAuthModal({ onClose, onAuthSuccess }) {
   const handleVerifyCode = async (e) => {
     e.preventDefault();
     setErrorMsg("");
+
+    const cleanCode = code.trim();
+    if (!cleanCode || cleanCode.length < 6) {
+      setErrorMsg("Введите 6 цифр из письма");
+      return;
+    }
+
+    const cleanPass = password.trim();
+    if (!cleanPass || cleanPass.length < 4) {
+      setErrorMsg("Пожалуйста, придумайте пароль (не менее 4 символов)");
+      return;
+    }
+
+    if (newPassword && cleanPass !== newPassword.trim()) {
+      setErrorMsg("Введенные пароли не совпадают");
+      return;
+    }
+
     setLoading(true);
     triggerHaptic("heavy");
 
     try {
-      const res = await Api.post("/auth/verify-email-code", { email, code });
+      const res = await Api.post("/auth/verify-email-code", {
+        email: email.trim().toLowerCase(),
+        code: cleanCode,
+        password: cleanPass
+      });
       Api.setToken(res.access_token);
       SoundEngine.playFanfare();
       if (onAuthSuccess) onAuthSuccess(res.user);
@@ -280,10 +302,11 @@ export function EmailAuthModal({ onClose, onAuthSuccess }) {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Пароль:</label>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Пароль (можете указать сейчас или после кода):
+                </label>
                 <input
                   type="password"
-                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -309,7 +332,7 @@ export function EmailAuthModal({ onClose, onAuthSuccess }) {
 
           {/* 2. Verify Code Form */}
           {mode === "verify_code" && (
-            <form onSubmit={handleVerifyCode} className="space-y-4">
+            <form onSubmit={handleVerifyCode} className="space-y-3.5">
               <div className="text-center space-y-1">
                 <p className="text-xs text-slate-300">
                   Мы отправили 6-значный код подтверждения на почту: <b className="text-white">{email}</b>
@@ -321,25 +344,54 @@ export function EmailAuthModal({ onClose, onAuthSuccess }) {
 
               <div>
                 <label className="text-[11px] font-bold text-slate-300 block mb-1 text-center">
-                  Введите 6-значный код:
+                  Введите 6-значный код из письма:
                 </label>
                 <input
                   type="text"
                   maxLength="6"
                   required
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))}
                   placeholder="123456"
                   className="w-48 mx-auto block text-center font-mono text-2xl tracking-widest bg-slate-950 border-2 border-pink-500/50 rounded-2xl py-2 text-white outline-none focus:border-pink-500"
                 />
               </div>
 
+              {/* Придумайте пароль */}
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                    🔑 Придумайте пароль (для входа с любого телефона):
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Придумайте пароль (мин. 4 символа)"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-pink-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                    🔑 Повторите пароль для проверки:
+                  </label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Повторите введенный пароль"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-pink-500"
+                  />
+                </div>
+              </div>
+
               <button
                 type="submit"
-                disabled={loading || code.length < 6}
+                disabled={loading || code.length < 6 || !password.trim()}
                 className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 text-white font-black text-xs py-3 rounded-xl shadow-lg transition-all"
               >
-                {loading ? "Проверка кода..." : "✓ Подтвердить и войти"}
+                {loading ? "Активация..." : "✓ Подтвердить код, сохранить пароль и войти"}
               </button>
 
               <button

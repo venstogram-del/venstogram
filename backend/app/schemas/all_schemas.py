@@ -32,6 +32,7 @@ class EmailRegisterRequest(BaseModel):
 class EmailVerifyCodeRequest(BaseModel):
     email: str
     code: str
+    password: Optional[str] = None
 
 class EmailLoginRequest(BaseModel):
     email: str

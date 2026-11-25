@@ -54,18 +54,6 @@ export function Header({
 
       {/* Right Action Bar */}
       <div className="flex items-center space-x-2">
-        {/* Light / Dark Theme Switcher Button */}
-        <button
-          onClick={() => {
-            triggerHaptic("selection");
-            if (onToggleTheme) onToggleTheme();
-          }}
-          className="p-1.5 text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-colors shadow-sm"
-          title={theme === "light" ? "Включить темную тему" : "Включить светлую тему"}
-        >
-          <span className="text-sm block">{theme === "light" ? "🌙" : "☀️"}</span>
-        </button>
-
         {/* Fast Language Toggle */}
         <button
           onClick={() => {
@@ -163,43 +151,6 @@ export function Header({
               >
                 ✕
               </button>
-            </div>
-
-            {/* Theme Selector (White / Black) */}
-            <div className="space-y-2 border-b border-slate-800 pb-3">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                {t.theme || "Тема оформления"}
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => {
-                    triggerHaptic("selection");
-                    if (theme !== "light" && onToggleTheme) onToggleTheme();
-                  }}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
-                    theme === "light"
-                      ? "bg-amber-400 text-slate-950 shadow-md font-black"
-                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                  }`}
-                >
-                  <span>☀️</span>
-                  <span>{t.themeLight || "Светлая (Белая)"}</span>
-                </button>
-                <button
-                  onClick={() => {
-                    triggerHaptic("selection");
-                    if (theme !== "dark" && onToggleTheme) onToggleTheme();
-                  }}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
-                    theme === "dark"
-                      ? "bg-pink-600 text-white shadow-md font-black"
-                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                  }`}
-                >
-                  <span>🌙</span>
-                  <span>{t.themeDark || "Темная (Черная)"}</span>
-                </button>
-              </div>
             </div>
 
             {/* Language Selector */}

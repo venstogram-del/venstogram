@@ -73,20 +73,26 @@ export function triggerHaptic(type = "light") {
   } catch (e) {}
 }
 
-export function authenticateBiometrics(reason = "Подтвердите личность для доступа к кошельку") {
+export function safeConfirm(message = "Вы уверены?") {
   return new Promise((resolve) => {
     try {
-      const bio = window.Telegram?.WebApp?.BiometricManager;
-      if (bio && bio.isBiometricAvailable) {
-        bio.authenticate({ reason }, (success) => {
-          triggerHaptic(success ? "success" : "error");
-          resolve(success);
+      if (window.Telegram?.WebApp?.showConfirm) {
+        window.Telegram.WebApp.showConfirm(message, (ok) => {
+          resolve(Boolean(ok));
         });
-      } else {
-        resolve(null); // Not available on device, fallback to PIN
+        return;
       }
-    } catch (e) {
-      resolve(null);
-    }
+    } catch (e) {}
+
+    try {
+      if (typeof window !== "undefined" && typeof window.confirm === "function") {
+        const res = window.confirm(message);
+        resolve(Boolean(res));
+        return;
+      }
+    } catch (e) {}
+
+    // Fallback: if confirm is blocked or unavailable, proceed
+    resolve(true);
   });
 }

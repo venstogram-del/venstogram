@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc, case
+from sqlalchemy import select, desc, case, delete
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, timezone
 from app.database.session import get_db
-from app.models.entities import User, Post, PostLike, PostComment, Follow, SavedItem, Notification
+from app.models.entities import User, Post, PostLike, PostComment, Follow, SavedItem, Notification, Reel, ReelLike, ReelComment
 from app.schemas.all_schemas import PostCreate, CommentCreate
 from app.api.deps import get_current_user
 from app.core.ai_moderator import ai_moderator
+from app.core.config import settings
 
 router = APIRouter(prefix="/posts", tags=["Feed & Posts"])
 
@@ -379,19 +380,62 @@ async def delete_post(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Deletes a publication. Allowed for the author of the post or Director/Moderator.
+    Deletes a publication (or Reel). Allowed for the author of the post or Director/Moderator/Admin.
     """
+    is_admin = (
+        current_user.role in ("director", "moderator", "admin", "it_admin", "developer") or
+        current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS
+    )
+
+    # 1. Try finding Post
     res = await db.execute(select(Post).where(Post.id == post_id))
     post = res.scalars().first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Публикация не найдена")
 
-    if post.user_id != current_user.id and current_user.role not in ("director", "moderator"):
+    if not post:
+        # Check if this ID is a Reel
+        reel_res = await db.execute(select(Reel).where(Reel.id == post_id))
+        reel = reel_res.scalars().first()
+        if not reel:
+            raise HTTPException(status_code=404, detail="Публикация не найдена")
+
+        if reel.user_id != current_user.id and not is_admin:
+            raise HTTPException(status_code=403, detail="Вы можете удалять только свои публикации")
+
+        await db.execute(delete(ReelComment).where(ReelComment.reel_id == reel.id))
+        await db.execute(delete(ReelLike).where(ReelLike.reel_id == reel.id))
+        await db.execute(delete(SavedItem).where(SavedItem.item_type == "reel", SavedItem.item_id == reel.id))
+        await db.execute(delete(Notification).where(Notification.target_id == reel.id))
+        await db.delete(reel)
+        await db.commit()
+        return {"status": "ok", "message": "Публикация успешно удалена", "deleted_id": post_id}
+
+    # Post found - check permission
+    if post.user_id != current_user.id and not is_admin:
         raise HTTPException(status_code=403, detail="Вы можете удалять только свои публикации")
+
+    # Also clean up any Reel that was synced from this video post
+    if post.media_urls:
+        synced_reels_res = await db.execute(
+            select(Reel).where(
+                Reel.user_id == post.user_id,
+                Reel.video_url.in_(post.media_urls)
+            )
+        )
+        for synced_r in synced_reels_res.scalars().all():
+            await db.execute(delete(ReelComment).where(ReelComment.reel_id == synced_r.id))
+            await db.execute(delete(ReelLike).where(ReelLike.reel_id == synced_r.id))
+            await db.execute(delete(SavedItem).where(SavedItem.item_type == "reel", SavedItem.item_id == synced_r.id))
+            await db.delete(synced_r)
+
+    # Clean up post comments, likes, saved items, notifications
+    await db.execute(delete(PostComment).where(PostComment.post_id == post.id))
+    await db.execute(delete(PostLike).where(PostLike.post_id == post.id))
+    await db.execute(delete(SavedItem).where(SavedItem.item_type == "post", SavedItem.item_id == post.id))
+    await db.execute(delete(Notification).where(Notification.target_id == post.id))
 
     await db.delete(post)
     await db.commit()
-    return {"status": "ok", "message": "Публикация успешно удалена"}
+    return {"status": "ok", "message": "Публикация успешно удалена", "deleted_id": post_id}
 
 
 @router.delete("/{post_id}/comments/{comment_id}")

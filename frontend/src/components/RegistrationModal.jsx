@@ -27,6 +27,8 @@ const regTexts = {
     featuresList: "📸 Lenta va Stories • 🎬 Reels • 💬 Xabarlar",
     submitBtn: "🚀 Ro'yxatdan o'tish va boshlash",
     submitting: "Profil yaratilmoqda...",
+    passwordTitle: "Parol o'ylab toping (boshqa telefonlardan kirish uchun):",
+    passwordPlaceholder: "Yangi parol kiriting",
     errFirstName: "Iltimos, ismingizni kiriting",
     errBirthYear: "Iltimos, haqiqiy tug'ilgan yilingizni kiriting",
     errUsername: "Username kamida 3 ta belgidan iborat bo'lishi kerak",
@@ -56,6 +58,8 @@ const regTexts = {
     featuresList: "📸 Лента и Stories • 🎬 Reels • 💬 Личные сообщения",
     submitBtn: "🚀 Создать аккаунт и войти",
     submitting: "Создание аккаунта...",
+    passwordTitle: "Придумайте пароль (для входа с любого телефона):",
+    passwordPlaceholder: "Придумайте надежный пароль",
     errFirstName: "Пожалуйста, введите ваше имя",
     errBirthYear: "Пожалуйста, укажите реальный год рождения",
     errUsername: "Никнейм должен быть от 3 символов (латиница, цифры и _)",
@@ -85,6 +89,8 @@ const regTexts = {
     featuresList: "📸 Feed & Stories • 🎬 Reels • 💬 Direct Messages",
     submitBtn: "🚀 Create Profile & Start",
     submitting: "Creating profile...",
+    passwordTitle: "Create a password (for logging in from other devices):",
+    passwordPlaceholder: "Create a secure password",
     errFirstName: "Please enter your first name",
     errBirthYear: "Please enter your valid birth year",
     errUsername: "Username must be at least 3 characters",
@@ -237,7 +243,8 @@ export function RegistrationModal({ user, onComplete, onOpenEmailAuth, lang = "u
         try {
           await Api.post("/auth/verify-email-code", {
             email: email.trim().toLowerCase(),
-            code: emailCode.trim()
+            code: emailCode.trim(),
+            password: password.trim() || undefined
           });
         } catch (vErr) {
           setErrorMsg(vErr.message || tr.errVerifyCode);
@@ -495,15 +502,15 @@ export function RegistrationModal({ user, onComplete, onOpenEmailAuth, lang = "u
               )}
 
               {/* Password creation */}
-              <div className="pt-1">
+              <div className="pt-2">
                 <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                  Придумайте пароль (для входа с любого телефона):
+                  🔑 {tr.passwordTitle}
                 </label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Пароль для вашего аккаунта"
+                  placeholder={tr.passwordPlaceholder}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition"
                 />
               </div>

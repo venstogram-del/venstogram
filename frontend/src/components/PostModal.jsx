@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { triggerHaptic } from "../telegram.js";
+import { triggerHaptic, safeConfirm } from "../telegram.js";
 import { SoundEngine } from "../sound.js";
 import { Api } from "../api.js";
 import { AudienceStatsModal } from "./AudienceStatsModal.jsx";
@@ -128,16 +128,44 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
   };
 
   const handleDeletePost = async () => {
-    if (!confirm("Вы действительно хотите навсегда удалить эту публикацию?")) return;
+    const isReel = currentPost?.item_type === "reel" || Boolean(currentPost?.video_url) || Boolean(currentPost?.audio_title);
+    const confirmed = await safeConfirm(
+      isReel
+        ? "Вы действительно хотите удалить это видео (Reels)?"
+        : "Вы действительно хотите удалить эту публикацию?"
+    );
+    if (!confirmed) return;
+
     setDeleting(true);
     triggerHaptic("heavy");
     try {
-      await Api.delete(`/posts/${currentPost.id}`);
-      alert("Публикация успешно удалена!");
-      if (onPostDeleted) onPostDeleted(currentPost.id);
-      onClose();
+      let deleted = false;
+      if (isReel) {
+        try {
+          await Api.delete(`/reels/${currentPost.id}`);
+          deleted = true;
+        } catch (rErr) {
+          await Api.delete(`/posts/${currentPost.id}`);
+          deleted = true;
+        }
+      } else {
+        try {
+          await Api.delete(`/posts/${currentPost.id}`);
+          deleted = true;
+        } catch (pErr) {
+          await Api.delete(`/reels/${currentPost.id}`);
+          deleted = true;
+        }
+      }
+
+      if (deleted) {
+        triggerHaptic("success");
+        if (onPostDeleted) onPostDeleted(currentPost.id);
+        onClose();
+      }
     } catch (err) {
-      alert("Ошибка удаления публикации: " + err.message);
+      alert("Ошибка удаления: " + (err.message || "Не удалось удалить"));
+    } finally {
       setDeleting(false);
     }
   };
@@ -206,7 +234,7 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
           </div>
 
           <div className="flex items-center space-x-2">
-            {(currentPost.author?.id === currentUser?.id || currentPost.user_id === currentUser?.id || currentUser?.role === "director") && (
+            {(currentPost.author?.id === currentUser?.id || currentPost.user_id === currentUser?.id || (currentPost.author?.username && currentUser?.username && currentPost.author.username === currentUser.username) || currentUser?.role === "director" || currentUser?.role === "moderator" || currentUser?.role === "admin") && (
               <button
                 onClick={handleDeletePost}
                 disabled={deleting}

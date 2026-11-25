@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { triggerHaptic, tg } from "../telegram.js";
+import { triggerHaptic, tg, safeConfirm } from "../telegram.js";
 import { SoundEngine } from "../sound.js";
 import { Api } from "../api.js";
 import { AudienceStatsModal } from "./AudienceStatsModal.jsx";
@@ -139,15 +139,20 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
   };
 
   const handleDeletePost = async (postId) => {
-    if (!confirm("Вы действительно хотите удалить эту публикацию?")) return;
+    const confirmed = await safeConfirm("Вы действительно хотите удалить эту публикацию?");
+    if (!confirmed) return;
     triggerHaptic("heavy");
     try {
-      await Api.delete(`/posts/${postId}`);
+      try {
+        await Api.delete(`/posts/${postId}`);
+      } catch (e) {
+        await Api.delete(`/reels/${postId}`);
+      }
       setPosts((prev) => prev.filter((p) => p.id !== postId));
       if (inspectPost && inspectPost.id === postId) {
         setInspectPost(null);
       }
-      alert("Публикация успешно удалена!");
+      triggerHaptic("success");
     } catch (err) {
       alert("Ошибка удаления публикации: " + err.message);
     }

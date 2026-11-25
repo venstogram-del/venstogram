@@ -784,7 +784,19 @@ export function ProfileView({
                 key={`${postItem.item_type || "item"}_${postItem.id}`}
                 onClick={() => {
                   triggerHaptic("light");
-                  setSelectedPost(postItem);
+                  const inferredType = (activeTab === "reels" || postItem.item_type === "reel" || Boolean(postItem.video_url)) ? "reel" : (postItem.media_type === "video" ? "reel" : "post");
+                  setSelectedPost({
+                    ...postItem,
+                    item_type: postItem.item_type || inferredType,
+                    user_id: postItem.user_id || user?.id,
+                    author: postItem.author || {
+                      id: user?.id,
+                      username: user?.username,
+                      first_name: user?.first_name,
+                      last_name: user?.last_name,
+                      avatar_url: user?.avatar_url
+                    }
+                  });
                 }}
                 className="aspect-square bg-slate-900 overflow-hidden rounded-xl relative group cursor-pointer border border-slate-800/80 hover:border-pink-500/60 transition-all shadow-sm"
               >
@@ -842,6 +854,7 @@ export function ProfileView({
             setSelectedPost(null);
             setUserPosts((prev) => prev.filter((p) => p.id !== deletedId));
             setUserReels((prev) => prev.filter((r) => r.id !== deletedId));
+            setSavedItems((prev) => prev.filter((s) => s.id !== deletedId && s.item_id !== deletedId));
             triggerHaptic("success");
           }}
         />
@@ -1274,45 +1287,6 @@ export function ProfileView({
                   <span className="text-xs font-bold text-slate-300">Законы РУз и правила платформы</span>
                 </div>
                 <span className="text-slate-400 text-xs">Читать ↗</span>
-              </div>
-            </div>
-
-            {/* Theme Selector (White / Black) */}
-            <div className="space-y-2">
-              <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider block">
-                Тема оформления (Дизайн)
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic("selection");
-                    if (theme !== "light" && onToggleTheme) onToggleTheme();
-                  }}
-                  className={`p-2.5 rounded-2xl border text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
-                    theme === "light"
-                      ? "bg-amber-400 text-slate-950 font-black shadow-md border-amber-300"
-                      : "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700"
-                  }`}
-                >
-                  <span>☀️</span>
-                  <span>Светлая (Белая)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic("selection");
-                    if (theme !== "dark" && onToggleTheme) onToggleTheme();
-                  }}
-                  className={`p-2.5 rounded-2xl border text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
-                    theme === "dark"
-                      ? "bg-pink-600 text-white font-black shadow-md border-pink-500"
-                      : "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700"
-                  }`}
-                >
-                  <span>🌙</span>
-                  <span>Темная (Черная)</span>
-                </button>
               </div>
             </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { triggerHaptic } from "../telegram.js";
+import { triggerHaptic, safeConfirm } from "../telegram.js";
 import { SoundEngine } from "../sound.js";
 import { Api } from "../api.js";
 import { ShareModal } from "./ShareModal.jsx";
@@ -51,11 +51,16 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
   };
 
   const handleDeleteReel = async (reelId) => {
-    if (!confirm("Вы действительно хотите навсегда удалить этот Reel?")) return;
+    const confirmed = await safeConfirm("Вы действительно хотите навсегда удалить этот Reel?");
+    if (!confirmed) return;
     setDeletingReel(true);
     triggerHaptic("heavy");
     try {
-      await Api.delete(`/reels/${reelId}`);
+      try {
+        await Api.delete(`/reels/${reelId}`);
+      } catch (e) {
+        await Api.delete(`/posts/${reelId}`);
+      }
       showToast("✓ Reels успешно удален");
       setReels((prev) => prev.filter((r) => r.id !== reelId));
       setCurrentIndex((prev) => (prev > 0 ? prev - 1 : 0));

@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc, case
+from sqlalchemy import select, desc, case, delete
 from sqlalchemy.orm import selectinload
 from typing import Optional
 from app.database.session import get_db
-from app.models.entities import User, Reel, ReelLike, ReelComment, Follow, SavedItem, Notification
+from app.models.entities import User, Reel, ReelLike, ReelComment, Follow, SavedItem, Notification, Post, PostLike, PostComment
 from app.schemas.all_schemas import ReelCreate, ReelCommentCreate
 from app.api.deps import get_current_user
+from app.core.config import settings
 
 router = APIRouter(prefix="/reels", tags=["Reels & Shorts"])
 
@@ -282,19 +283,60 @@ async def delete_reel(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Deletes a Reel. Allowed for Reel author or Director/Moderator.
+    Deletes a Reel (or Post). Allowed for Reel author or Director/Moderator/Admin.
     """
+    is_admin = (
+        current_user.role in ("director", "moderator", "admin", "it_admin", "developer") or
+        current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS
+    )
+
     res = await db.execute(select(Reel).where(Reel.id == reel_id))
     reel = res.scalars().first()
-    if not reel:
-        raise HTTPException(status_code=404, detail="Reel не найден")
 
-    if reel.user_id != current_user.id and current_user.role not in ("director", "moderator"):
+    if not reel:
+        # Fallback to Post if id belongs to a Post
+        post_res = await db.execute(select(Post).where(Post.id == reel_id))
+        post = post_res.scalars().first()
+        if not post:
+            raise HTTPException(status_code=404, detail="Reel не найден")
+
+        if post.user_id != current_user.id and not is_admin:
+            raise HTTPException(status_code=403, detail="Вы можете удалять только свои публикации")
+
+        await db.execute(delete(PostComment).where(PostComment.post_id == post.id))
+        await db.execute(delete(PostLike).where(PostLike.post_id == post.id))
+        await db.execute(delete(SavedItem).where(SavedItem.item_type == "post", SavedItem.item_id == post.id))
+        await db.execute(delete(Notification).where(Notification.target_id == post.id))
+        await db.delete(post)
+        await db.commit()
+        return {"status": "ok", "message": "Публикация успешно удалена", "deleted_id": reel_id}
+
+    if reel.user_id != current_user.id and not is_admin:
         raise HTTPException(status_code=403, detail="Вы можете удалять только свои Reels")
+
+    # Also clean up any Post created with this video URL
+    if reel.video_url:
+        synced_posts_res = await db.execute(
+            select(Post).where(
+                Post.user_id == reel.user_id,
+                Post.media_type == "video"
+            )
+        )
+        for sp in synced_posts_res.scalars().all():
+            if sp.media_urls and reel.video_url in sp.media_urls:
+                await db.execute(delete(PostComment).where(PostComment.post_id == sp.id))
+                await db.execute(delete(PostLike).where(PostLike.post_id == sp.id))
+                await db.execute(delete(SavedItem).where(SavedItem.item_type == "post", SavedItem.item_id == sp.id))
+                await db.delete(sp)
+
+    await db.execute(delete(ReelComment).where(ReelComment.reel_id == reel.id))
+    await db.execute(delete(ReelLike).where(ReelLike.reel_id == reel.id))
+    await db.execute(delete(SavedItem).where(SavedItem.item_type == "reel", SavedItem.item_id == reel.id))
+    await db.execute(delete(Notification).where(Notification.target_id == reel.id))
 
     await db.delete(reel)
     await db.commit()
-    return {"status": "ok", "message": "Reels успешно удален"}
+    return {"status": "ok", "message": "Reels успешно удален", "deleted_id": reel_id}
 
 
 @router.delete("/{reel_id}/comments/{comment_id}")
