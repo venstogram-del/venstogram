@@ -255,14 +255,15 @@ export function UserProfileModal({
 
               <button
                 onClick={() => {
+                  if (!profile) return;
                   triggerHaptic("medium");
                   onOpenChat({
-                    id: profile.id,
-                    username: profile.username,
-                    first_name: profile.first_name,
-                    last_name: profile.last_name,
-                    avatar_url: profile.avatar_url,
-                    is_verified: profile.is_verified
+                    id: profile.id || 1,
+                    username: profile.username || "user",
+                    first_name: profile.first_name || "User",
+                    last_name: profile.last_name || "",
+                    avatar_url: profile.avatar_url || null,
+                    is_verified: profile.is_verified || false
                   });
                   onClose();
                 }}

@@ -252,28 +252,7 @@ export function App() {
     }
   };
 
-  // Initialize Telegram SDK & Authentication
-  useEffect(() => {
-    try {
-      initTelegramApp();
-    } catch (e) {
-      console.warn("initTelegramApp error", e);
-    }
-
-    const handleOffline = () => setIsOffline(true);
-    const handleOnline = () => setIsOffline(false);
-    window.addEventListener("offline", handleOffline);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("vensto_offline_mode", () => setIsOffline(true));
-
-    authenticateUser();
-
-    return () => {
-      window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("online", handleOnline);
-    };
-  }, []);
-
+  // Move authenticateUser declaration before useEffect so it is never accessed before initialization
   const authenticateUser = async () => {
     try {
       const initData = window.Telegram?.WebApp?.initData;
@@ -355,7 +334,7 @@ export function App() {
       }
 
       // Check deep link parameters
-      const urlParams = new URLSearchParams(window.location.search);
+      const urlParams = new URLSearchParams(typeof window !== "undefined" && window.location?.search ? window.location.search : "");
       const tabParam = urlParams.get("tab");
       const startAppParam = urlParams.get("startapp");
 
@@ -387,6 +366,28 @@ export function App() {
       setLoading(false);
     }
   };
+
+  // Initialize Telegram SDK & Authentication
+  useEffect(() => {
+    try {
+      initTelegramApp();
+    } catch (e) {
+      console.warn("initTelegramApp error", e);
+    }
+
+    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => setIsOffline(false);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("vensto_offline_mode", () => setIsOffline(true));
+
+    authenticateUser();
+
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
 
   const loadAllContent = async () => {
     try {

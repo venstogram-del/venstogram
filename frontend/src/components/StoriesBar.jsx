@@ -68,7 +68,7 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
     if (e) e.preventDefault();
     if (!storyReplyText.trim() || !activeViewerGroup) return;
     triggerHaptic("medium");
-    const partnerId = activeViewerGroup.user.id;
+    const partnerId = activeViewerGroup.user?.id || 1;
     const currentStory = activeViewerGroup.stories[currentStoryIndex];
     try {
       await Api.post("/chats/send", {
@@ -214,13 +214,13 @@ export function StoriesBar({ storiesGroups = [], currentUserId, onStoryCreated, 
                 }`}
               >
                 <img
-                  src={group.user.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
-                  alt={group.user.first_name}
+                  src={group?.user?.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
+                  alt={group?.user?.first_name || "user"}
                   className="w-full h-full rounded-full object-cover border-2 border-white"
                 />
               </div>
               <span className="text-[11px] text-slate-800 font-medium mt-1 max-w-[64px] truncate">
-                {group.user.first_name || group.user.username}
+                {group?.user?.first_name || group?.user?.username || "Пользователь"}
               </span>
             </div>
           );

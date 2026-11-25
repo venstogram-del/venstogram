@@ -135,9 +135,10 @@ export function ProfileView({
   const loadUserContent = async () => {
     try {
       setContentLoading(true);
+      const targetUserId = user?.id || 1;
       const [postsRes, reelsRes, savedRes] = await Promise.allSettled([
-        Api.get(`/users/${user.id}/posts`),
-        Api.get(`/users/${user.id}/reels`),
+        Api.get(`/users/${targetUserId}/posts`),
+        Api.get(`/users/${targetUserId}/reels`),
         Api.get("/users/me/saved")
       ]);
       setUserPosts(postsRes.status === "fulfilled" && Array.isArray(postsRes.value) ? postsRes.value : []);

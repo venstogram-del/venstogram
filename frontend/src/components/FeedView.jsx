@@ -41,14 +41,15 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
   }, []);
 
   const handleFollowSuggested = async (author) => {
+    if (!author || !author.id) return;
     triggerHaptic("medium");
     try {
       const res = await Api.post(`/users/${author.id}/follow`, {});
       setSuggestedUsers((prev) =>
-        prev.map((u) => (u.id === author.id ? { ...u, is_following: res.is_following } : u))
+        Array.isArray(prev) ? prev.map((u) => (u && u.id === author.id ? { ...u, is_following: res?.is_following } : u)) : []
       );
       if (res?.is_following) {
-        alert(`✓ Obuna bo'lindi: @${author.username}`);
+        alert(`✓ Obuna bo'lindi: @${author.username || "user"}`);
       }
     } catch (err) {
       alert(err.message || "Xatolik yuz berdi");
@@ -197,17 +198,17 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
             <div className="flex items-center justify-between px-4 py-2.5">
               <div
                 className="flex items-center space-x-2.5 cursor-pointer"
-                onClick={() => onOpenProfile && onOpenProfile(post.author.id)}
+                onClick={() => onOpenProfile && (post.author?.id || post.user_id) && onOpenProfile(post.author?.id || post.user_id)}
               >
                 <img
-                  src={post.author.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
-                  alt={post.author.username}
+                  src={post.author?.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
+                  alt={post.author?.username || "user"}
                   className="w-9 h-9 rounded-full object-cover ring-2 ring-pink-500/30"
                 />
                 <div>
                   <div className="flex items-center space-x-1">
                     <span className="text-xs font-bold text-slate-900 tracking-tight">
-                      {post.author.username}
+                      {post.author?.username || `user_${post.user_id || 1}`}
                     </span>
                     {post.author.badge_type === "gold_founder" ? (
                       <span className="text-amber-500 text-xs font-bold" title="Золотая Галочка Основателя">
@@ -447,21 +448,21 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
           </div>
 
           {/* Suggested Bloggers */}
-          {suggestedUsers && suggestedUsers.filter((u) => u.id !== user?.id).length > 0 && (
+          {Array.isArray(suggestedUsers) && suggestedUsers.filter((u) => u && u.id && u.id !== user?.id).length > 0 && (
             <div className="space-y-2 pt-2 text-left">
               <span className="text-[10px] font-bold uppercase tracking-wider text-pink-400 block px-1">
                 Tavsiya etilgan mualliflar / Рекомендованные авторы:
               </span>
               <div className="flex flex-col space-y-2">
                 {suggestedUsers
-                  .filter((author) => author.id !== user?.id)
+                  .filter((author) => author && author.id && author.id !== user?.id)
                   .map((author) => (
                     <div
                       key={author.id}
                       className="flex items-center justify-between p-2.5 bg-slate-950/80 rounded-2xl border border-slate-800"
                     >
                       <div
-                        onClick={() => onOpenProfile && onOpenProfile(author.id)}
+                        onClick={() => onOpenProfile && author?.id && onOpenProfile(author.id)}
                         className="flex items-center space-x-2.5 cursor-pointer text-left min-w-0"
                       >
                         <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-amber-500 flex items-center justify-center text-white font-bold text-sm overflow-hidden flex-shrink-0">
