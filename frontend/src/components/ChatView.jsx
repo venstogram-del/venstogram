@@ -142,6 +142,55 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     queuedRemoteOfferRef.current = null;
   };
 
+  const attachRemoteTrack = (event) => {
+    console.log("[WebRTC ontrack] Remote track received:", event.track.kind, event.track.id);
+
+    if (!remoteStreamRef.current) {
+      remoteStreamRef.current = new MediaStream();
+    }
+
+    // Accumulate all incoming tracks into remoteStreamRef so audio is never replaced by video
+    const curTracks = remoteStreamRef.current.getTracks();
+    if (!curTracks.some((t) => t.id === event.track.id)) {
+      remoteStreamRef.current.addTrack(event.track);
+    }
+
+    if (event.streams && event.streams[0]) {
+      event.streams[0].getTracks().forEach((t) => {
+        if (!remoteStreamRef.current.getTracks().some((x) => x.id === t.id)) {
+          remoteStreamRef.current.addTrack(t);
+        }
+      });
+    }
+
+    // Audio Playback: Dedicated audio element ensures VoIP routing & speakerphone output
+    if (remoteAudioRef.current) {
+      if (remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
+        remoteAudioRef.current.srcObject = remoteStreamRef.current;
+      }
+      remoteAudioRef.current.volume = 1.0;
+      remoteAudioRef.current.muted = false;
+      try {
+        const p = remoteAudioRef.current.play();
+        if (p !== undefined) p.catch(() => {});
+      } catch (e) {}
+    }
+
+    // Video Playback: Muted video element displays video frames without audio hardware conflict
+    if (remoteVideoRef.current) {
+      if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
+        remoteVideoRef.current.srcObject = remoteStreamRef.current;
+      }
+      try {
+        const p = remoteVideoRef.current.play();
+        if (p !== undefined) p.catch(() => {});
+      } catch (e) {}
+    }
+
+    setActiveCall((prev) => (prev ? { ...prev, isConnected: true } : null));
+    SoundEngine.stopRingtone();
+  };
+
   const applyRemoteOffer = async (offer, pc, targetUserId, callId) => {
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
@@ -149,7 +198,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         const cand = queuedIceCandidatesRef.current.shift();
         try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch (e) {}
       }
-      const answer = await pc.createAnswer();
+      const answer = await pc.createAnswer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
       await pc.setLocalDescription(answer);
       sendCallSignal("call_answer", answer, targetUserId, callId);
     } catch (err) {
@@ -363,6 +415,41 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       if (callTimerRef.current) clearInterval(callTimerRef.current);
     };
   }, [activeCall?.isConnected]);
+
+  // Synchronize and re-attach audio & video streams when call connects or view changes
+  useEffect(() => {
+    if (activeCall?.isConnected) {
+      if (remoteAudioRef.current && remoteStreamRef.current) {
+        if (remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
+          remoteAudioRef.current.srcObject = remoteStreamRef.current;
+        }
+        remoteAudioRef.current.volume = 1.0;
+        remoteAudioRef.current.muted = false;
+        try {
+          const p = remoteAudioRef.current.play();
+          if (p !== undefined) p.catch(() => {});
+        } catch (e) {}
+      }
+      if (remoteVideoRef.current && remoteStreamRef.current) {
+        if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
+          remoteVideoRef.current.srcObject = remoteStreamRef.current;
+        }
+        try {
+          const p = remoteVideoRef.current.play();
+          if (p !== undefined) p.catch(() => {});
+        } catch (e) {}
+      }
+      if (localVideoRef.current && localStreamRef.current) {
+        if (localVideoRef.current.srcObject !== localStreamRef.current) {
+          localVideoRef.current.srcObject = localStreamRef.current;
+        }
+        try {
+          const p = localVideoRef.current.play();
+          if (p !== undefined) p.catch(() => {});
+        } catch (e) {}
+      }
+    }
+  }, [activeCall?.isConnected, activeCall?.isVideo, isCallMinimized]);
 
   const loadDialogs = async () => {
     try {
@@ -793,11 +880,20 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         video: isVideo ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false
       });
       localStreamRef.current = localStream;
+      localStream.getAudioTracks().forEach((t) => (t.enabled = true));
+      localStream.getVideoTracks().forEach((t) => (t.enabled = true));
     } catch (mediaErr) {
       console.error("[startCall media error]", mediaErr);
       SoundEngine.stopRingtone();
       alert("Не удалось включить микрофон или камеру. Пожалуйста, разрешите доступ в настройках браузера.");
       return;
+    }
+
+    // Unlock mobile browser audio playback during user gesture
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.volume = 1.0;
+      remoteAudioRef.current.muted = false;
+      try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
     }
 
     let callId = null;
@@ -843,22 +939,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     });
 
     // Handle remote tracks
-    pc.ontrack = (event) => {
-      console.log("[Caller ontrack] Remote stream track received:", event.track.kind);
-      if (event.streams && event.streams[0]) {
-        remoteStreamRef.current = event.streams[0];
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-          try { remoteVideoRef.current.play().catch(() => {}); } catch(e) {}
-        }
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = event.streams[0];
-          try { remoteAudioRef.current.play().catch(() => {}); } catch(e) {}
-        }
-      }
-      setActiveCall((prev) => (prev ? { ...prev, isConnected: true } : null));
-      SoundEngine.stopRingtone();
-    };
+    pc.ontrack = attachRemoteTrack;
 
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
@@ -870,9 +951,12 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       }
     };
 
-    // 3. Create SDP Offer and dispatch
+    // 3. Create SDP Offer and dispatch (with explicit audio & video receiving flags)
     try {
-      const offer = await pc.createOffer();
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: isVideo
+      });
       await pc.setLocalDescription(offer);
       const targetPid = activePartner?.id || activePartnerRef.current?.id;
       if (targetPid && callId) {
@@ -963,8 +1047,17 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         video: isVideo ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false
       });
       localStreamRef.current = localStream;
+      localStream.getAudioTracks().forEach((t) => (t.enabled = true));
+      localStream.getVideoTracks().forEach((t) => (t.enabled = true));
     } catch (mediaErr) {
       console.error("[Accept media error]", mediaErr);
+    }
+
+    // Unlock mobile browser audio playback during user gesture
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.volume = 1.0;
+      remoteAudioRef.current.muted = false;
+      try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
     }
 
     setTimeout(() => {
@@ -984,22 +1077,8 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       });
     }
 
-    pc.ontrack = (event) => {
-      console.log("[Receiver ontrack] Remote stream track received:", event.track.kind);
-      if (event.streams && event.streams[0]) {
-        remoteStreamRef.current = event.streams[0];
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-          try { remoteVideoRef.current.play().catch(() => {}); } catch(e) {}
-        }
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = event.streams[0];
-          try { remoteAudioRef.current.play().catch(() => {}); } catch(e) {}
-        }
-      }
-      setActiveCall((prev) => (prev ? { ...prev, isConnected: true } : null));
-      SoundEngine.stopRingtone();
-    };
+    // Handle remote tracks
+    pc.ontrack = attachRemoteTrack;
 
     pc.onicecandidate = (event) => {
       if (event.candidate && targetUserId && callToAccept.call_id) {
@@ -1539,8 +1618,20 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         </div>
       )}
 
-      {/* Hidden WebRTC Audio Playback Element */}
-      <audio ref={remoteAudioRef} autoPlay playsInline />
+      {/* Dedicated WebRTC Audio Playback Element */}
+      <audio
+        ref={(el) => {
+          remoteAudioRef.current = el;
+          if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) {
+            el.srcObject = remoteStreamRef.current;
+            el.volume = 1.0;
+            el.muted = false;
+            try { el.play().catch(() => {}); } catch(e) {}
+          }
+        }}
+        autoPlay
+        playsInline
+      />
 
       {/* Floating Picture-in-Picture (PIP) Call Widget when Minimized */}
       {activeCall && isCallMinimized && (
@@ -1561,6 +1652,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                 }}
                 autoPlay
                 playsInline
+                muted
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -1625,9 +1717,16 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             activeCall.isVideo ? (
               <div className="absolute inset-0 bg-slate-950 flex items-center justify-center overflow-hidden">
                 <video
-                  ref={remoteVideoRef}
+                  ref={(el) => {
+                    remoteVideoRef.current = el;
+                    if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) {
+                      el.srcObject = remoteStreamRef.current;
+                      try { el.play().catch(() => {}); } catch(e) {}
+                    }
+                  }}
                   autoPlay
                   playsInline
+                  muted
                   className="w-full h-full object-cover"
                 />
                 {!remoteStreamRef.current && (
@@ -1667,7 +1766,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
           {activeCall.isVideo && activeCall.isConnected && (
             <div className="absolute top-16 right-4 z-20 w-28 h-40 sm:w-36 sm:h-48 rounded-2xl overflow-hidden border-2 border-pink-500/80 shadow-2xl bg-slate-900">
               <video
-                ref={localVideoRef}
+                ref={(el) => {
+                  localVideoRef.current = el;
+                  if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
+                    el.srcObject = localStreamRef.current;
+                    try { el.play().catch(() => {}); } catch(e) {}
+                  }
+                }}
                 autoPlay
                 playsInline
                 muted
