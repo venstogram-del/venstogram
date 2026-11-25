@@ -20,7 +20,7 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
   const [showLikers, setShowLikers] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportReason, setReportReason] = useState("Запрещенный контент / Порнография (Ст. 130 УК РУз)");
-  const [isSaved, setIsSaved] = useState(false);
+  const [isSaved, setIsSaved] = useState(post?.is_saved || false);
   const [deleting, setDeleting] = useState(false);
   const [replyToComment, setReplyToComment] = useState(null); // { id, username }
   const [statsModalOpen, setStatsModalOpen] = useState(false);
@@ -304,11 +304,16 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
             </button>
 
             <button
-              onClick={() => {
-                triggerHaptic("light");
-                setIsSaved(!isSaved);
+              onClick={async () => {
+                triggerHaptic("medium");
+                const nextVal = !isSaved;
+                setIsSaved(nextVal);
+                try {
+                  await Api.post(`/posts/${currentPost.id}/save`, {});
+                } catch (e) {}
               }}
-              className="text-base text-slate-400 hover:text-amber-400"
+              className="text-base text-slate-400 hover:text-amber-400 transition"
+              title={isSaved ? "Удалить из сохраненного" : "Сохранить публикацию"}
             >
               {isSaved ? "🔖" : "🏷️"}
             </button>

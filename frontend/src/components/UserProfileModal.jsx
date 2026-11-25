@@ -23,6 +23,9 @@ export function UserProfileModal({
   const [followersCount, setFollowersCount] = useState(0);
   const [copySuccess, setCopySuccess] = useState(false);
   const [followModal, setFollowModal] = useState(null); // { type, userId, title }
+  const [giftThemeOpen, setGiftThemeOpen] = useState(false);
+  const [giftSelectedTheme, setGiftSelectedTheme] = useState("gold_founder");
+  const [gifting, setGifting] = useState(false);
 
   useEffect(() => {
     if (userId) {
@@ -273,6 +276,20 @@ export function UserProfileModal({
             </div>
           )}
 
+          {/* Director VIP Theme Gifting Quick Button */}
+          {!isMe && currentUser?.role === "director" && (
+            <button
+              onClick={() => {
+                triggerHaptic("medium");
+                setGiftThemeOpen(true);
+              }}
+              className="w-full py-2 bg-gradient-to-r from-amber-500/20 via-yellow-500/30 to-amber-500/20 hover:from-amber-500/30 hover:to-yellow-500/40 border border-amber-400/50 text-amber-300 rounded-xl text-xs font-black flex items-center justify-center space-x-1.5 shadow-sm active:scale-98 transition"
+            >
+              <span>👑</span>
+              <span>Подарить VIP оформление от Основателя</span>
+            </button>
+          )}
+
           {/* Grid Tabs: Posts vs Reels */}
           <div className="flex border-b border-slate-800 text-xs font-bold">
             <button
@@ -429,6 +446,84 @@ export function UserProfileModal({
             } catch (e) {}
           }}
         />
+      )}
+
+      {/* Gift VIP Theme Modal */}
+      {giftThemeOpen && (
+        <div className="fixed inset-0 z-100 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl relative shadow-amber-500/10">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl">🎁</span>
+                <div>
+                  <h3 className="text-sm font-black text-white">Подарить дизайн @{profile?.username}</h3>
+                  <span className="text-[10px] text-amber-400 font-semibold">Привилегия Основателя</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setGiftThemeOpen(false)}
+                className="text-slate-400 hover:text-white p-1 text-base font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {[
+                { id: "gold_founder", title: "👑 Золотой Основатель", desc: "Роскошный золотой фон, корона и аура", color: "border-amber-500/50 bg-amber-950/20 text-amber-300" },
+                { id: "cyber_neon", title: "💎 Киберпанк Неон", desc: "Электрический неоновый градиент и свечение", color: "border-cyan-500/50 bg-cyan-950/20 text-cyan-300" },
+                { id: "royal_emerald", title: "🌿 Королевский Изумруд", desc: "Глубокий изумрудный бархат с золотом", color: "border-emerald-500/50 bg-emerald-950/20 text-emerald-300" },
+                { id: "ruby_luxury", title: "🍷 Рубиновый Люкс", desc: "Насыщенный рубиновый и розовое золото", color: "border-rose-500/50 bg-rose-950/20 text-rose-300" },
+                { id: "default", title: "⚙️ Стандартная тема", desc: "Классический темный дизайн", color: "border-slate-800 bg-slate-950 text-slate-300" }
+              ].map((themeOpt) => (
+                <div
+                  key={themeOpt.id}
+                  onClick={() => {
+                    triggerHaptic("selection");
+                    setGiftSelectedTheme(themeOpt.id);
+                  }}
+                  className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
+                    giftSelectedTheme === themeOpt.id
+                      ? `${themeOpt.color} ring-2 ring-amber-400 shadow-md`
+                      : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400"
+                  }`}
+                >
+                  <div>
+                    <span className="text-xs font-bold block">{themeOpt.title}</span>
+                    <span className="text-[10px] opacity-75">{themeOpt.desc}</span>
+                  </div>
+                  {giftSelectedTheme === themeOpt.id && (
+                    <span className="text-amber-400 font-bold text-sm">✓</span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={async () => {
+                setGifting(true);
+                triggerHaptic("medium");
+                try {
+                  const res = await Api.post(`/users/${userId}/gift-theme`, {
+                    user_id: userId,
+                    theme: giftSelectedTheme
+                  });
+                  triggerHaptic("success");
+                  alert(res.message || "✓ VIP дизайн успешно подарен!");
+                  setGiftThemeOpen(false);
+                } catch (err) {
+                  alert("Ошибка: " + err.message);
+                } finally {
+                  setGifting(false);
+                }
+              }}
+              disabled={gifting}
+              className="w-full py-3 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-amber-500/30 active:scale-95 transition"
+            >
+              {gifting ? "Отправка подарка..." : "Установить VIP дизайн 🎁"}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

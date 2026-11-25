@@ -15,6 +15,7 @@ const files = [
   'components/PostModal.jsx',
   'components/FollowListModal.jsx',
   'components/UserProfileModal.jsx',
+  'components/NotificationsModal.jsx',
   'components/Header.jsx',
   'components/BottomNav.jsx',
   'components/StoriesBar.jsx',

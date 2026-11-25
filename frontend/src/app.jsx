@@ -19,6 +19,7 @@ import { FounderQuestModal } from "./components/FounderQuestModal.jsx";
 import { RegistrationModal } from "./components/RegistrationModal.jsx";
 import { UserProfileModal } from "./components/UserProfileModal.jsx";
 import { PostModal } from "./components/PostModal.jsx";
+import { NotificationsModal } from "./components/NotificationsModal.jsx";
 
 export function App() {
   const safeGetItem = (k) => { try { return localStorage.getItem(k); } catch(e) { return null; } };
@@ -47,6 +48,21 @@ export function App() {
   const [isRegistered, setIsRegistered] = useState(true);
   const [viewingProfileUserId, setViewingProfileUserId] = useState(null);
   const [selectedPostModal, setSelectedPostModal] = useState(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  // Sync unread notifications count
+  useEffect(() => {
+    if (user?.id) {
+      Api.get("/users/notifications?limit=1")
+        .then((res) => {
+          if (res && typeof res.unread_count === "number") {
+            setUnreadNotificationsCount(res.unread_count);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user?.id, notificationsOpen]);
 
   // Global Incoming Call & Message Toast States
   const [globalIncomingCall, setGlobalIncomingCall] = useState(null);
@@ -412,6 +428,8 @@ export function App() {
         onLanguageChange={handleLanguageChange}
         onOpenCreate={() => setCreatePostOpen(true)}
         onOpenChat={() => setChatOpen(true)}
+        onOpenNotifications={() => setNotificationsOpen(true)}
+        unreadNotificationsCount={unreadNotificationsCount}
       />
 
       {/* Main View Router */}
@@ -520,6 +538,14 @@ export function App() {
             setActiveChatUser(null);
             setPendingCallAccept(null);
           }}
+        />
+      )}
+
+      {notificationsOpen && (
+        <NotificationsModal
+          onClose={() => setNotificationsOpen(false)}
+          onOpenProfile={handleOpenProfile}
+          onUnreadCountChanged={(count) => setUnreadNotificationsCount(count)}
         />
       )}
 

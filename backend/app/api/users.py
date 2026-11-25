@@ -5,7 +5,8 @@ from sqlalchemy import select, or_, func, and_
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from app.database.session import get_db
-from app.models.entities import User, Follow, Post, Reel, UsernameListing, PostLike, ReelLike
+from app.models.entities import User, Follow, Post, Reel, UsernameListing, PostLike, ReelLike, SavedItem, Notification
+from app.schemas.all_schemas import GiftThemeRequest
 from app.api.deps import get_current_user, get_current_user_optional
 
 FOUNDER_RESERVED_USERNAMES = {
@@ -278,7 +279,7 @@ async def get_user_reels_full(
     res = await db.execute(
         select(Reel)
         .options(selectinload(Reel.author))
-        .where(Reel.user_id == user_id, Reel.moderation_status != "rejected")
+        .where(Reel.user_id == user_id, Reel.is_flagged == False)
         .order_by(Reel.created_at.desc())
     )
     reels = res.scalars().all()
@@ -298,7 +299,9 @@ async def get_user_reels_full(
             "id": r.id,
             "caption": r.caption,
             "video_url": r.video_url,
+            "thumbnail_url": r.thumbnail_url or "",
             "media_urls": [r.video_url] if r.video_url else [],
+            "media_type": "video",
             "likes_count": r.likes_count,
             "views_count": r.views_count,
             "comments_count": r.comments_count,
@@ -386,13 +389,28 @@ async def toggle_follow(
         select(Follow).where(Follow.follower_id == current_user.id, Follow.following_id == user_id)
     )
     existing = res.scalars().first()
+    actor_name = current_user.first_name or current_user.username or "Пользователь"
     if existing:
         await db.delete(existing)
         is_following = False
+        notif = Notification(
+            user_id=user_id,
+            actor_id=current_user.id,
+            type="unfollow",
+            message=f"{actor_name} отписался(лась) от вас"
+        )
+        db.add(notif)
     else:
         new_follow = Follow(follower_id=current_user.id, following_id=user_id)
         db.add(new_follow)
         is_following = True
+        notif = Notification(
+            user_id=user_id,
+            actor_id=current_user.id,
+            type="follow",
+            message=f"{actor_name} подписался(лась) на вас"
+        )
+        db.add(notif)
 
     await db.commit()
     followers_count = (await db.execute(select(func.count(Follow.id)).where(Follow.following_id == user_id))).scalar() or 0
@@ -618,3 +636,207 @@ async def claim_founder_quest_reward(
         "badge_type": current_user.badge_type,
         "message": "Поздравляем! Золотая Галочка Основателя и максимальный 5x буст активированы!"
     }
+
+
+# ============================================================================
+# Saved Publications & Reels (Bookmarks)
+# ============================================================================
+
+@router.get("/me/saved")
+async def get_my_saved_items(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    saved_res = await db.execute(
+        select(SavedItem)
+        .where(SavedItem.user_id == current_user.id)
+        .order_by(SavedItem.created_at.desc())
+        .limit(100)
+    )
+    saved_items = saved_res.scalars().all()
+    
+    post_ids = [s.item_id for s in saved_items if s.item_type == "post"]
+    reel_ids = [s.item_id for s in saved_items if s.item_type == "reel"]
+    
+    posts_map = {}
+    if post_ids:
+        p_res = await db.execute(
+            select(Post).options(selectinload(Post.author)).where(Post.id.in_(post_ids))
+        )
+        for p in p_res.scalars().all():
+            posts_map[p.id] = p
+            
+    reels_map = {}
+    if reel_ids:
+        r_res = await db.execute(
+            select(Reel).options(selectinload(Reel.author)).where(Reel.id.in_(reel_ids))
+        )
+        for r in r_res.scalars().all():
+            reels_map[r.id] = r
+            
+    output = []
+    for s in saved_items:
+        if s.item_type == "post" and s.item_id in posts_map:
+            p = posts_map[s.item_id]
+            output.append({
+                "id": p.id,
+                "item_type": "post",
+                "caption": p.caption,
+                "media_urls": p.media_urls or [],
+                "media_type": p.media_type,
+                "likes_count": p.likes_count,
+                "views_count": p.views_count,
+                "comments_count": p.comments_count,
+                "is_saved": True,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+                "author": {
+                    "id": p.author.id,
+                    "username": p.author.username,
+                    "first_name": p.author.first_name,
+                    "last_name": p.author.last_name,
+                    "avatar_url": p.author.avatar_url,
+                    "is_verified": p.author.is_verified,
+                    "badge_type": getattr(p.author, "badge_type", "blue")
+                } if p.author else None
+            })
+        elif s.item_type == "reel" and s.item_id in reels_map:
+            r = reels_map[s.item_id]
+            output.append({
+                "id": r.id,
+                "item_type": "reel",
+                "caption": r.caption,
+                "video_url": r.video_url,
+                "thumbnail_url": r.thumbnail_url or "",
+                "media_urls": [r.video_url] if r.video_url else [],
+                "media_type": "video",
+                "likes_count": r.likes_count,
+                "views_count": r.views_count,
+                "comments_count": r.comments_count,
+                "is_saved": True,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "author": {
+                    "id": r.author.id,
+                    "username": r.author.username,
+                    "first_name": r.author.first_name,
+                    "last_name": r.author.last_name,
+                    "avatar_url": r.author.avatar_url,
+                    "is_verified": r.author.is_verified,
+                    "badge_type": getattr(r.author, "badge_type", "blue")
+                } if r.author else None
+            })
+    return output
+
+
+# ============================================================================
+# Notifications & Activity Center
+# ============================================================================
+
+@router.get("/notifications")
+async def get_my_notifications(
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = (
+        select(Notification)
+        .options(selectinload(Notification.actor))
+        .where(Notification.user_id == current_user.id)
+        .order_by(Notification.created_at.desc())
+        .limit(limit)
+    )
+    res = await db.execute(stmt)
+    notifs = res.scalars().all()
+
+    unread_count = (await db.execute(
+        select(func.count(Notification.id)).where(
+            Notification.user_id == current_user.id,
+            Notification.is_read == False
+        )
+    )).scalar() or 0
+
+    return {
+        "unread_count": unread_count,
+        "notifications": [
+            {
+                "id": n.id,
+                "type": n.type,
+                "target_id": n.target_id,
+                "message": n.message,
+                "is_read": n.is_read,
+                "created_at": n.created_at.isoformat() if n.created_at else None,
+                "actor": {
+                    "id": n.actor.id,
+                    "username": n.actor.username,
+                    "first_name": n.actor.first_name,
+                    "last_name": n.actor.last_name,
+                    "avatar_url": n.actor.avatar_url,
+                    "is_verified": n.actor.is_verified,
+                    "badge_type": getattr(n.actor, "badge_type", "blue")
+                } if n.actor else None
+            }
+            for n in notifs
+        ]
+    }
+
+
+@router.post("/notifications/read-all")
+async def mark_notifications_read(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from sqlalchemy import update
+    await db.execute(
+        update(Notification)
+        .where(Notification.user_id == current_user.id, Notification.is_read == False)
+        .values(is_read=True)
+    )
+    await db.commit()
+    return {"status": "ok"}
+
+
+# ============================================================================
+# Gift VIP Design / Theme (Director Privilege)
+# ============================================================================
+
+@router.post("/{user_id}/gift-theme")
+async def gift_vip_theme(
+    user_id: int,
+    req: GiftThemeRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from app.core.config import settings
+    is_director = getattr(current_user, "role", "") == "director" or current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS
+    if not is_director:
+        raise HTTPException(status_code=403, detail="Только Основатель / Директор может дарить VIP темы оформления.")
+
+    target_res = await db.execute(select(User).where(User.id == user_id))
+    target_u = target_res.scalars().first()
+    if not target_u:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    target_u.profile_theme = req.theme
+    
+    theme_names = {
+        "gold_founder": "👑 Золотой Основатель (VIP Gold)",
+        "cyber_neon": "💎 Неоновый Киберпанк (Cyber Neon)",
+        "royal_emerald": "🌿 Королевский Изумруд (Royal Emerald)",
+        "ruby_luxury": "🍷 Рубиновый Люкс (Ruby Luxury)",
+        "default": "Стандартная темная"
+    }
+    t_name = theme_names.get(req.theme, req.theme)
+    
+    actor_name = current_user.first_name or "Основатель"
+    notif = Notification(
+        user_id=target_u.id,
+        actor_id=current_user.id,
+        type="gift_theme",
+        message=f"👑 {actor_name} подарил вам эксклюзивный VIP дизайн: {t_name}!"
+    )
+    db.add(notif)
+    await db.commit()
+    return {
+        "status": "ok",
+        "message": f"VIP тема '{t_name}' успешно установлена для @{target_u.username}!"
+    }
+

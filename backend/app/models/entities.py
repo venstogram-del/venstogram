@@ -49,6 +49,7 @@ class User(Base):
     is_registered = Column(Boolean, default=False) # True when name, surname, birth_year & username setup completed
     is_incognito = Column(Boolean, default=False) # Режим невидимка (скрыть активность / онлайн)
     is_private = Column(Boolean, default=False) # Закрытый аккаунт
+    profile_theme = Column(String(32), default="default") # default, gold_founder, cyber_neon, royal_emerald, ruby_luxury
     
     # Founder Quest & Referrals
     referred_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -99,6 +100,7 @@ class Post(Base):
     # AI Moderation
     is_flagged = Column(Boolean, default=False)
     threat_score = Column(Integer, default=0)
+    moderation_status = Column(String(32), default="approved") # approved, pending, rejected
     moderation_status = Column(String(32), default="approved") # approved, pending, rejected
     moderation_reason = Column(String(256), nullable=True)
     
@@ -179,6 +181,7 @@ class Reel(Base):
     
     is_flagged = Column(Boolean, default=False)
     threat_score = Column(Integer, default=0)
+    moderation_status = Column(String(32), default="approved") # approved, pending, rejected
     
     created_at = Column(DateTime, default=utcnow, index=True)
 
@@ -419,5 +422,33 @@ class SponsoredAd(Base):
     views_count = Column(Integer, default=0)
     clicks_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=utcnow)
+
+
+class SavedItem(Base):
+    __tablename__ = "saved_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    item_type = Column(String(16), nullable=False) # 'post' or 'reel'
+    item_id = Column(Integer, nullable=False, index=True)
+    created_at = Column(DateTime, default=utcnow, index=True)
+
+    user = relationship("User", foreign_keys=[user_id])
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True) # receiver
+    actor_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True) # initiator
+    type = Column(String(32), nullable=False) # 'like_post', 'like_reel', 'follow', 'unfollow', 'gift_theme'
+    target_id = Column(Integer, nullable=True) # post_id, reel_id
+    message = Column(String(256), default="")
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=utcnow, index=True)
+
+    actor = relationship("User", foreign_keys=[actor_id])
+
 
 

@@ -102,10 +102,17 @@ export function ProfileView({
 
   const fileInputRef = useRef(null);
 
-  // Dynamic publications and reels loaded from API
+  // Dynamic publications, reels and saved items loaded from API
   const [userPosts, setUserPosts] = useState([]);
   const [userReels, setUserReels] = useState([]);
+  const [savedItems, setSavedItems] = useState([]);
   const [contentLoading, setContentLoading] = useState(false);
+
+  // VIP Theme Gifting Modal (Founder Privilege)
+  const [giftThemeModalOpen, setGiftThemeModalOpen] = useState(false);
+  const [giftRecipientUsername, setGiftRecipientUsername] = useState("");
+  const [giftSelectedTheme, setGiftSelectedTheme] = useState("gold_founder");
+  const [giftingTheme, setGiftingTheme] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -113,19 +120,30 @@ export function ProfileView({
     }
   }, [user?.id]);
 
+  useEffect(() => {
+    if (activeTab === "saved") {
+      Api.get("/users/me/saved")
+        .then((data) => setSavedItems(Array.isArray(data) ? data : []))
+        .catch(() => {});
+    }
+  }, [activeTab]);
+
   const loadUserContent = async () => {
     try {
       setContentLoading(true);
-      const [postsData, reelsData] = await Promise.all([
+      const [postsRes, reelsRes, savedRes] = await Promise.allSettled([
         Api.get(`/users/${user.id}/posts`),
-        Api.get(`/users/${user.id}/reels`)
+        Api.get(`/users/${user.id}/reels`),
+        Api.get("/users/me/saved")
       ]);
-      setUserPosts(Array.isArray(postsData) ? postsData : []);
-      setUserReels(Array.isArray(reelsData) ? reelsData : []);
+      setUserPosts(postsRes.status === "fulfilled" && Array.isArray(postsRes.value) ? postsRes.value : []);
+      setUserReels(reelsRes.status === "fulfilled" && Array.isArray(reelsRes.value) ? reelsRes.value : []);
+      setSavedItems(savedRes.status === "fulfilled" && Array.isArray(savedRes.value) ? savedRes.value : []);
     } catch (err) {
-      console.warn("Failed loading user posts/reels:", err);
+      console.warn("Failed loading user content:", err);
       setUserPosts([]);
       setUserReels([]);
+      setSavedItems([]);
     } finally {
       setContentLoading(false);
     }
@@ -333,7 +351,64 @@ export function ProfileView({
     }
   };
 
-  const displayList = activeTab === "reels" ? userReels : userPosts;
+  const displayList =
+    activeTab === "reels"
+      ? userReels
+      : activeTab === "saved"
+      ? savedItems
+      : userPosts;
+
+  const userTheme = user?.profile_theme || (user?.role === "director" ? "gold_founder" : "default");
+  const isDirector = user?.role === "director";
+  const isFounderTheme = userTheme === "gold_founder" || isDirector;
+
+  let themeContainerStyle = "p-4 space-y-4 pb-24";
+  if (isFounderTheme) {
+    themeContainerStyle += " bg-gradient-to-b from-[#1c1507] via-[#0d0d12] to-[#040406] border-t-2 border-amber-500/40";
+  } else if (userTheme === "cyber_neon") {
+    themeContainerStyle += " bg-gradient-to-b from-[#180629] via-[#090b14] to-[#030508] border-t-2 border-cyan-400/40";
+  } else if (userTheme === "royal_emerald") {
+    themeContainerStyle += " bg-gradient-to-b from-[#061e12] via-[#060e0a] to-[#020503] border-t-2 border-emerald-400/40";
+  } else if (userTheme === "ruby_luxury") {
+    themeContainerStyle += " bg-gradient-to-b from-[#24060f] via-[#0f0508] to-[#040102] border-t-2 border-rose-500/40";
+  }
+
+  const handleGiftThemeSubmit = async (e) => {
+    e.preventDefault();
+    const cleanTarget = (giftRecipientUsername || "").trim().replace(/^@/, "").toLowerCase();
+    if (!cleanTarget) {
+      alert("Введите никнейм пользователя");
+      return;
+    }
+    setGiftingTheme(true);
+    triggerHaptic("medium");
+    try {
+      const searchRes = await Api.get(`/users/search?q=${encodeURIComponent(cleanTarget)}`);
+      let targetUser = null;
+      if (Array.isArray(searchRes)) {
+        targetUser = searchRes.find(
+          (u) => (u.username || "").toLowerCase() === cleanTarget
+        ) || searchRes[0];
+      }
+      if (!targetUser) {
+        throw new Error(`Пользователь @${cleanTarget} не найден`);
+      }
+
+      const res = await Api.post(`/users/${targetUser.id}/gift-theme`, {
+        user_id: targetUser.id,
+        theme: giftSelectedTheme
+      });
+      triggerHaptic("success");
+      SoundEngine.playFanfare();
+      alert(res.message || "✓ VIP дизайн успешно установлен!");
+      setGiftThemeModalOpen(false);
+      setGiftRecipientUsername("");
+    } catch (err) {
+      alert("Ошибка: " + err.message);
+    } finally {
+      setGiftingTheme(false);
+    }
+  };
 
   if (!user) {
     return (
@@ -345,7 +420,7 @@ export function ProfileView({
   }
 
   return (
-    <div className="p-4 space-y-4 pb-24">
+    <div className={themeContainerStyle}>
       {/* Top Profile Bar with Username and Three-Dots Menu */}
       <div className="flex items-center justify-between pb-1">
         <div className="flex items-center space-x-1.5 flex-wrap">
@@ -368,7 +443,7 @@ export function ProfileView({
             <span className="text-sky-400 font-bold text-sm" title="Верифицирован">✓</span>
           ) : null}
           {user.role === "director" && (
-            <span className="text-[9px] bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black px-1.5 py-0.5 rounded-full uppercase ml-1">
+            <span className="text-[9px] bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black px-1.5 py-0.5 rounded-full uppercase ml-1 shadow-sm">
               👑 Директор
             </span>
           )}
@@ -386,6 +461,37 @@ export function ProfileView({
           <span className="text-base font-black tracking-widest leading-none">⋯</span>
         </button>
       </div>
+
+      {/* Founder VIP Banner & Gift Button */}
+      {isFounderTheme && (
+        <div className="bg-gradient-to-r from-amber-500/20 via-yellow-500/25 to-amber-600/20 border border-amber-400/40 rounded-2xl p-3 shadow-lg shadow-amber-500/10 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 to-yellow-600 flex items-center justify-center text-base shadow-md ring-2 ring-amber-300 shrink-0">
+              👑
+            </div>
+            <div>
+              <span className="text-xs font-black text-amber-300 tracking-wide block uppercase">
+                {isDirector ? "Основатель Venstogram" : "Лига Победителей Лиги Основателя"}
+              </span>
+              <span className="text-[10px] text-amber-200/80">
+                Эксклюзивный VIP дизайн • Золотой фон
+              </span>
+            </div>
+          </div>
+          {isDirector && (
+            <button
+              onClick={() => {
+                triggerHaptic("medium");
+                setGiftThemeModalOpen(true);
+              }}
+              className="bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black text-[11px] px-3 py-1.5 rounded-xl shadow-md active:scale-95 transition flex items-center space-x-1 shrink-0 ml-2"
+            >
+              <span>🎁</span>
+              <span>Подарить VIP</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Suggestion banner if username is standard user_XXXXXX */}
       {user.username?.startsWith("user_") && (
@@ -416,7 +522,17 @@ export function ProfileView({
           <img
             src={user.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"}
             alt="Profile avatar"
-            className="w-20 h-20 rounded-full object-cover ring-2 ring-pink-500 shadow-xl"
+            className={`w-20 h-20 rounded-full object-cover transition-all shadow-xl ${
+              isFounderTheme
+                ? "ring-4 ring-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.6)]"
+                : userTheme === "cyber_neon"
+                ? "ring-4 ring-cyan-400 shadow-[0_0_25px_rgba(34,211,238,0.6)]"
+                : userTheme === "royal_emerald"
+                ? "ring-4 ring-emerald-400 shadow-[0_0_25px_rgba(52,211,153,0.6)]"
+                : userTheme === "ruby_luxury"
+                ? "ring-4 ring-rose-500 shadow-[0_0_25px_rgba(244,63,94,0.6)]"
+                : "ring-2 ring-pink-500"
+            }`}
           />
           <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
             <span className="text-xs text-white font-bold">📷 Сменить</span>
@@ -624,43 +740,91 @@ export function ProfileView({
         </div>
       ) : displayList.length === 0 ? (
         <div className="py-12 px-4 text-center bg-slate-900/40 border border-slate-800/80 rounded-2xl my-2">
-          <span className="text-3xl block mb-2">{activeTab === "reels" ? "🎬" : "📸"}</span>
+          <span className="text-3xl block mb-2">
+            {activeTab === "reels" ? "🎬" : activeTab === "saved" ? "🔖" : "📸"}
+          </span>
           <p className="text-xs font-bold text-white mb-1">
-            {activeTab === "reels" ? "У вас пока нет Reels" : "У вас пока нет публикаций"}
+            {activeTab === "reels"
+              ? "У вас пока нет Reels"
+              : activeTab === "saved"
+              ? "У вас пока нет сохраненных публикаций"
+              : "У вас пока нет публикаций"}
           </p>
           <p className="text-[11px] text-slate-400 mb-3 max-w-xs mx-auto">
             {activeTab === "reels"
               ? "Загрузите первое видео, чтобы набрать просмотры и попасть в рекомендации!"
+              : activeTab === "saved"
+              ? "Сохраняйте понравившиеся Reels и посты, нажимая на значок закладки 🔖!"
               : "Делитесь своими моментами, публикуйте фото и привлекайте подписчиков!"}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-1.5 pt-1">
-          {displayList.map((postItem) => (
-            <div
-              key={postItem.id}
-              onClick={() => {
-                triggerHaptic("light");
-                setSelectedPost(postItem);
-              }}
-              className="aspect-square bg-slate-900 overflow-hidden rounded-xl relative group cursor-pointer border border-slate-800/80 hover:border-pink-500/60 transition-all shadow-sm"
-            >
-              <img
-                src={postItem.media_urls?.[0] || postItem.video_url || "/placeholder.jpg"}
-                alt="Post thumbnail"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-              />
-              {activeTab === "reels" && (
-                <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-sm rounded-lg p-1 text-white text-[10px]">
-                  ▶
+          {displayList.map((postItem) => {
+            const isVideo =
+              activeTab === "reels" ||
+              postItem.item_type === "reel" ||
+              postItem.media_type === "video" ||
+              Boolean(postItem.video_url) ||
+              (typeof postItem.media_urls?.[0] === "string" &&
+                (postItem.media_urls[0].includes(".mp4") ||
+                  postItem.media_urls[0].includes(".mov") ||
+                  postItem.media_urls[0].includes(".webm") ||
+                  postItem.media_urls[0].startsWith("data:video")));
+
+            const videoSrc = postItem.video_url || (isVideo ? postItem.media_urls?.[0] : null);
+            const imageSrc = postItem.thumbnail_url || (!isVideo ? postItem.media_urls?.[0] : null) || "/placeholder.jpg";
+
+            return (
+              <div
+                key={`${postItem.item_type || "item"}_${postItem.id}`}
+                onClick={() => {
+                  triggerHaptic("light");
+                  setSelectedPost(postItem);
+                }}
+                className="aspect-square bg-slate-900 overflow-hidden rounded-xl relative group cursor-pointer border border-slate-800/80 hover:border-pink-500/60 transition-all shadow-sm"
+              >
+                {postItem.thumbnail_url ? (
+                  <img
+                    src={postItem.thumbnail_url}
+                    alt="Thumbnail"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                  />
+                ) : isVideo && videoSrc ? (
+                  <video
+                    src={videoSrc}
+                    preload="metadata"
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover pointer-events-none group-hover:scale-105 transition-transform"
+                  />
+                ) : (
+                  <img
+                    src={imageSrc}
+                    alt="Post thumbnail"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                  />
+                )}
+
+                {isVideo && (
+                  <div className="absolute top-1.5 right-1.5 bg-black/70 backdrop-blur-sm rounded-md px-1.5 py-0.5 text-white text-[10px] font-black flex items-center space-x-0.5 shadow-md">
+                    <span>▶</span>
+                  </div>
+                )}
+
+                {postItem.item_type === "reel" && (
+                  <div className="absolute top-1.5 left-1.5 bg-pink-600/90 backdrop-blur-sm rounded-md px-1 py-0.5 text-white text-[8px] font-black uppercase tracking-wider">
+                    Reels
+                  </div>
+                )}
+
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 flex items-center justify-between text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span>❤️ {postItem.likes_count || 0}</span>
+                  <span>👁️ {postItem.views_count || 0}</span>
                 </div>
-              )}
-              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 flex items-center justify-between text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                <span>❤️ {postItem.likes_count || 0}</span>
-                <span>👁️ {postItem.views_count || 0}</span>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -717,6 +881,27 @@ export function ProfileView({
                 </div>
                 <span className="text-pink-400 text-xs font-bold">Копировать</span>
               </div>
+
+              {/* Founder VIP Theme Gifting */}
+              {isDirector && (
+                <div
+                  onClick={() => {
+                    triggerHaptic("medium");
+                    setSettingsOpen(false);
+                    setGiftThemeModalOpen(true);
+                  }}
+                  className="bg-gradient-to-r from-amber-950/60 via-yellow-950/40 to-slate-950 p-3 rounded-2xl border border-amber-500/50 flex items-center justify-between cursor-pointer hover:border-amber-400 transition-all shadow-md shadow-amber-500/10 active:scale-98"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <span className="text-xl">🎁</span>
+                    <div>
+                      <span className="text-xs font-bold text-amber-300 block">Подарить VIP дизайн</span>
+                      <span className="text-[10px] text-amber-200/70">Подарите блогеру или пользователю эксклюзивное оформление</span>
+                    </div>
+                  </div>
+                  <span className="text-amber-400 text-xs font-bold">Выбрать ↵</span>
+                </div>
+              )}
 
               {/* Venstogram Verified Buy/Status Option */}
               <div className="bg-gradient-to-r from-sky-950/80 via-blue-900/40 to-slate-950 p-3 rounded-2xl border border-sky-500/40 space-y-2">
@@ -1692,6 +1877,92 @@ export function ProfileView({
             } catch (e) {}
           }}
         />
+      )}
+
+      {/* Gift VIP Theme Modal (Director Privilege) */}
+      {giftThemeModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl relative shadow-amber-500/10 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl">🎁</span>
+                <div>
+                  <h3 className="text-base font-black text-white">Подарить VIP дизайн</h3>
+                  <span className="text-[11px] text-amber-400 font-semibold">Привилегия Основателя платформы</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setGiftThemeModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleGiftThemeSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1.5">
+                  Никнейм пользователя (@username)
+                </label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3 text-slate-500 font-bold select-none">@</span>
+                  <input
+                    type="text"
+                    value={giftRecipientUsername}
+                    onChange={(e) => setGiftRecipientUsername(e.target.value.replace(/^@/, ""))}
+                    placeholder="логин_пользователя"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-7 pr-3 py-2.5 text-xs text-white outline-none focus:border-amber-400"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1.5">
+                  Выберите VIP оформление:
+                </label>
+                <div className="space-y-2">
+                  {[
+                    { id: "gold_founder", title: "👑 Золотой Основатель", desc: "Роскошный золотой фон, корона и аура", color: "border-amber-500/50 bg-amber-950/20 text-amber-300" },
+                    { id: "cyber_neon", title: "💎 Киберпанк Неон", desc: "Электрический неоновый градиент и свечение", color: "border-cyan-500/50 bg-cyan-950/20 text-cyan-300" },
+                    { id: "royal_emerald", title: "🌿 Королевский Изумруд", desc: "Глубокий изумрудный бархат с золотом", color: "border-emerald-500/50 bg-emerald-950/20 text-emerald-300" },
+                    { id: "ruby_luxury", title: "🍷 Рубиновый Люкс", desc: "Насыщенный рубиновый и розовое золото", color: "border-rose-500/50 bg-rose-950/20 text-rose-300" },
+                    { id: "default", title: "⚙️ Стандартная тема", desc: "Классический темный дизайн", color: "border-slate-800 bg-slate-950 text-slate-300" }
+                  ].map((themeOpt) => (
+                    <div
+                      key={themeOpt.id}
+                      onClick={() => {
+                        triggerHaptic("selection");
+                        setGiftSelectedTheme(themeOpt.id);
+                      }}
+                      className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
+                        giftSelectedTheme === themeOpt.id
+                          ? `${themeOpt.color} ring-2 ring-amber-400 shadow-md`
+                          : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400"
+                      }`}
+                    >
+                      <div>
+                        <span className="text-xs font-bold block">{themeOpt.title}</span>
+                        <span className="text-[10px] opacity-75">{themeOpt.desc}</span>
+                      </div>
+                      {giftSelectedTheme === themeOpt.id && (
+                        <span className="text-amber-400 font-bold text-sm">✓</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={giftingTheme}
+                className="w-full py-3.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-amber-500/30 active:scale-95 transition"
+              >
+                {giftingTheme ? "Подарок отправляется..." : "Подарить VIP оформление 🎁"}
+              </button>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

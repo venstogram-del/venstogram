@@ -62,6 +62,11 @@ class UserProfileUpdate(BaseModel):
     biometric_enabled: Optional[bool] = None
     is_incognito: Optional[bool] = None
     is_private: Optional[bool] = None
+    profile_theme: Optional[str] = None
+
+class GiftThemeRequest(BaseModel):
+    user_id: int
+    theme: str # gold_founder, cyber_neon, royal_emerald, ruby_luxury
 
 class UsernameOrderCreate(BaseModel):
     listing_id: Optional[int] = None

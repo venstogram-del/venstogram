@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, timezone
 from app.database.session import get_db
-from app.models.entities import User, Post, PostLike, PostComment, Follow
+from app.models.entities import User, Post, PostLike, PostComment, Follow, SavedItem, Notification
 from app.schemas.all_schemas import PostCreate, CommentCreate
 from app.api.deps import get_current_user
 from app.core.ai_moderator import ai_moderator
@@ -40,9 +40,10 @@ async def get_feed(
     res = await db.execute(query)
     posts = res.scalars().all()
 
-    # Get user's liked posts
+    # Get user's liked and saved posts
     post_ids = [p.id for p in posts]
     liked_post_ids = set()
+    saved_post_ids = set()
     if post_ids:
         likes_res = await db.execute(
             select(PostLike.post_id).where(
@@ -51,6 +52,15 @@ async def get_feed(
             )
         )
         liked_post_ids = set(likes_res.scalars().all())
+
+        saved_res = await db.execute(
+            select(SavedItem.item_id).where(
+                SavedItem.user_id == current_user.id,
+                SavedItem.item_type == "post",
+                SavedItem.item_id.in_(post_ids)
+            )
+        )
+        saved_post_ids = set(saved_res.scalars().all())
 
     output = []
     for p in posts:
@@ -67,6 +77,7 @@ async def get_feed(
             "views_count": p.views_count,
             "comments_count": p.comments_count,
             "is_liked": p.id in liked_post_ids,
+            "is_saved": p.id in saved_post_ids,
             "created_at": p.created_at.isoformat() if p.created_at else None,
             "author": {
                 "id": p.author.id,
@@ -139,9 +150,51 @@ async def toggle_like_post(
         db.add(new_like)
         post.likes_count += 1
         liked = True
+        if post.user_id != current_user.id:
+            actor_name = current_user.first_name or current_user.username or "Пользователь"
+            notif = Notification(
+                user_id=post.user_id,
+                actor_id=current_user.id,
+                type="like_post",
+                target_id=post.id,
+                message=f"{actor_name} оценил(а) вашу публикацию"
+            )
+            db.add(notif)
 
     await db.commit()
     return {"liked": liked, "likes_count": post.likes_count}
+
+
+@router.post("/{post_id}/save")
+async def toggle_save_post(
+    post_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    res = await db.execute(select(Post).where(Post.id == post_id))
+    post = res.scalars().first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    saved_res = await db.execute(
+        select(SavedItem).where(
+            SavedItem.user_id == current_user.id,
+            SavedItem.item_type == "post",
+            SavedItem.item_id == post_id
+        )
+    )
+    existing_saved = saved_res.scalars().first()
+    if existing_saved:
+        await db.delete(existing_saved)
+        is_saved = False
+    else:
+        new_saved = SavedItem(user_id=current_user.id, item_type="post", item_id=post_id)
+        db.add(new_saved)
+        is_saved = True
+
+    await db.commit()
+    return {"status": "ok", "is_saved": is_saved}
+
 
 
 @router.get("/{post_id}/comments")

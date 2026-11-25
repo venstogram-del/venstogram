@@ -7,7 +7,9 @@ export function Header({
   lang,
   onLanguageChange,
   onOpenCreate,
-  onOpenChat
+  onOpenChat,
+  onOpenNotifications,
+  unreadNotificationsCount = 0
 }) {
   const [supportOpen, setSupportOpen] = useState(false);
 
@@ -74,6 +76,25 @@ export function Header({
           <svg className="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
           </svg>
+        </button>
+
+        {/* Heart Notifications Icon */}
+        <button
+          onClick={() => {
+            triggerHaptic("light");
+            if (onOpenNotifications) onOpenNotifications();
+          }}
+          className="p-1.5 text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-colors relative"
+          title="Уведомления и лайки"
+        >
+          <svg className="w-5 h-5 text-rose-500 fill-current" viewBox="0 0 24 24">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+          </svg>
+          {unreadNotificationsCount > 0 ? (
+            <span className="absolute -top-1 -right-1.5 bg-rose-600 text-[9px] font-black text-white px-1 py-0.2 rounded-full min-w-[16px] text-center shadow-lg border border-slate-950 animate-pulse">
+              {unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount}
+            </span>
+          ) : null}
         </button>
 
         {/* Direct Messages Icon */}

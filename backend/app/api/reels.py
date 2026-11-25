@@ -4,7 +4,7 @@ from sqlalchemy import select, desc, case
 from sqlalchemy.orm import selectinload
 from typing import Optional
 from app.database.session import get_db
-from app.models.entities import User, Reel, ReelLike, ReelComment, Follow
+from app.models.entities import User, Reel, ReelLike, ReelComment, Follow, SavedItem, Notification
 from app.schemas.all_schemas import ReelCreate, ReelCommentCreate
 from app.api.deps import get_current_user
 
@@ -39,6 +39,7 @@ async def get_reels(
 
     reel_ids = [r.id for r in reels]
     liked_ids = set()
+    saved_ids = set()
     if reel_ids:
         likes_res = await db.execute(
             select(ReelLike.reel_id).where(
@@ -47,6 +48,15 @@ async def get_reels(
             )
         )
         liked_ids = set(likes_res.scalars().all())
+
+        saved_res = await db.execute(
+            select(SavedItem.item_id).where(
+                SavedItem.user_id == current_user.id,
+                SavedItem.item_type == "reel",
+                SavedItem.item_id.in_(reel_ids)
+            )
+        )
+        saved_ids = set(saved_res.scalars().all())
 
     output = []
     for r in reels:
@@ -63,6 +73,7 @@ async def get_reels(
             "comments_count": r.comments_count,
             "shares_count": r.shares_count,
             "is_liked": r.id in liked_ids,
+            "is_saved": r.id in saved_ids,
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "analytics": {
                 "views": r.views_count,
@@ -135,9 +146,51 @@ async def toggle_like_reel(
         db.add(new_like)
         reel.likes_count += 1
         liked = True
+        if reel.user_id != current_user.id:
+            actor_name = current_user.first_name or current_user.username or "Пользователь"
+            notif = Notification(
+                user_id=reel.user_id,
+                actor_id=current_user.id,
+                type="like_reel",
+                target_id=reel.id,
+                message=f"{actor_name} оценил(а) ваш Reels"
+            )
+            db.add(notif)
 
     await db.commit()
     return {"liked": liked, "likes_count": reel.likes_count}
+
+
+@router.post("/{reel_id}/save")
+async def toggle_save_reel(
+    reel_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    res = await db.execute(select(Reel).where(Reel.id == reel_id))
+    reel = res.scalars().first()
+    if not reel:
+        raise HTTPException(status_code=404, detail="Reel not found")
+
+    saved_res = await db.execute(
+        select(SavedItem).where(
+            SavedItem.user_id == current_user.id,
+            SavedItem.item_type == "reel",
+            SavedItem.item_id == reel_id
+        )
+    )
+    existing_saved = saved_res.scalars().first()
+    if existing_saved:
+        await db.delete(existing_saved)
+        is_saved = False
+    else:
+        new_saved = SavedItem(user_id=current_user.id, item_type="reel", item_id=reel_id)
+        db.add(new_saved)
+        is_saved = True
+
+    await db.commit()
+    return {"status": "ok", "is_saved": is_saved}
+
 
 
 @router.get("/{reel_id}/comments")

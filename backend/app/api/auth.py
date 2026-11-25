@@ -179,6 +179,7 @@ async def get_me(current_user: User = Depends(get_current_user), db: AsyncSessio
         "role": current_user.role,
         "is_verified": current_user.is_verified,
         "badge_type": getattr(current_user, "badge_type", "blue"),
+        "profile_theme": getattr(current_user, "profile_theme", "gold_founder" if getattr(current_user, "role", "") == "director" else "default") or ("gold_founder" if getattr(current_user, "role", "") == "director" else "default"),
         "verified_until": current_user.verified_until,
         "wallet_coins": current_user.wallet_coins,
         "wallet_uzs": current_user.wallet_uzs,
@@ -287,6 +288,8 @@ async def update_profile(
         current_user.is_incognito = req.is_incognito
     if req.is_private is not None:
         current_user.is_private = req.is_private
+    if req.profile_theme is not None:
+        current_user.profile_theme = req.profile_theme
 
     await db.commit()
     await db.refresh(current_user)
@@ -305,6 +308,7 @@ async def update_profile(
         "website": current_user.website,
         "telegram_channel": current_user.telegram_channel or "",
         "role": current_user.role,
+        "profile_theme": getattr(current_user, "profile_theme", "default"),
         "is_verified": current_user.is_verified,
         "wallet_coins": current_user.wallet_coins
     }

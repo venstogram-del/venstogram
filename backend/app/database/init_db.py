@@ -38,8 +38,10 @@ async def init_models():
             "ALTER TABLE users ADD COLUMN badge_type VARCHAR(32) DEFAULT 'blue'",
             "ALTER TABLE users ADD COLUMN is_incognito BOOLEAN DEFAULT 0",
             "ALTER TABLE users ADD COLUMN is_private BOOLEAN DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN profile_theme VARCHAR(32) DEFAULT 'default'",
             "ALTER TABLE stories ADD COLUMN is_close_friends BOOLEAN DEFAULT 0",
-            "ALTER TABLE reel_comments ADD COLUMN parent_id INTEGER"
+            "ALTER TABLE reel_comments ADD COLUMN parent_id INTEGER",
+            "ALTER TABLE reels ADD COLUMN moderation_status VARCHAR(32) DEFAULT 'approved'"
         ]:
             try:
                 await conn.execute(text(col_sql))
