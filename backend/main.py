@@ -179,6 +179,9 @@ app.include_router(ws_endpoints.router)
 from fastapi.responses import RedirectResponse, JSONResponse
 from datetime import datetime, timezone
 
+server_start_time = datetime.now(timezone.utc).isoformat()
+BOT_VERSION = "v1.2.1-clean-start-no-inline-button"
+
 @app.get("/health")
 @app.get("/api/health")
 @app.get("/api/ping")
@@ -186,6 +189,8 @@ async def health_check():
     return JSONResponse(content={
         "status": "healthy",
         "service": "Venstogram Core API",
+        "version": BOT_VERSION,
+        "started_at": server_start_time,
         "keep_alive": True,
         "server_time": datetime.now(timezone.utc).isoformat(),
         "platform": "Venstogram Engine 24/7"
