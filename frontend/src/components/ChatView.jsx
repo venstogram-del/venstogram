@@ -214,6 +214,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         handleRemoteAnswer(data.payload);
       } else if (evt === "ice_candidate" || evt === "candidate") {
         handleRemoteCandidate(data.payload);
+      } else if (evt === "call_accepted") {
+        if (callPollTimerRef.current) clearInterval(callPollTimerRef.current);
+        SoundEngine.stopRingtone();
+        setActiveCall((prev) => (prev ? { ...prev, isConnected: true } : null));
       } else if (evt === "call_rejected" || evt === "call_reject") {
         SoundEngine.stopRingtone();
         cleanupMediaCall();
@@ -227,7 +231,8 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         const currentPartnerId = activePartnerRef.current ? activePartnerRef.current.id : null;
         if (currentPartnerId && (newMsg.sender_id === currentPartnerId || newMsg.recipient_id === currentPartnerId)) {
           setMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
+            if (!Array.isArray(prev)) return [newMsg];
+            if (prev.some((m) => m && m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
           if (newMsg.sender_id === currentPartnerId) {
@@ -241,12 +246,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         }
         // Update dialogs stream in real time
         setDialogs((prev) => {
+          if (!Array.isArray(prev)) return [];
           const myId = user?.id || 0;
           const partnerId = newMsg.sender_id === myId ? newMsg.recipient_id : newMsg.sender_id;
-          const exists = prev.some((d) => d.partner.id === partnerId);
+          const exists = prev.some((d) => d && d.partner && d.partner.id === partnerId);
           if (exists) {
             return prev.map((d) => {
-              if (d.partner.id === partnerId) {
+              if (d && d.partner && d.partner.id === partnerId) {
                 return {
                   ...d,
                   last_message: {
@@ -308,13 +314,14 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
   // Active chat polling fallback (2.2s): guarantees text, voice notes & media sync in real-time
   useEffect(() => {
-    if (!activePartner) return;
+    if (!activePartner || !activePartner.id) return;
     const interval = setInterval(async () => {
       try {
         const msgs = await Api.get(`/chats/${activePartner.id}/messages`);
         if (msgs && Array.isArray(msgs)) {
           setMessages((prev) => {
-            if (msgs.length !== prev.length || (msgs.length > 0 && prev.length > 0 && msgs[msgs.length - 1].id !== prev[prev.length - 1].id)) {
+            if (!Array.isArray(prev)) return msgs;
+            if (msgs.length !== prev.length || (msgs.length > 0 && prev.length > 0 && msgs[msgs.length - 1]?.id !== prev[prev.length - 1]?.id)) {
               setTimeout(() => {
                 if (messagesEndRef.current) {
                   messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -373,12 +380,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
   const handleToggleArchive = async (e, partnerId, currentIsArchived) => {
     if (e) e.stopPropagation();
+    if (!partnerId) return;
     triggerHaptic("light");
     const endpoint = currentIsArchived ? `/chats/${partnerId}/unarchive` : `/chats/${partnerId}/archive`;
     try {
       await Api.post(endpoint, {});
       setDialogs((prev) =>
-        prev.map((d) => (d.partner.id === partnerId ? { ...d, is_archived: !currentIsArchived } : d))
+        Array.isArray(prev)
+          ? prev.map((d) => (d?.partner?.id === partnerId ? { ...d, is_archived: !currentIsArchived } : d))
+          : []
       );
     } catch (err) {
       console.warn("Archive toggle error", err);
@@ -386,6 +396,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
   };
 
   const openDialog = async (partner) => {
+    if (!partner || !partner.id) return;
     triggerHaptic("light");
     setActivePartner(partner);
     try {
@@ -751,7 +762,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
   // Real WebRTC & Signaling Call System
   const startCall = async (isVideo = true) => {
-    if (!activePartner) return;
+    if (!activePartner || !activePartner.id) return;
 
     // Protection: Nobody can call the Founder, but Founder can call anyone!
     const isPartnerFounder = activePartner.role === "director" ||
@@ -852,7 +863,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        sendCallSignal("ice_candidate", event.candidate, activePartner.id, callId);
+        const targetPid = activePartner?.id || activePartnerRef.current?.id;
+        if (targetPid && callId) {
+          sendCallSignal("ice_candidate", event.candidate, targetPid, callId);
+        }
       }
     };
 
@@ -860,7 +874,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     try {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      sendCallSignal("call_offer", offer, activePartner.id, callId);
+      const targetPid = activePartner?.id || activePartnerRef.current?.id;
+      if (targetPid && callId) {
+        sendCallSignal("call_offer", offer, targetPid, callId);
+      }
     } catch (err) {
       console.error("[createOffer error]", err);
     }
@@ -874,7 +891,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         clearInterval(callPollTimerRef.current);
         SoundEngine.stopRingtone();
         cleanupMediaCall();
-        alert(`Абонент @${activePartner.username} не отвечает.`);
+        alert(`Абонент @${activePartner?.username || "пользователь"} не отвечает.`);
         if (callId) {
           Api.post("/chats/call/end", { call_id: callId, duration_seconds: 0 }).catch(() => {});
         }
@@ -893,7 +910,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             clearInterval(callPollTimerRef.current);
             SoundEngine.stopRingtone();
             cleanupMediaCall();
-            alert(`Абонент @${activePartner.username} отклонил звонок.`);
+            alert(`Абонент @${activePartner?.username || "пользователь"} отклонил звонок.`);
             setActiveCall(null);
           } else if (statusRes.status === "ended") {
             clearInterval(callPollTimerRef.current);
@@ -907,13 +924,20 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
   };
 
   const handleAcceptIncomingCall = async (customCall = null) => {
-    const callToAccept = customCall || incomingCall;
+    // If called directly from an onClick button handler, customCall is the React SyntheticEvent
+    const callToAccept = (customCall && customCall.call_id) ? customCall : incomingCall;
     if (!callToAccept) return;
     triggerHaptic("heavy");
     SoundEngine.stopRingtone();
     setIncomingCall(null);
     const isVideo = callToAccept.call_type === "video";
-    const partnerUser = callToAccept.caller;
+    const partnerUser = callToAccept.caller || activePartner || {
+      id: callToAccept.caller_id || 1,
+      username: "user",
+      first_name: "Собеседник",
+      avatar_url: null
+    };
+    const targetUserId = partnerUser?.id || callToAccept.caller_id;
     setIsCameraOff(false);
 
     try {
@@ -978,15 +1002,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     };
 
     pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        sendCallSignal("ice_candidate", event.candidate, partnerUser.id, callToAccept.call_id);
+      if (event.candidate && targetUserId && callToAccept.call_id) {
+        sendCallSignal("ice_candidate", event.candidate, targetUserId, callToAccept.call_id);
       }
     };
 
     // 3. Process queued remote offer if received
     if (queuedRemoteOfferRef.current) {
       const { offer, fromUserId, callId } = queuedRemoteOfferRef.current;
-      await applyRemoteOffer(offer, pc, fromUserId || partnerUser.id, callId || callToAccept.call_id);
+      await applyRemoteOffer(offer, pc, fromUserId || targetUserId, callId || callToAccept.call_id);
       queuedRemoteOfferRef.current = null;
     }
   };
@@ -1017,7 +1041,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         call_id: activeCall.id,
         duration_seconds: activeCall.callSeconds || 0
       }).catch(() => {});
-      if (activeCall.partner?.id) {
+      if (activeCall?.partner?.id) {
         sendCallSignal("call_end", {}, activeCall.partner.id, activeCall.id);
       }
     }
@@ -1375,7 +1399,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
           {/* Dialogs List Stream */}
           <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50/50">
-            {(chatFolder === "archived" ? dialogs.filter((d) => d.is_archived) : dialogs.filter((d) => !d.is_archived)).length === 0 ? (
+            {(chatFolder === "archived" ? dialogs.filter((d) => d?.is_archived) : dialogs.filter((d) => !d?.is_archived)).length === 0 ? (
               <div className="p-8 text-center text-slate-400 space-y-2">
                 <span className="text-3xl block">
                   {chatFolder === "archived" ? "📦" : "💬"}
@@ -1387,63 +1411,67 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                 </p>
               </div>
             ) : (
-              (chatFolder === "archived" ? dialogs.filter((d) => d.is_archived) : dialogs.filter((d) => !d.is_archived)).map((d) => (
-                <div
-                  key={d.partner.id}
-                  onClick={() => openDialog(d.partner)}
-                  className="bg-white hover:bg-slate-50 border border-slate-200 hover:border-pink-300 rounded-2xl p-3.5 flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] shadow-sm"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="relative">
-                      <img
-                        src={d.partner.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%23f1f5f9'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%23cbd5e1'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%23cbd5e1'/%3E%3C/svg%3E"}
-                        className="w-12 h-12 rounded-full object-cover ring-2 ring-slate-100"
-                      />
-                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-white" />
-                    </div>
-
-                    <div className="max-w-[170px] sm:max-w-xs">
-                      <div className="flex items-center space-x-1">
-                        <span className="text-xs font-black text-slate-900 truncate">
-                          {d.partner.first_name} {d.partner.last_name || ""}
-                        </span>
-                        {d.partner.is_verified && <span className="text-sky-500 font-bold text-xs">✓</span>}
+              (chatFolder === "archived" ? dialogs.filter((d) => d?.is_archived) : dialogs.filter((d) => !d?.is_archived)).map((d) => {
+                const partnerObj = d.partner || { id: Math.random(), first_name: "Пользователь", username: "user" };
+                const partnerId = partnerObj.id;
+                return (
+                  <div
+                    key={partnerId}
+                    onClick={() => openDialog(partnerObj)}
+                    className="bg-white hover:bg-slate-50 border border-slate-200 hover:border-pink-300 rounded-2xl p-3.5 flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] shadow-sm"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="relative">
+                        <img
+                          src={partnerObj.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%23f1f5f9'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%23cbd5e1'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%23cbd5e1'/%3E%3C/svg%3E"}
+                          className="w-12 h-12 rounded-full object-cover ring-2 ring-slate-100"
+                        />
+                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-white" />
                       </div>
-                      <span className="text-[10px] text-pink-600 font-bold block">
-                        @{d.partner.username}
-                      </span>
-                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                        {d.last_message ? d.last_message.content : "Начните общение..."}
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center space-x-2">
-                    <div className="text-right flex flex-col items-end space-y-1">
-                      {d.last_message && d.last_message.created_at && (
-                        <span className="text-[9px] text-slate-400 font-mono">
-                          {new Date(d.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <div className="max-w-[170px] sm:max-w-xs">
+                        <div className="flex items-center space-x-1">
+                          <span className="text-xs font-black text-slate-900 truncate">
+                            {partnerObj.first_name} {partnerObj.last_name || ""}
+                          </span>
+                          {partnerObj.is_verified && <span className="text-sky-500 font-bold text-xs">✓</span>}
+                        </div>
+                        <span className="text-[10px] text-pink-600 font-bold block">
+                          @{partnerObj.username}
                         </span>
-                      )}
-                      {d.unread_count > 0 && (
-                        <span className="bg-pink-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-md">
-                          {d.unread_count}
-                        </span>
-                      )}
+                        <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                          {d.last_message ? d.last_message.content : "Начните общение..."}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Quick Archive / Unarchive Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleToggleArchive(e, d.partner.id, d.is_archived)}
-                      title={d.is_archived ? "Вернуть из архива" : "Отправить в архив (для поклонников)"}
-                      className="p-1.5 rounded-xl text-slate-400 hover:text-pink-600 hover:bg-slate-100 transition shrink-0"
-                    >
-                      <span className="text-sm">{d.is_archived ? "📥" : "📦"}</span>
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <div className="text-right flex flex-col items-end space-y-1">
+                        {d.last_message && d.last_message.created_at && (
+                          <span className="text-[9px] text-slate-400 font-mono">
+                            {new Date(d.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                        {d.unread_count > 0 && (
+                          <span className="bg-pink-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-md">
+                            {d.unread_count}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Quick Archive / Unarchive Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleArchive(e, partnerId, d.is_archived)}
+                        title={d.is_archived ? "Вернуть из архива" : "Отправить в архив (для поклонников)"}
+                        className="p-1.5 rounded-xl text-slate-400 hover:text-pink-600 hover:bg-slate-100 transition shrink-0"
+                      >
+                        <span className="text-sm">{d.is_archived ? "📥" : "📦"}</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -1537,7 +1565,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
               />
             ) : (
               <img
-                src={activeCall.partner.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100"}
+                src={activeCall?.partner?.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100"}
                 className="w-full h-full object-cover"
               />
             )}
@@ -1546,7 +1574,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
           <div>
             <span className="text-xs font-bold text-white block">
-              {activeCall.partner.first_name}
+              {activeCall?.partner?.first_name || "Собеседник"}
             </span>
             <span className="text-[10px] text-emerald-400 font-mono font-bold block">
               🟢 {formatCallTime(activeCall.callSeconds)}
@@ -1577,13 +1605,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                 <div className="absolute w-44 h-44 rounded-full bg-pink-500/15 animate-ping" />
                 <div className="absolute w-36 h-36 rounded-full bg-rose-500/25 animate-pulse" />
                 <img
-                  src={activeCall.partner.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150"}
+                  src={activeCall?.partner?.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150"}
                   className="w-28 h-28 rounded-full object-cover ring-4 ring-pink-500 shadow-2xl relative z-10"
                 />
               </div>
               <div className="space-y-1 relative z-10">
-                <h2 className="text-2xl font-black text-white">{activeCall.partner.first_name}</h2>
-                <p className="text-xs text-pink-400 font-mono">@{activeCall.partner.username}</p>
+                <h2 className="text-2xl font-black text-white">{activeCall?.partner?.first_name || "Собеседник"}</h2>
+                <p className="text-xs text-pink-400 font-mono">@{activeCall?.partner?.username || "user"}</p>
                 <div className="pt-3">
                   <span className="inline-flex items-center space-x-2 bg-slate-900/90 border border-pink-500/40 px-3.5 py-1.5 rounded-full text-xs font-semibold text-pink-300 animate-pulse">
                     <span>{activeCall.isVideo ? "📹 Видеовызов..." : "📞 Аудиовызов..."}</span>
@@ -1605,10 +1633,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                 {!remoteStreamRef.current && (
                   <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center space-y-3 p-6 text-center">
                     <img
-                      src={activeCall.partner.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150"}
+                      src={activeCall?.partner?.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150"}
                       className="w-28 h-28 rounded-full object-cover ring-4 ring-pink-500/80 shadow-2xl animate-pulse"
                     />
-                    <h2 className="text-xl font-black text-white">{activeCall.partner.first_name}</h2>
+                    <h2 className="text-xl font-black text-white">{activeCall?.partner?.first_name || "Собеседник"}</h2>
                     <p className="text-xs text-pink-400 font-semibold animate-pulse">
                       🟢 Подключение видеопотока HD...
                     </p>
@@ -1619,14 +1647,14 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
               <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-950 to-black flex flex-col items-center justify-center space-y-5 p-6 text-center">
                 <div className="relative">
                   <img
-                    src={activeCall.partner.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150"}
+                    src={activeCall?.partner?.avatar_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150"}
                     className="w-32 h-32 rounded-full object-cover ring-4 ring-emerald-500 shadow-2xl"
                   />
                   <span className="absolute -inset-2 rounded-full border-2 border-emerald-400 animate-ping opacity-60" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black text-white">{activeCall.partner.first_name}</h2>
-                  <span className="text-xs text-pink-400 font-mono">@{activeCall.partner.username}</span>
+                  <h2 className="text-2xl font-black text-white">{activeCall?.partner?.first_name || "Собеседник"}</h2>
+                  <span className="text-xs text-pink-400 font-mono">@{activeCall?.partner?.username || "user"}</span>
                   <span className="text-xs text-emerald-400 font-mono font-bold block mt-2">
                     🟢 Идет аудиоразговор ({formatCallTime(activeCall.callSeconds)})
                   </span>
@@ -1767,14 +1795,14 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
-                onClick={handleRejectIncomingCall}
+                onClick={() => handleRejectIncomingCall()}
                 className="bg-rose-600 hover:bg-rose-500 text-white font-bold py-3.5 px-4 rounded-2xl flex items-center justify-center space-x-2 shadow-lg shadow-rose-600/30 active:scale-95 transition"
               >
                 <span>🔴 Отклонить</span>
               </button>
 
               <button
-                onClick={handleAcceptIncomingCall}
+                onClick={() => handleAcceptIncomingCall()}
                 className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/30 active:scale-95 animate-bounce transition"
               >
                 <span>🟢 Принять</span>

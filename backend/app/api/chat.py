@@ -30,14 +30,16 @@ async def get_dialogs(
         partner_id = m.recipient_id if m.sender_id == current_user.id else m.sender_id
         if partner_id not in dialog_partners:
             partner = m.recipient if m.sender_id == current_user.id else m.sender
+            if not partner:
+                continue
             dialog_partners[partner_id] = {
                 "partner": {
                     "id": partner.id,
-                    "username": partner.username,
-                    "first_name": partner.first_name,
-                    "last_name": partner.last_name,
+                    "username": partner.username or f"user{partner.id}",
+                    "first_name": partner.first_name or "Пользователь",
+                    "last_name": partner.last_name or "",
                     "avatar_url": partner.avatar_url,
-                    "is_verified": partner.is_verified,
+                    "is_verified": bool(getattr(partner, "is_verified", False)),
                     "last_active": partner.last_active.isoformat() if partner.last_active else None
                 },
                 "last_message": {
@@ -52,7 +54,8 @@ async def get_dialogs(
                 "is_archived": False
             }
         elif m.recipient_id == current_user.id and not m.is_read:
-            dialog_partners[partner_id]["unread_count"] += 1
+            if partner_id in dialog_partners:
+                dialog_partners[partner_id]["unread_count"] += 1
 
     # Check which partners are archived by current user
     from app.models.entities import ArchivedChat
@@ -330,17 +333,17 @@ async def check_incoming_call(
         .order_by(desc(CallSession.created_at))
     )
     call = res.scalars().first()
-    if not call:
+    if not call or not call.caller:
         return {"has_incoming": False}
 
     return {
         "has_incoming": True,
         "call_id": call.id,
-        "call_type": call.call_type,
+        "call_type": call.call_type or "audio",
         "caller": {
             "id": call.caller.id,
-            "username": call.caller.username,
-            "first_name": call.caller.first_name,
+            "username": call.caller.username or f"user{call.caller.id}",
+            "first_name": call.caller.first_name or "Пользователь",
             "avatar_url": call.caller.avatar_url
         }
     }
