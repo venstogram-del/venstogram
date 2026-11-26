@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { triggerHaptic } from "../telegram.js";
-import { SoundEngine } from "../sound.js";
+import { SoundEngine, getAudioContext } from "../sound.js";
 import { Api } from "../api.js";
 
 export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingCallAccept, onClearPendingCall }) {
@@ -49,6 +49,8 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
   const peerConnectionRef = useRef(null);
   const queuedIceCandidatesRef = useRef([]);
   const queuedRemoteOfferRef = useRef(null);
+  const audioContextSourceRef = useRef(null);
+  const audioGainNodeRef = useRef(null);
   const [cameraFacing, setCameraFacing] = useState("user");
   const [isCameraOff, setIsCameraOff] = useState(false);
 
@@ -130,6 +132,14 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
   };
 
   const cleanupMediaCall = () => {
+    if (audioContextSourceRef.current) {
+      try { audioContextSourceRef.current.disconnect(); } catch (e) {}
+      audioContextSourceRef.current = null;
+    }
+    if (audioGainNodeRef.current) {
+      try { audioGainNodeRef.current.disconnect(); } catch (e) {}
+      audioGainNodeRef.current = null;
+    }
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => {
         try { track.stop(); } catch (e) {}
@@ -159,77 +169,94 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     queuedRemoteOfferRef.current = null;
   };
 
+  const routeRemoteAudio = (stream) => {
+    if (!stream) return;
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks || audioTracks.length === 0) return;
+
+    // 1. Ensure all remote audio tracks are active
+    audioTracks.forEach((track) => {
+      try { track.enabled = true; } catch (e) {}
+    });
+
+    // 2. Play via dedicated <audio> element fallback
+    if (remoteAudioRef.current) {
+      if (remoteAudioRef.current.srcObject !== stream) {
+        remoteAudioRef.current.srcObject = stream;
+      }
+      remoteAudioRef.current.volume = 1.0;
+      remoteAudioRef.current.muted = false;
+      try {
+        const ap = remoteAudioRef.current.play();
+        if (ap !== undefined) ap.catch(() => {});
+      } catch (e) {}
+    }
+
+    // 3. Web Audio API pipeline (Unlocks direct hardware speaker in WebViews & mobile)
+    try {
+      const ctx = getAudioContext();
+      if (ctx) {
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+        if (!audioContextSourceRef.current) {
+          const source = ctx.createMediaStreamSource(stream);
+          const gain = ctx.createGain();
+          gain.gain.value = 1.35; // Amplification for crystal clear & loud voice
+          source.connect(gain);
+          gain.connect(ctx.destination);
+          audioContextSourceRef.current = source;
+          audioGainNodeRef.current = gain;
+          console.log("[routeRemoteAudio] Connected to Web Audio speaker output");
+        }
+      }
+    } catch (err) {
+      console.warn("[routeRemoteAudio Web Audio note]", err);
+    }
+  };
+
   const attachRemoteTrack = (event) => {
     console.log("[WebRTC ontrack] Track received:", event.track?.kind, event.streams);
 
-    // Native WebRTC stream from event.streams[0] is the authentic stream containing decoded opus audio & h264/vp8 video
-    const stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+    if (!remoteStreamRef.current) {
+      remoteStreamRef.current = new MediaStream();
+    }
+    const targetStream = remoteStreamRef.current;
 
-    if (stream) {
-      remoteStreamRef.current = stream;
-
-      // 1. Ensure all tracks in the native WebRTC stream are enabled
-      stream.getAudioTracks().forEach((track) => {
-        try { track.enabled = true; } catch (e) {}
-      });
-      stream.getVideoTracks().forEach((track) => {
-        try { track.enabled = true; } catch (e) {}
-      });
-
-      // 2. Remote Video Display with Unmuted Voice Audio
-      if (remoteVideoRef.current) {
-        if (remoteVideoRef.current.srcObject !== stream) {
-          remoteVideoRef.current.srcObject = stream;
-        }
-        remoteVideoRef.current.muted = false;
-        remoteVideoRef.current.volume = 1.0;
-        try {
-          const vp = remoteVideoRef.current.play();
-          if (vp !== undefined) vp.catch((e) => console.warn("[remoteVideo play note]", e));
-        } catch (e) {}
-      }
-
-      // 3. Dedicated Audio Element Playback
-      if (remoteAudioRef.current) {
-        if (remoteAudioRef.current.srcObject !== stream) {
-          remoteAudioRef.current.srcObject = stream;
-        }
-        remoteAudioRef.current.volume = 1.0;
-        remoteAudioRef.current.muted = false;
-        try {
-          const ap = remoteAudioRef.current.play();
-          if (ap !== undefined) ap.catch((e) => console.warn("[remoteAudio play note]", e));
-        } catch (e) {}
-      }
-    } else if (event.track) {
-      // Fallback if browser dispatched standalone track
+    // Accumulate all incoming tracks (audio & video) into targetStream without dropping previous tracks
+    if (event.track) {
       try { event.track.enabled = true; } catch (e) {}
-      if (!remoteStreamRef.current) {
-        remoteStreamRef.current = new MediaStream([event.track]);
-      } else {
-        const curTracks = remoteStreamRef.current.getTracks();
-        if (!curTracks.some((t) => t.id === event.track.id)) {
-          remoteStreamRef.current.addTrack(event.track);
-        }
-      }
-      const s = remoteStreamRef.current;
-      if (remoteVideoRef.current) {
-        if (remoteVideoRef.current.srcObject !== s) {
-          remoteVideoRef.current.srcObject = s;
-        }
-        remoteVideoRef.current.muted = false;
-        remoteVideoRef.current.volume = 1.0;
-        try { remoteVideoRef.current.play().catch(() => {}); } catch (e) {}
-      }
-      if (remoteAudioRef.current) {
-        if (remoteAudioRef.current.srcObject !== s) {
-          remoteAudioRef.current.srcObject = s;
-        }
-        remoteAudioRef.current.volume = 1.0;
-        remoteAudioRef.current.muted = false;
-        try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
+      if (!targetStream.getTracks().some((t) => t.id === event.track.id)) {
+        targetStream.addTrack(event.track);
       }
     }
+    if (event.streams && event.streams[0]) {
+      event.streams[0].getTracks().forEach((track) => {
+        try { track.enabled = true; } catch (e) {}
+        if (!targetStream.getTracks().some((t) => t.id === track.id)) {
+          targetStream.addTrack(track);
+        }
+      });
+    }
+
+    // Ensure all audio & video tracks are enabled
+    targetStream.getAudioTracks().forEach((t) => { try { t.enabled = true; } catch (e) {} });
+    targetStream.getVideoTracks().forEach((t) => { try { t.enabled = true; } catch (e) {} });
+
+    // Video display: MUST be muted={true} so mobile browsers never block video or silence audio devices!
+    if (remoteVideoRef.current) {
+      if (remoteVideoRef.current.srcObject !== targetStream) {
+        remoteVideoRef.current.srcObject = targetStream;
+      }
+      remoteVideoRef.current.muted = true;
+      try {
+        const vp = remoteVideoRef.current.play();
+        if (vp !== undefined) vp.catch(() => {});
+      } catch (e) {}
+    }
+
+    // Audio: route through Web Audio API + Audio element
+    routeRemoteAudio(targetStream);
 
     setActiveCall((prev) => (prev ? { ...prev, isConnected: true } : null));
     SoundEngine.stopRingtone();
@@ -242,7 +269,14 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         const cand = queuedIceCandidatesRef.current.shift();
         try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch (e) {}
       }
-      // In Unified Plan WebRTC, calling createAnswer() cleanly answers the exact offered transceivers without duplicating m-lines
+      // Guarantee two-way send & receive on all transceivers
+      pc.getTransceivers().forEach((transceiver) => {
+        try {
+          if (transceiver.direction !== "sendrecv") {
+            transceiver.direction = "sendrecv";
+          }
+        } catch (e) {}
+      });
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       sendCallSignal("call_answer", answer, targetUserId, callId);
@@ -464,31 +498,20 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     if (activeCall?.isConnected && remoteStreamRef.current) {
       const stream = remoteStreamRef.current;
 
-      // 1. Remote Video Playback with Unmuted Voice
+      // 1. Remote Video Playback (Muted so browser never blocks video stream)
       if (remoteVideoRef.current) {
         if (remoteVideoRef.current.srcObject !== stream) {
           remoteVideoRef.current.srcObject = stream;
         }
-        remoteVideoRef.current.muted = false;
-        remoteVideoRef.current.volume = 1.0;
+        remoteVideoRef.current.muted = true;
         try {
           const p = remoteVideoRef.current.play();
           if (p !== undefined) p.catch(() => {});
         } catch (e) {}
       }
 
-      // 2. Audio Playback Element
-      if (remoteAudioRef.current) {
-        if (remoteAudioRef.current.srcObject !== stream) {
-          remoteAudioRef.current.srcObject = stream;
-        }
-        remoteAudioRef.current.volume = 1.0;
-        remoteAudioRef.current.muted = false;
-        try {
-          const p = remoteAudioRef.current.play();
-          if (p !== undefined) p.catch(() => {});
-        } catch (e) {}
-      }
+      // 2. Audio Playback (Web Audio API & Audio element)
+      routeRemoteAudio(stream);
 
       // 3. Local Camera Preview: MUST stay muted to avoid echo/feedback
       if (localVideoRef.current && localStreamRef.current) {
@@ -909,6 +932,12 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     setIsCallMinimized(false);
     setIsCameraOff(false);
 
+    // Guarantee audio context is unlocked on user gesture
+    try {
+      const ctx = getAudioContext();
+      if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+    } catch (e) {}
+
     // 1. Acquire Local Microphone & Optional Camera
     let localStream = null;
     try {
@@ -930,20 +959,24 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         return;
       }
     }
+
+    // Guarantee audio track presence even if device returned video-only stream
+    if (localStream && localStream.getAudioTracks().length === 0) {
+      try {
+        const audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioOnly.getAudioTracks().forEach((t) => localStream.addTrack(t));
+      } catch (e) {}
+    }
+
     localStreamRef.current = localStream;
     localStream.getAudioTracks().forEach((t) => (t.enabled = true));
     localStream.getVideoTracks().forEach((t) => (t.enabled = true));
 
-    // Unlock audio & video elements on user gesture
+    // Unlock audio elements on user gesture
     if (remoteAudioRef.current) {
       remoteAudioRef.current.volume = 1.0;
       remoteAudioRef.current.muted = false;
       try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
-    }
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.volume = 1.0;
-      remoteVideoRef.current.muted = false;
-      try { remoteVideoRef.current.play().catch(() => {}); } catch (e) {}
     }
 
     let callId = null;
@@ -988,6 +1021,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       pc.addTrack(track, localStream);
     });
 
+    // Ensure all transceivers send and receive
+    pc.getTransceivers().forEach((transceiver) => {
+      try {
+        if (transceiver.direction !== "sendrecv") {
+          transceiver.direction = "sendrecv";
+        }
+      } catch (e) {}
+    });
+
     // Handle remote tracks
     pc.ontrack = attachRemoteTrack;
 
@@ -1003,7 +1045,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
     // 3. Create SDP Offer and dispatch (Unified Plan WebRTC without duplicate transceiver flags)
     try {
-      const offer = await pc.createOffer();
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: isVideo
+      });
       await pc.setLocalDescription(offer);
       const targetPid = activePartner?.id || activePartnerRef.current?.id;
       if (targetPid && callId) {
@@ -1075,6 +1120,12 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       await Api.post("/chats/call/accept", { call_id: callToAccept.call_id });
     } catch (e) {}
 
+    // Guarantee audio context is unlocked on user gesture
+    try {
+      const ctx = getAudioContext();
+      if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+    } catch (e) {}
+
     setActiveCall({
       id: callToAccept.call_id,
       partner: partnerUser,
@@ -1104,22 +1155,26 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         console.error("[Accept media error]", mediaErr);
       }
     }
+
+    // Guarantee audio track presence even if device returned video-only stream
+    if (localStream && localStream.getAudioTracks().length === 0) {
+      try {
+        const audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioOnly.getAudioTracks().forEach((t) => localStream.addTrack(t));
+      } catch (e) {}
+    }
+
     localStreamRef.current = localStream;
     if (localStream) {
       localStream.getAudioTracks().forEach((t) => (t.enabled = true));
       localStream.getVideoTracks().forEach((t) => (t.enabled = true));
     }
 
-    // Unlock audio & video elements on user gesture
+    // Unlock audio elements on user gesture
     if (remoteAudioRef.current) {
       remoteAudioRef.current.volume = 1.0;
       remoteAudioRef.current.muted = false;
       try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
-    }
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.volume = 1.0;
-      remoteVideoRef.current.muted = false;
-      try { remoteVideoRef.current.play().catch(() => {}); } catch (e) {}
     }
 
     setTimeout(() => {
@@ -1138,6 +1193,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         pc.addTrack(track, localStream);
       });
     }
+
+    // Ensure all transceivers send and receive
+    pc.getTransceivers().forEach((transceiver) => {
+      try {
+        if (transceiver.direction !== "sendrecv") {
+          transceiver.direction = "sendrecv";
+        }
+      } catch (e) {}
+    });
 
     // Handle remote tracks
     pc.ontrack = attachRemoteTrack;
@@ -1687,7 +1751,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         }}
         autoPlay
         playsInline
-        style={{ position: "absolute", width: "1px", height: "1px", opacity: 0.01, pointerEvents: "none" }}
+        style={{ position: "fixed", top: "-100px", left: "-100px", width: "10px", height: "10px", pointerEvents: "none" }}
       />
 
       {/* Floating Picture-in-Picture (PIP) Call Widget when Minimized */}
@@ -1754,21 +1818,8 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         <div
           onClick={() => {
             // Screen tap: guarantees user activation for audio
-            if (remoteVideoRef.current) {
-              if (remoteStreamRef.current && remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
-                remoteVideoRef.current.srcObject = remoteStreamRef.current;
-              }
-              remoteVideoRef.current.muted = false;
-              remoteVideoRef.current.volume = 1.0;
-              try { remoteVideoRef.current.play().catch(() => {}); } catch(e) {}
-            }
-            if (remoteAudioRef.current) {
-              if (remoteStreamRef.current && remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
-                remoteAudioRef.current.srcObject = remoteStreamRef.current;
-              }
-              remoteAudioRef.current.volume = 1.0;
-              remoteAudioRef.current.muted = false;
-              try { remoteAudioRef.current.play().catch(() => {}); } catch(e) {}
+            if (remoteStreamRef.current) {
+              routeRemoteAudio(remoteStreamRef.current);
             }
           }}
           className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between overflow-hidden animate-in fade-in select-none"
@@ -1810,13 +1861,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                     remoteVideoRef.current = el;
                     if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) {
                       el.srcObject = remoteStreamRef.current;
-                      el.muted = false;
-                      el.volume = 1.0;
+                      el.muted = true;
                       try { el.play().catch(() => {}); } catch(e) {}
                     }
                   }}
                   autoPlay
                   playsInline
+                  muted
                   className="w-full h-full object-cover"
                 />
                 {!remoteStreamRef.current && (
@@ -1937,21 +1988,8 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                   onClick={(e) => {
                     e.stopPropagation();
                     triggerHaptic("medium");
-                    if (remoteVideoRef.current) {
-                      if (remoteStreamRef.current && remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
-                        remoteVideoRef.current.srcObject = remoteStreamRef.current;
-                      }
-                      remoteVideoRef.current.muted = false;
-                      remoteVideoRef.current.volume = 1.0;
-                      try { remoteVideoRef.current.play().catch(() => {}); } catch (e) {}
-                    }
-                    if (remoteAudioRef.current) {
-                      if (remoteStreamRef.current && remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
-                        remoteAudioRef.current.srcObject = remoteStreamRef.current;
-                      }
-                      remoteAudioRef.current.volume = 1.0;
-                      remoteAudioRef.current.muted = false;
-                      try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
+                    if (remoteStreamRef.current) {
+                      routeRemoteAudio(remoteStreamRef.current);
                     }
                   }}
                   className="p-4 rounded-full text-xl shadow-xl bg-slate-800/90 text-white border border-slate-700 active:scale-90"
