@@ -48,6 +48,12 @@ async def init_models():
                 await conn.execute(text(col_sql))
             except Exception:
                 pass
+
+        # Clean any legacy boy/girl stock photo avatars so everyone has their own uploaded avatar or initials badge
+        try:
+            await conn.execute(text("UPDATE users SET avatar_url = '' WHERE avatar_url LIKE '%unsplash%' OR avatar_url LIKE '%photo-%'"))
+        except Exception:
+            pass
     print("[Database] All tables and columns successfully verified.")
 
 async def seed_demo_data():

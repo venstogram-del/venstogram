@@ -655,14 +655,20 @@ export function App() {
             <div className="relative flex items-center justify-center">
               <div className="absolute w-36 h-36 rounded-full bg-pink-500/20 animate-ping" />
               <div className="absolute w-32 h-32 rounded-full bg-rose-500/30 animate-pulse" />
-              {globalIncomingCall.caller?.avatar_url ? (
+              {globalIncomingCall.caller?.avatar_url && !globalIncomingCall.caller.avatar_url.includes("unsplash") && !globalIncomingCall.caller.avatar_url.includes("photo-") ? (
                 <img
                   src={globalIncomingCall.caller.avatar_url}
                   alt={globalIncomingCall.caller.username}
                   className="w-24 h-24 rounded-full object-cover border-4 border-pink-500 shadow-2xl z-10 relative"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                    if (e.currentTarget.nextElementSibling) {
+                      e.currentTarget.nextElementSibling.style.display = "flex";
+                    }
+                  }}
                 />
               ) : (
-                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-pink-500 to-amber-500 flex items-center justify-center text-3xl font-black border-4 border-white/20 shadow-2xl z-10 relative">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center text-3xl font-black border-4 border-white/20 shadow-2xl z-10 relative select-none">
                   {(globalIncomingCall.caller?.first_name || globalIncomingCall.caller?.username || "U")[0].toUpperCase()}
                 </div>
               )}

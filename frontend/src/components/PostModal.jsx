@@ -271,15 +271,16 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
               preload="metadata"
               className="w-full h-full object-contain"
             />
-          ) : (
+          ) : (currentPost.media_urls && currentPost.media_urls[0]) ? (
             <img
-              src={
-                (currentPost.media_urls && currentPost.media_urls[0]) ||
-                "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800"
-              }
+              src={currentPost.media_urls[0]}
               alt="Post media"
               className="w-full h-full object-contain"
             />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-black text-slate-600 text-sm">
+              Нет медиа
+            </div>
           )}
         </div>
 

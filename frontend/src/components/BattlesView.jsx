@@ -206,11 +206,17 @@ export function BattlesView({ user, t, onUpdateCoins }) {
       <div className="flex-1 grid grid-cols-2 gap-1 bg-black pt-20 pb-28 relative">
         {/* Host Stream Box */}
         <div className="relative w-full h-full bg-slate-900 overflow-hidden flex items-center justify-center border-r border-slate-800">
-          <img
-            src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&auto=format&fit=crop&q=80"
-            className="w-full h-full object-cover opacity-90"
-            alt="Host"
-          />
+          {battle.host?.avatar_url && !battle.host.avatar_url.includes("unsplash") ? (
+            <img
+              src={battle.host.avatar_url}
+              className="w-full h-full object-cover opacity-90"
+              alt="Host"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-slate-900 text-white font-black text-4xl select-none">
+              {(battle.host?.first_name || battle.host?.username || "H")[0].toUpperCase()}
+            </div>
+          )}
           <div className="absolute top-2 left-2 z-10 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-lg flex items-center space-x-1">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             <span className="text-[11px] font-bold text-white">@{battle.host.username}</span>
@@ -224,11 +230,17 @@ export function BattlesView({ user, t, onUpdateCoins }) {
 
         {/* Guest Stream Box */}
         <div className="relative w-full h-full bg-slate-900 overflow-hidden flex items-center justify-center">
-          <img
-            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%231e293b'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2364748b'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%2364748b'/%3E%3C/svg%3E"
-            className="w-full h-full object-cover opacity-90"
-            alt="Guest"
-          />
+          {battle.guest?.avatar_url && !battle.guest.avatar_url.includes("unsplash") ? (
+            <img
+              src={battle.guest.avatar_url}
+              className="w-full h-full object-cover opacity-90"
+              alt="Guest"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-slate-900 text-white font-black text-4xl select-none">
+              {(battle.guest?.first_name || battle.guest?.username || "G")[0].toUpperCase()}
+            </div>
+          )}
           <div className="absolute top-2 right-2 z-10 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-lg flex items-center space-x-1">
             <span className="text-[11px] font-bold text-white">@{battle.guest?.username || "Guest"}</span>
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />

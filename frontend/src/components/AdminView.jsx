@@ -1641,10 +1641,16 @@ export function AdminView({ user, t }) {
                     <div className="space-y-2">
                       {selectedUserDetail.posts.map((p) => (
                         <div key={p.id} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center space-x-2.5">
-                          <img
-                            src={p.media_urls?.[0] || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100"}
-                            className="w-12 h-12 rounded-lg object-cover"
-                          />
+                          {p.media_urls?.[0] ? (
+                            <img
+                              src={p.media_urls[0]}
+                              className="w-12 h-12 rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500 text-xs">
+                              📷
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
                             <p className="text-xs text-white truncate">{p.caption || "Без описания"}</p>
                             <div className="flex items-center space-x-3 text-[10px] text-slate-400 mt-1">
