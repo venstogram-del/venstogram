@@ -186,7 +186,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from datetime import datetime, timezone
 
 server_start_time = datetime.now(timezone.utc).isoformat()
-BOT_VERSION = "v1.6.8-audio-call-loudspeaker-and-no-stock-avatars"
+BOT_VERSION = "v1.6.9-restore-pristine-video-call-and-clean-avatars"
 
 @app.get("/health")
 @app.get("/api/health")

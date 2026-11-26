@@ -36,7 +36,6 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
-  const remoteAudioVideoRef = useRef(null);
   const remoteStreamRef = useRef(null);
   const localStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
@@ -122,34 +121,6 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     }
   };
 
-  const renderUserAvatar = (userObj, sizeClasses, textClasses = "text-2xl font-bold") => {
-    const rawUrl = userObj?.avatar_url;
-    const isClean = rawUrl && typeof rawUrl === "string" && !rawUrl.includes("unsplash") && !rawUrl.includes("photo-");
-    const initial = (userObj?.first_name || userObj?.username || "U").trim()[0]?.toUpperCase() || "U";
-
-    if (isClean) {
-      return (
-        <img
-          src={rawUrl}
-          alt={userObj?.first_name || userObj?.username || "User"}
-          className={`${sizeClasses} rounded-full object-cover`}
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-            if (e.currentTarget.nextElementSibling) {
-              e.currentTarget.nextElementSibling.style.display = "flex";
-            }
-          }}
-        />
-      );
-    }
-
-    return (
-      <div className={`${sizeClasses} rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center text-white ${textClasses} font-black shadow-inner select-none`}>
-        {initial}
-      </div>
-    );
-  };
-
   const cleanupMediaCall = () => {
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => {
@@ -175,10 +146,6 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = null;
       try { remoteAudioRef.current.pause(); } catch (e) {}
-    }
-    if (remoteAudioVideoRef.current) {
-      remoteAudioVideoRef.current.srcObject = null;
-      try { remoteAudioVideoRef.current.pause(); } catch (e) {}
     }
     queuedIceCandidatesRef.current = [];
     queuedRemoteOfferRef.current = null;
@@ -211,27 +178,11 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         } catch (e) {}
       }
 
-      // 3. Audio Loudspeaker Sink (hidden video element):
-      // Forces Android WebView / Chromium to route audio to the main loud speakerphone in ALL calls (both audio and video)
-      if (remoteAudioVideoRef.current) {
-        remoteAudioVideoRef.current.srcObject = stream;
-        remoteAudioVideoRef.current.muted = true;
-        try {
-          const avp = remoteAudioVideoRef.current.play();
-          if (avp !== undefined) avp.catch((e) => console.warn("[remoteAudioVideo play note]", e));
-        } catch (e) {}
-      }
-
-      // 4. Audio Track playback: Dedicated unmuted HTML5 audio element attached directly to the native WebRTC stream
+      // 3. Audio Track playback: Dedicated unmuted HTML5 audio element attached directly to the native WebRTC stream
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
         remoteAudioRef.current.volume = 1.0;
         remoteAudioRef.current.muted = false;
-        try {
-          if (typeof remoteAudioRef.current.setSinkId === "function") {
-            remoteAudioRef.current.setSinkId("speaker").catch(() => {});
-          }
-        } catch (e) {}
         try {
           const ap = remoteAudioRef.current.play();
           if (ap !== undefined) ap.catch((e) => console.warn("[remoteAudio play note]", e));
@@ -246,23 +197,11 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         remoteStreamRef.current.addTrack(event.track);
       }
       const s = remoteStreamRef.current;
-      if (event.track.kind === "audio") {
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = s;
-          remoteAudioRef.current.volume = 1.0;
-          remoteAudioRef.current.muted = false;
-          try {
-            if (typeof remoteAudioRef.current.setSinkId === "function") {
-              remoteAudioRef.current.setSinkId("speaker").catch(() => {});
-            }
-          } catch (e) {}
-          try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
-        }
-        if (remoteAudioVideoRef.current) {
-          remoteAudioVideoRef.current.srcObject = s;
-          remoteAudioVideoRef.current.muted = true;
-          try { remoteAudioVideoRef.current.play().catch(() => {}); } catch (e) {}
-        }
+      if (event.track.kind === "audio" && remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = s;
+        remoteAudioRef.current.volume = 1.0;
+        remoteAudioRef.current.muted = false;
+        try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
       } else if (event.track.kind === "video" && remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = s;
         remoteVideoRef.current.muted = true;
@@ -339,15 +278,6 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             call_type: data.call_type || "video",
             caller: data.caller
           });
-          if (data.caller?.id) {
-            Api.get(`/users/${data.caller.id}`)
-              .then((fresh) => {
-                if (fresh && fresh.id) {
-                  setIncomingCall((prev) => (prev ? { ...prev, caller: { ...prev.caller, ...fresh } } : null));
-                }
-              })
-              .catch(() => {});
-          }
           SoundEngine.playRingtone();
         }
       } else if (evt === "call_offer" || evt === "offer") {
@@ -518,23 +448,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         remoteAudioRef.current.volume = 1.0;
         remoteAudioRef.current.muted = false;
         try {
-          if (typeof remoteAudioRef.current.setSinkId === "function") {
-            remoteAudioRef.current.setSinkId("speaker").catch(() => {});
-          }
-        } catch (e) {}
-        try {
           const p = remoteAudioRef.current.play();
-          if (p !== undefined) p.catch(() => {});
-        } catch (e) {}
-      }
-
-      if (remoteAudioVideoRef.current) {
-        if (remoteAudioVideoRef.current.srcObject !== stream) {
-          remoteAudioVideoRef.current.srcObject = stream;
-        }
-        remoteAudioVideoRef.current.muted = true;
-        try {
-          const p = remoteAudioVideoRef.current.play();
           if (p !== undefined) p.catch(() => {});
         } catch (e) {}
       }
@@ -597,20 +511,6 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     if (!partner || !partner.id) return;
     triggerHaptic("light");
     setActivePartner(partner);
-
-    // Fetch fresh user profile to ensure up-to-date avatar_url and details
-    Api.get(`/users/${partner.id}`)
-      .then((fresh) => {
-        if (fresh && fresh.id) {
-          setActivePartner((prev) => (prev && prev.id === fresh.id ? { ...prev, ...fresh } : prev));
-          setDialogs((prev) =>
-            Array.isArray(prev)
-              ? prev.map((d) => (d?.partner?.id === fresh.id ? { ...d, partner: { ...d.partner, ...fresh } } : d))
-              : []
-          );
-        }
-      })
-      .catch(() => {});
     try {
       const msgs = await Api.get(`/chats/${partner.id}/messages`);
       if (msgs && msgs.length > 0) {
@@ -1001,7 +901,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     let localStream = null;
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: isVideo ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false
       });
     } catch (advErr) {
@@ -1026,27 +926,8 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     if (remoteAudioRef.current) {
       remoteAudioRef.current.volume = 1.0;
       remoteAudioRef.current.muted = false;
-      try {
-        if (typeof remoteAudioRef.current.setSinkId === "function") {
-          remoteAudioRef.current.setSinkId("speaker").catch(() => {});
-        }
-      } catch (e) {}
       try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
     }
-    if (remoteAudioVideoRef.current) {
-      remoteAudioVideoRef.current.muted = true;
-      try { remoteAudioVideoRef.current.play().catch(() => {}); } catch (e) {}
-    }
-
-    // Refresh partner info to ensure latest avatar
-    Api.get(`/users/${activePartner.id}`)
-      .then((fresh) => {
-        if (fresh && fresh.id) {
-          setActivePartner((prev) => (prev && prev.id === fresh.id ? { ...prev, ...fresh } : prev));
-          setActiveCall((prev) => (prev ? { ...prev, partner: { ...prev.partner, ...fresh } } : null));
-        }
-      })
-      .catch(() => {});
 
     let callId = null;
     try {
@@ -1192,7 +1073,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     let localStream = null;
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: isVideo ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false
       });
     } catch (advErr) {
@@ -1216,27 +1097,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     if (remoteAudioRef.current) {
       remoteAudioRef.current.volume = 1.0;
       remoteAudioRef.current.muted = false;
-      try {
-        if (typeof remoteAudioRef.current.setSinkId === "function") {
-          remoteAudioRef.current.setSinkId("speaker").catch(() => {});
-        }
-      } catch (e) {}
       try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
-    }
-    if (remoteAudioVideoRef.current) {
-      remoteAudioVideoRef.current.muted = true;
-      try { remoteAudioVideoRef.current.play().catch(() => {}); } catch (e) {}
-    }
-
-    // Refresh partner info
-    if (targetUserId) {
-      Api.get(`/users/${targetUserId}`)
-        .then((fresh) => {
-          if (fresh && fresh.id) {
-            setActiveCall((prev) => (prev ? { ...prev, partner: { ...prev.partner, ...fresh } } : null));
-          }
-        })
-        .catch(() => {});
     }
 
     setTimeout(() => {
@@ -1366,8 +1227,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                   if (onOpenProfile && activePartner?.id) onOpenProfile(activePartner.id);
                 }}
               >
-                <div className="relative flex-shrink-0">
-                  {renderUserAvatar(activePartner, "w-9 h-9 ring-1 ring-slate-200", "text-sm")}
+                <div className="relative">
+                  <img
+                    src={activePartner.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%23f1f5f9'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%23cbd5e1'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%23cbd5e1'/%3E%3C/svg%3E"}
+                    className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%23f1f5f9'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%23cbd5e1'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%23cbd5e1'/%3E%3C/svg%3E";
+                    }}
+                  />
                   <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
                 </div>
                 <div>
@@ -1672,8 +1540,11 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                     className="bg-white hover:bg-slate-50 border border-slate-200 hover:border-pink-300 rounded-2xl p-3.5 flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] shadow-sm"
                   >
                     <div className="flex items-center space-x-3">
-                      <div className="relative flex-shrink-0">
-                        {renderUserAvatar(partnerObj, "w-12 h-12 ring-2 ring-slate-100", "text-lg")}
+                      <div className="relative">
+                        <img
+                          src={partnerObj.avatar_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%23f1f5f9'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%23cbd5e1'/%3E%3Cpath d='M22 84 C22 66, 34 58, 50 58 C66 58, 78 66, 78 84 Z' fill='%23cbd5e1'/%3E%3C/svg%3E"}
+                          className="w-12 h-12 rounded-full object-cover ring-2 ring-slate-100"
+                        />
                         <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-white" />
                       </div>
 
@@ -1795,32 +1666,11 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             el.srcObject = remoteStreamRef.current;
             el.volume = 1.0;
             el.muted = false;
-            try {
-              if (typeof el.setSinkId === "function") {
-                el.setSinkId("speaker").catch(() => {});
-              }
-            } catch (e) {}
             try { el.play().catch(() => {}); } catch(e) {}
           }
         }}
         autoPlay
         playsInline
-        style={{ position: "absolute", width: "1px", height: "1px", opacity: 0.01, pointerEvents: "none" }}
-      />
-
-      {/* Dedicated WebRTC Loudspeaker Video Sink Element */}
-      {/* Ensures mobile Android WebView routes audio through loudspeaker in all calls */}
-      <video
-        ref={(el) => {
-          remoteAudioVideoRef.current = el;
-          if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) {
-            el.srcObject = remoteStreamRef.current;
-            try { el.play().catch(() => {}); } catch(e) {}
-          }
-        }}
-        autoPlay
-        playsInline
-        muted
         style={{ position: "absolute", width: "1px", height: "1px", opacity: 0.01, pointerEvents: "none" }}
       />
 
@@ -1847,8 +1697,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                 muted
                 className="w-full h-full object-cover"
               />
+            ) : activeCall?.partner?.avatar_url && !activeCall.partner.avatar_url.includes("unsplash") ? (
+              <img
+                src={activeCall.partner.avatar_url}
+                className="w-full h-full object-cover"
+              />
             ) : (
-              renderUserAvatar(activeCall?.partner, "w-full h-full", "text-sm")
+              <div className="w-full h-full bg-gradient-to-tr from-pink-500 to-amber-500 flex items-center justify-center font-bold text-white text-xs select-none">
+                {(activeCall?.partner?.first_name || activeCall?.partner?.username || "U")[0].toUpperCase()}
+              </div>
             )}
             <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full animate-ping" />
           </div>
@@ -1880,25 +1737,14 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       {activeCall && !isCallMinimized && (
         <div
           onClick={() => {
-            // Screen tap: guarantees user activation for audio and video sinks if browser blocked initial autoplay
+            // Screen tap: guarantees user activation for audio if browser blocked initial autoplay
             if (remoteAudioRef.current) {
               if (remoteStreamRef.current && remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
                 remoteAudioRef.current.srcObject = remoteStreamRef.current;
               }
               remoteAudioRef.current.volume = 1.0;
               remoteAudioRef.current.muted = false;
-              try {
-                if (typeof remoteAudioRef.current.setSinkId === "function") {
-                  remoteAudioRef.current.setSinkId("speaker").catch(() => {});
-                }
-              } catch (e) {}
               try { remoteAudioRef.current.play().catch(() => {}); } catch(e) {}
-            }
-            if (remoteAudioVideoRef.current) {
-              if (remoteStreamRef.current && remoteAudioVideoRef.current.srcObject !== remoteStreamRef.current) {
-                remoteAudioVideoRef.current.srcObject = remoteStreamRef.current;
-              }
-              try { remoteAudioVideoRef.current.play().catch(() => {}); } catch(e) {}
             }
           }}
           className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between overflow-hidden animate-in fade-in select-none"
@@ -1909,7 +1755,16 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
               <div className="relative flex items-center justify-center">
                 <div className="absolute w-44 h-44 rounded-full bg-pink-500/15 animate-ping" />
                 <div className="absolute w-36 h-36 rounded-full bg-rose-500/25 animate-pulse" />
-                {renderUserAvatar(activeCall?.partner, "w-28 h-28 ring-4 ring-pink-500 shadow-2xl relative z-10", "text-4xl")}
+                {activeCall?.partner?.avatar_url && !activeCall.partner.avatar_url.includes("unsplash") ? (
+                  <img
+                    src={activeCall.partner.avatar_url}
+                    className="w-28 h-28 rounded-full object-cover ring-4 ring-pink-500 shadow-2xl relative z-10"
+                  />
+                ) : (
+                  <div className="w-28 h-28 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center font-black text-white text-4xl shadow-2xl relative z-10 select-none">
+                    {(activeCall?.partner?.first_name || activeCall?.partner?.username || "U")[0].toUpperCase()}
+                  </div>
+                )}
               </div>
               <div className="space-y-1 relative z-10">
                 <h2 className="text-2xl font-black text-white">{activeCall?.partner?.first_name || "Собеседник"}</h2>
@@ -1941,7 +1796,16 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                 />
                 {!remoteStreamRef.current && (
                   <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center space-y-3 p-6 text-center">
-                    {renderUserAvatar(activeCall?.partner, "w-28 h-28 ring-4 ring-pink-500/80 shadow-2xl animate-pulse", "text-4xl")}
+                    {activeCall?.partner?.avatar_url && !activeCall.partner.avatar_url.includes("unsplash") ? (
+                      <img
+                        src={activeCall.partner.avatar_url}
+                        className="w-28 h-28 rounded-full object-cover ring-4 ring-pink-500/80 shadow-2xl animate-pulse"
+                      />
+                    ) : (
+                      <div className="w-28 h-28 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center font-black text-white text-4xl shadow-2xl animate-pulse select-none">
+                        {(activeCall?.partner?.first_name || activeCall?.partner?.username || "U")[0].toUpperCase()}
+                      </div>
+                    )}
                     <h2 className="text-xl font-black text-white">{activeCall?.partner?.first_name || "Собеседник"}</h2>
                     <p className="text-xs text-pink-400 font-semibold animate-pulse">
                       🟢 Подключение видеопотока HD...
@@ -1952,7 +1816,16 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             ) : (
               <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-950 to-black flex flex-col items-center justify-center space-y-5 p-6 text-center">
                 <div className="relative">
-                  {renderUserAvatar(activeCall?.partner, "w-32 h-32 ring-4 ring-emerald-500 shadow-2xl", "text-5xl")}
+                  {activeCall?.partner?.avatar_url && !activeCall.partner.avatar_url.includes("unsplash") ? (
+                    <img
+                      src={activeCall.partner.avatar_url}
+                      className="w-32 h-32 rounded-full object-cover ring-4 ring-emerald-500 shadow-2xl"
+                    />
+                  ) : (
+                    <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center font-black text-white text-5xl shadow-2xl select-none">
+                      {(activeCall?.partner?.first_name || activeCall?.partner?.username || "U")[0].toUpperCase()}
+                    </div>
+                  )}
                   <span className="absolute -inset-2 rounded-full border-2 border-emerald-400 animate-ping opacity-60 pointer-events-none" />
                 </div>
                 <div>
@@ -2045,18 +1918,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                       }
                       remoteAudioRef.current.volume = 1.0;
                       remoteAudioRef.current.muted = false;
-                      try {
-                        if (typeof remoteAudioRef.current.setSinkId === "function") {
-                          remoteAudioRef.current.setSinkId("speaker").catch(() => {});
-                        }
-                      } catch (err) {}
                       try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
-                    }
-                    if (remoteAudioVideoRef.current) {
-                      if (remoteStreamRef.current && remoteAudioVideoRef.current.srcObject !== remoteStreamRef.current) {
-                        remoteAudioVideoRef.current.srcObject = remoteStreamRef.current;
-                      }
-                      try { remoteAudioVideoRef.current.play().catch(() => {}); } catch (e) {}
                     }
                   }}
                   className="p-4 rounded-full text-xl shadow-xl bg-slate-800/90 text-white border border-slate-700 active:scale-90"
@@ -2118,7 +1980,17 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         <div className="fixed inset-0 z-70 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 animate-in fade-in select-none">
           <div className="w-full max-w-sm bg-slate-900 border border-emerald-500/50 rounded-3xl p-6 text-center space-y-5 shadow-2xl shadow-emerald-500/20">
             <div className="relative w-24 h-24 mx-auto">
-              {renderUserAvatar(incomingCall.caller, "w-24 h-24 ring-4 ring-emerald-500 animate-pulse shadow-xl", "text-3xl")}
+              {incomingCall.caller?.avatar_url && !incomingCall.caller.avatar_url.includes("unsplash") ? (
+                <img
+                  src={incomingCall.caller.avatar_url}
+                  alt="Caller"
+                  className="w-24 h-24 rounded-full object-cover ring-4 ring-emerald-500 animate-pulse shadow-xl"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center font-black text-white text-3xl shadow-xl ring-4 ring-emerald-500 animate-pulse select-none">
+                  {(incomingCall.caller?.first_name || incomingCall.caller?.username || "U")[0].toUpperCase()}
+                </div>
+              )}
               <span className="absolute bottom-0 right-0 w-7 h-7 bg-emerald-500 rounded-full flex items-center justify-center text-xs text-white shadow-md">
                 {incomingCall.call_type === "video" ? "📹" : "📞"}
               </span>
