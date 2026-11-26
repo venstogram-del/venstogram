@@ -289,12 +289,32 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         window.__vensto_audio_player.muted = false;
         window.__vensto_audio_player.play().then(() => setIsAudioMutedByBrowser(false)).catch(() => {});
       } catch(e) {}
+
+      // Web Audio API destination pipe (bypasses DOM visibility throttling in iOS Safari!)
+      try {
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtxClass) {
+          if (!window.__vensto_remote_audio_ctx) {
+            window.__vensto_remote_audio_ctx = new AudioCtxClass();
+          }
+          const ctx = window.__vensto_remote_audio_ctx;
+          if (ctx.state === "suspended") {
+            ctx.resume().catch(() => {});
+          }
+          const srcNode = ctx.createMediaStreamSource(freshAudioStream);
+          const gainNode = ctx.createGain();
+          gainNode.gain.value = 1.2;
+          srcNode.connect(gainNode);
+          gainNode.connect(ctx.destination);
+        }
+      } catch(e) {}
     } else if (event.track?.kind === "video") {
       const videoTrack = event.track;
       try { videoTrack.enabled = true; } catch(e) {}
 
       const freshVideoStream = new MediaStream([videoTrack]);
       remoteVideoStreamRef.current = freshVideoStream;
+      remoteStreamRef.current = freshVideoStream;
 
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = freshVideoStream;
@@ -1862,8 +1882,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         }}
         autoPlay
         playsInline
-        className="w-1 h-1 opacity-0 absolute pointer-events-none"
-        style={{ zIndex: 1, left: "0px", bottom: "0px" }}
+        style={{ position: "fixed", bottom: "0px", left: "0px", width: "10px", height: "10px", opacity: 0.01, zIndex: 99999, pointerEvents: "none" }}
       />
 
       {/* Floating Picture-in-Picture (PIP) Call Widget when Minimized */}

@@ -19,8 +19,10 @@ if settings.BOT_TOKEN:
 
 def get_webapp_keyboard(start_param: str = "", is_admin: bool = False) -> InlineKeyboardMarkup:
     """Builds inline keyboard with launch button into Telegram Mini App."""
+    import time
     base_url = settings.WEBAPP_URL
-    app_url = f"{base_url}?startapp={start_param}" if start_param else base_url
+    delim = "&" if "?" in base_url else "?"
+    app_url = f"{base_url}{delim}startapp={start_param}&t={int(time.time())}" if start_param else f"{base_url}{delim}t={int(time.time())}"
     is_https = app_url.startswith("https://")
     
     if is_https:

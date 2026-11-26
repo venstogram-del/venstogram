@@ -99,7 +99,7 @@ async def lifespan(app: FastAPI):
             await bot.delete_webhook(drop_pending_updates=True)
             try:
                 from aiogram.types import MenuButtonWebApp, WebAppInfo
-                base_url = settings.WEBAPP_URL.rstrip('/') + '/'
+                base_url = f"{settings.WEBAPP_URL.rstrip('/')}/?v={int(time.time())}"
                 await bot.set_chat_menu_button(
                     menu_button=MenuButtonWebApp(
                         text="Venstogram 🚀",
@@ -178,6 +178,31 @@ app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads"
 # Frontend Mini App static mount
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend"))
 os.makedirs(frontend_dir, exist_ok=True)
+
+import time
+import re
+from fastapi.responses import HTMLResponse
+
+@app.get("/app")
+@app.get("/app/")
+@app.get("/app/index.html")
+async def serve_fresh_app_index():
+    index_file = os.path.join(frontend_dir, "index.html")
+    if os.path.exists(index_file):
+        with open(index_file, "r", encoding="utf-8") as f:
+            html = f.read()
+        cache_id = str(int(time.time() * 1000))
+        html = re.sub(r'app\.bundle\.js(\?[^"]*)?', f'app.bundle.js?v={cache_id}', html)
+        return HTMLResponse(
+            content=html,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
+    return HTMLResponse("<h1>Venstogram Loading...</h1>")
+
 app.mount("/app", StaticFiles(directory=frontend_dir, html=True), name="frontend")
 
 # Include API Routers
