@@ -1093,7 +1093,7 @@ async def get_all_users(
                 "email": u.email,
                 "role": u.role,
                 "is_verified": u.is_verified,
-                "is_registered": bool(u.is_registered or u.birth_year or (u.username and not u.username.startswith("user_"))),
+                "is_registered": bool(u.is_registered or u.role == "director" or (u.birth_year and u.username and not u.username.startswith("user_"))),
                 "is_banned": getattr(u, "is_banned", False),
                 "wallet_coins": u.wallet_coins,
                 "created_at": u.created_at.isoformat() if u.created_at else None,

@@ -210,340 +210,43 @@ async def send_message(
 
 
 # ============================================================================
-# WebRTC / Audio-Video Call Signaling
+# ============================================================================
+# Calls Disabled (Removed completely per project requirements)
 # ============================================================================
 
 @router.post("/call/start")
-async def start_call(
-    req: dict,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    from app.core.config import settings
-    recipient_id = req.get("recipient_id")
-    call_type = req.get("call_type", "audio") # "audio" only
-
-    rec_res = await db.execute(select(User).where(User.id == recipient_id))
-    recipient = rec_res.scalars().first()
-    if not recipient:
-        raise HTTPException(status_code=404, detail="Собеседник не найден")
-
-    # Create new call session in ringing state (open to all users)
-    call = CallSession(
-        caller_id=current_user.id,
-        receiver_id=recipient.id,
-        call_type=call_type,
-        status="ringing",
-        duration_seconds=0
-    )
-    db.add(call)
-    await db.commit()
-    await db.refresh(call)
-
-    # Deliver incoming call to recipient via WebSocket in Web App
-    from app.websocket.manager import ws_manager
-    call_payload = {
-        "event": "incoming_call",
-        "call_id": call.id,
-        "call_type": call_type,
-        "caller": {
-            "id": current_user.id,
-            "username": current_user.username,
-            "first_name": current_user.first_name,
-            "avatar_url": current_user.avatar_url
-        }
-    }
-    delivered = await ws_manager.send_personal_message(recipient.id, call_payload)
-    if not delivered and recipient.telegram_id:
-        delivered = await ws_manager.send_personal_message(recipient.telegram_id, call_payload)
-
-    # Send Telegram push notification to ensure recipient never misses the call
-    if recipient.telegram_id:
-        try:
-            from app.bot.bot import send_bot_push_notification
-            call_icon = "📞 Голосовой звонок"
-            await send_bot_push_notification(
-                telegram_id=recipient.telegram_id,
-                text=f"📲 <b>Входящий {call_icon} от @{current_user.username}</b>!\n\nОткройте приложение Venstogram, чтобы ответить на звонок.",
-                button_text="Принять звонок в приложении",
-                start_param=f"chat_{current_user.id}"
-            )
-        except Exception as e:
-            print(f"[Bot Call Push Note] {e}")
-
-    return {
-        "status": "ok",
-        "call_id": call.id,
-        "call_status": "ringing"
-    }
-
+async def start_call():
+    return {"status": "calls_disabled", "message": "Звонки отключены"}
 
 @router.get("/call/incoming")
-async def check_incoming_call(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Polls or checks if current_user has any incoming ringing call.
-    """
-    res = await db.execute(
-        select(CallSession)
-        .options(selectinload(CallSession.caller))
-        .where(
-            CallSession.receiver_id == current_user.id,
-            CallSession.status == "ringing"
-        )
-        .order_by(desc(CallSession.created_at))
-    )
-    call = res.scalars().first()
-    if not call or not call.caller:
-        return {"has_incoming": False}
-
-    return {
-        "has_incoming": True,
-        "call_id": call.id,
-        "call_type": call.call_type or "audio",
-        "caller": {
-            "id": call.caller.id,
-            "username": call.caller.username or f"user{call.caller.id}",
-            "first_name": call.caller.first_name or "Пользователь",
-            "avatar_url": call.caller.avatar_url
-        }
-    }
-
+async def check_incoming_call():
+    return {"has_incoming": False}
 
 @router.post("/call/accept")
-async def accept_call(
-    req: dict,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    call_id = req.get("call_id")
-    res = await db.execute(select(CallSession).where(CallSession.id == call_id))
-    call = res.scalars().first()
-    if not call:
-        raise HTTPException(status_code=404, detail="Звонок не найден")
-
-    call.status = "accepted"
-    await db.commit()
-
-    # Notify caller that receiver accepted
-    from app.websocket.manager import ws_manager
-    await ws_manager.send_personal_message(
-        call.caller_id,
-        {
-            "event": "call_accepted",
-            "call_id": call.id,
-            "receiver_id": current_user.id
-        }
-    )
-
-    return {"status": "ok", "call_status": "accepted"}
-
+async def accept_call():
+    return {"status": "calls_disabled"}
 
 @router.post("/call/reject")
-async def reject_call(
-    req: dict,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    call_id = req.get("call_id")
-    res = await db.execute(select(CallSession).where(CallSession.id == call_id))
-    call = res.scalars().first()
-    if not call:
-        raise HTTPException(status_code=404, detail="Звонок не найден")
-
-    call.status = "rejected"
-    await db.commit()
-
-    from app.websocket.manager import ws_manager
-    await ws_manager.send_personal_message(
-        call.caller_id,
-        {
-            "event": "call_rejected",
-            "call_id": call.id,
-            "message": "Абонент отклонил звонок"
-        }
-    )
-
-    return {"status": "ok", "call_status": "rejected"}
-
+async def reject_call():
+    return {"status": "calls_disabled"}
 
 @router.post("/call/end")
-async def end_call_session(
-    req: dict,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    call_id = req.get("call_id")
-    duration = req.get("duration_seconds", 0)
-    res = await db.execute(select(CallSession).where(CallSession.id == call_id))
-    call = res.scalars().first()
-    if not call:
-        return {"status": "ok"}
-
-    call.status = "ended"
-    call.duration_seconds = duration
-    await db.commit()
-
-    partner_id = call.receiver_id if call.caller_id == current_user.id else call.caller_id
-    from app.websocket.manager import ws_manager
-    await ws_manager.send_personal_message(
-        partner_id,
-        {
-            "event": "call_ended",
-            "call_id": call.id
-        }
-    )
-
-    return {"status": "ok", "call_status": "ended"}
-
+async def end_call_session():
+    return {"status": "ended"}
 
 @router.get("/call/{call_id}/status")
-async def get_call_status(
-    call_id: int,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    res = await db.execute(select(CallSession).where(CallSession.id == call_id))
-    call = res.scalars().first()
-    if not call:
-        return {"status": "ended"}
-
-    return {
-        "status": call.status,
-        "duration_seconds": call.duration_seconds
-    }
-
-
-# In-memory mailbox for WebRTC signaling (offers, answers, ICE candidates)
-# Ensures signaling delivery even across WebSocket disconnects / cellular handovers
-_pending_call_signals: dict = {}
+async def get_call_status(call_id: int):
+    return {"status": "ended", "duration_seconds": 0}
 
 @router.post("/call/signal")
-async def send_call_signal(
-    req: dict,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Relays WebRTC SDP offers, SDP answers, and ICE candidates between call participants.
-    Delivers via active WebSocket with fallback queuing for HTTP polling.
-    """
-    raw_target_id = req.get("target_user_id")
-    call_id = req.get("call_id")
-    signal_type = req.get("signal_type") # "call_offer", "call_answer", "ice_candidate", "call_end"
-    payload = req.get("payload")
-
-    if raw_target_id is None or not signal_type:
-        raise HTTPException(status_code=400, detail="Missing target_user_id or signal_type")
-
-    try:
-        target_uid_int = int(raw_target_id)
-    except (ValueError, TypeError):
-        target_uid_int = raw_target_id
-
-    # Resolve target user's database ID and telegram ID
-    target_db_id = target_uid_int
-    target_tg_id = None
-    try:
-        if isinstance(target_uid_int, int):
-            t_res = await db.execute(select(User).where((User.id == target_uid_int) | (User.telegram_id == target_uid_int)))
-            t_user = t_res.scalars().first()
-            if t_user:
-                target_db_id = t_user.id
-                target_tg_id = t_user.telegram_id
-    except Exception as e:
-        print("[Signaling user resolve note]", e)
-
-    event_name = signal_type if signal_type.startswith("call_") or signal_type == "ice_candidate" else f"call_{signal_type}"
-
-    signal_data = {
-        "event": event_name,
-        "signal_type": signal_type,
-        "call_id": call_id,
-        "from_user_id": current_user.id,
-        "target_user_id": target_db_id,
-        "payload": payload,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-
-    # 1. Deliver immediately to active WebSocket (try db_id, tg_id, and string versions)
-    from app.websocket.manager import ws_manager
-    delivered = await ws_manager.send_personal_message(target_db_id, signal_data)
-    if not delivered and target_tg_id:
-        delivered = await ws_manager.send_personal_message(target_tg_id, signal_data)
-    if not delivered and str(target_db_id) != target_db_id:
-        delivered = await ws_manager.send_personal_message(str(target_db_id), signal_data)
-
-    # 2. Store in pending queue under all identifiers for HTTP polling fallback
-    queue_targets = set()
-    if target_db_id is not None:
-        queue_targets.add(target_db_id)
-        queue_targets.add(str(target_db_id))
-    if target_tg_id is not None:
-        queue_targets.add(target_tg_id)
-        queue_targets.add(str(target_tg_id))
-    if raw_target_id is not None:
-        queue_targets.add(raw_target_id)
-
-    for q_id in queue_targets:
-        if q_id not in _pending_call_signals:
-            _pending_call_signals[q_id] = []
-        _pending_call_signals[q_id].append(signal_data)
-        if len(_pending_call_signals[q_id]) > 50:
-            _pending_call_signals[q_id] = _pending_call_signals[q_id][-50:]
-
-    return {"status": "ok", "delivered_ws": delivered}
-
+async def send_call_signal():
+    return {"status": "calls_disabled"}
 
 @router.get("/call/signal/pending")
-async def get_pending_call_signals(
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Fetches and drains queued WebRTC signaling messages for current user.
-    """
-    signals = []
-    keys_to_drain = set([
-        current_user.id,
-        str(current_user.id),
-        current_user.telegram_id,
-        str(current_user.telegram_id)
-    ])
-    for k in keys_to_drain:
-        if k in _pending_call_signals:
-            signals.extend(_pending_call_signals.pop(k, []))
-
-    # Deduplicate while preserving order
-    seen = set()
-    unique_signals = []
-    for s in signals:
-        key = (s.get("event"), s.get("call_id"), s.get("from_user_id"), s.get("created_at"))
-        if key not in seen:
-            seen.add(key)
-            unique_signals.append(s)
-
-    return {"signals": unique_signals}
-
+async def get_pending_call_signals():
+    return {"signals": []}
 
 @router.get("/call/ice-servers")
 async def get_ice_servers():
-    """
-    Returns public STUN and reliable TURN servers for WebRTC NAT traversal.
-    """
-    return {
-        "iceServers": [
-            {"urls": "stun:stun.l.google.com:19302"},
-            {"urls": "stun:stun1.l.google.com:19302"},
-            {"urls": "stun:stun2.l.google.com:19302"},
-            {"urls": "stun:stun3.l.google.com:19302"},
-            {"urls": "stun:stun4.l.google.com:19302"},
-            {"urls": "stun:stun.cloudflare.com:3478"},
-            {"urls": "stun:global.stun.twilio.com:3478"},
-            {"urls": "stun:standard.relay.metered.ca:80"},
-            {"urls": "turn:standard.relay.metered.ca:80", "username": "openrelayproject", "credential": "openrelayproject"},
-            {"urls": "turn:standard.relay.metered.ca:80?transport=tcp", "username": "openrelayproject", "credential": "openrelayproject"}
-        ]
-    }
+    return {"iceServers": []}
 

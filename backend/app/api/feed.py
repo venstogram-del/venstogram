@@ -32,8 +32,12 @@ async def get_feed(
     query = (
         select(Post)
         .options(selectinload(Post.author))
-        .where(Post.moderation_status != "rejected")
-        .join(User)
+        .join(User, Post.user_id == User.id)
+        .where(
+            Post.moderation_status != "rejected",
+            User.is_registered == True,
+            User.is_banned == False
+        )
         .order_by(desc(friend_priority), desc(User.is_verified), desc(Post.created_at))
         .offset(offset)
         .limit(limit)

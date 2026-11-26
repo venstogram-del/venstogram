@@ -99,9 +99,7 @@ export function App() {
     }
   }, [user?.id, notificationsOpen]);
 
-  // Global Incoming Call & Message Toast States
-  const [globalIncomingCall, setGlobalIncomingCall] = useState(null);
-  const [pendingCallAccept, setPendingCallAccept] = useState(null);
+  // Message Toast State
   const [messageToast, setMessageToast] = useState(null);
 
   // Nickname & Coins Approval States (from Founder)
@@ -109,30 +107,13 @@ export function App() {
   const [approvedCoinsModal, setApprovedCoinsModal] = useState(null); // { amount_coins, new_balance }
   const [applyingNickname, setApplyingNickname] = useState(false);
 
-  // Global Realtime WebSocket Listener (Incoming Calls & In-App Chat Messages)
+  // Global Realtime WebSocket Listener (In-App Chat Messages & Approvals)
   useEffect(() => {
     const handleWsEvent = (data) => {
       if (!data) return;
-      const evt = data.event || data.type || data.signal_type;
+      const evt = data.event || data.type;
 
-      if (evt === "incoming_call") {
-        const callerInfo = data.caller || {
-          id: data.caller_id,
-          username: data.caller_username || "Пользователь",
-          first_name: data.caller_name || "Пользователь",
-          avatar_url: data.caller_avatar || null
-        };
-        setGlobalIncomingCall({
-          call_id: data.call_id,
-          call_type: "audio",
-          caller: callerInfo
-        });
-        SoundEngine.playRingtone();
-        triggerHaptic("heavy");
-      } else if (evt === "call_rejected" || evt === "call_ended" || evt === "call_reject" || evt === "call_end") {
-        SoundEngine.stopRingtone();
-        setGlobalIncomingCall(null);
-      } else if (evt === "new_message") {
+      if (evt === "new_message") {
         if (!chatOpen || activeChatUser?.id !== data.message?.sender_id) {
           SoundEngine.playNotification();
           triggerHaptic("light");
@@ -176,67 +157,8 @@ export function App() {
 
     return () => {
       if (unsub) unsub();
-      SoundEngine.stopRingtone();
     };
   }, [chatOpen, activeChatUser]);
-
-  // Periodic poll for incoming call if socket is idle
-  useEffect(() => {
-    if (!user) return;
-    const interval = setInterval(async () => {
-      if (globalIncomingCall || chatOpen) return;
-      try {
-        const res = await Api.get("/chats/call/incoming");
-        if (res && res.has_incoming && res.caller) {
-          setGlobalIncomingCall({
-            call_id: res.call_id,
-            call_type: "audio",
-            caller: res.caller
-          });
-          SoundEngine.playRingtone();
-          triggerHaptic("heavy");
-        }
-      } catch (e) {}
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [user, globalIncomingCall, chatOpen]);
-
-  const handleAcceptGlobalCall = async () => {
-    if (!globalIncomingCall) return;
-    SoundEngine.stopRingtone();
-    triggerHaptic("heavy");
-    const call = globalIncomingCall;
-
-    // Pre-acquire microphone right inside user gesture click so browser permissions never stall in background
-    try {
-      if (typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-          video: false
-        });
-        window.__vensto_prewarmed_stream = stream;
-      }
-    } catch (e) {
-      console.warn("[Global accept media prewarm note]", e);
-    }
-
-    setGlobalIncomingCall(null);
-    setActiveChatUser(call.caller);
-    setPendingCallAccept(call);
-    setChatOpen(true);
-  };
-
-  const handleDeclineGlobalCall = async () => {
-    if (!globalIncomingCall) return;
-    SoundEngine.stopRingtone();
-    triggerHaptic("medium");
-    const call = globalIncomingCall;
-    setGlobalIncomingCall(null);
-    try {
-      await Api.post("/chats/call/reject", { call_id: call.call_id });
-    } catch (e) {}
-  };
 
   const handleApplyPurchasedNickname = async () => {
     if (!approvedNicknameModal?.username) return;
@@ -272,7 +194,24 @@ export function App() {
     try {
       let activeSessionUser = null;
 
-      // 1. First prioritize saved session JWT token from localStorage
+      // 0. Instant offline/cached user restoration
+      const cachedUserStr = safeGetItem("vensto_cached_user");
+      let cachedUser = null;
+      if (cachedUserStr) {
+        try {
+          cachedUser = JSON.parse(cachedUserStr);
+        } catch (e) {}
+      }
+      if (cachedUser && cachedUser.id) {
+        activeSessionUser = cachedUser;
+        setUser(cachedUser);
+        const resolvedUserId = cachedUser.id || 1;
+        const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`) === "true";
+        const isDirector = cachedUser.role === "director" || cachedUser.telegram_id === 1477103854;
+        setIsRegistered(isDirector || hasCreated || Boolean(cachedUser.is_registered));
+      }
+
+      // 1. Prioritize saved session JWT token from localStorage
       const savedToken = safeGetItem("vensto_token");
       if (savedToken) {
         try {
@@ -280,6 +219,8 @@ export function App() {
           const me = await Api.get("/auth/me");
           if (me && me.id) {
             activeSessionUser = me;
+            safeSetItem("vensto_cached_user", JSON.stringify(me));
+            setUser(me);
             try {
               if (!window.__vensto_socket) {
                 new RealtimeSocket(savedToken);
@@ -287,39 +228,54 @@ export function App() {
             } catch (wsErr) {}
           }
         } catch (meErr) {
-          console.warn("[Session token invalid or expired, re-authenticating]", meErr);
-          safeRemoveItem("vensto_token");
-          Api.setToken("");
-        }
-      }
-
-      // 2. Try Telegram WebApp initData HMAC authentication if no saved token session
-      if (!activeSessionUser) {
-        const initData = window.Telegram?.WebApp?.initData;
-        if (initData) {
-          try {
-            const authResult = await Api.post("/auth/telegram", { init_data: initData });
-            if (authResult && authResult.user) {
-              Api.setToken(authResult.access_token);
-              safeSetItem("vensto_token", authResult.access_token);
-              activeSessionUser = authResult.user;
-              try {
-                if (!window.__vensto_socket) {
-                  new RealtimeSocket(authResult.access_token);
-                }
-              } catch (wsErr) {
-                console.warn("[App WS Error]", wsErr);
-              }
-            }
-          } catch (e) {
-            console.warn("Telegram auth API failed:", e);
+          const status = meErr?.status;
+          if (status === 401 || status === 403) {
+            console.warn("[Session token invalid or expired]", meErr);
+            safeRemoveItem("vensto_token");
+            safeRemoveItem("vensto_cached_user");
+            Api.setToken("");
+            activeSessionUser = null;
+          } else {
+            console.warn("[Server network error or cold start, preserving existing session]", meErr);
+            // DO NOT wipe token on network timeouts, 502/503, or offline!
           }
         }
       }
 
-      // 3. Handle resolution
+      // 2. Try Telegram WebApp initData HMAC authentication if no active user session
+      if (!activeSessionUser) {
+        const initData = window.Telegram?.WebApp?.initData;
+        if (initData) {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const authResult = await Api.post("/auth/telegram", { init_data: initData });
+              if (authResult && authResult.user) {
+                Api.setToken(authResult.access_token);
+                safeSetItem("vensto_token", authResult.access_token);
+                safeSetItem("vensto_cached_user", JSON.stringify(authResult.user));
+                activeSessionUser = authResult.user;
+                setUser(authResult.user);
+                try {
+                  if (!window.__vensto_socket) {
+                    new RealtimeSocket(authResult.access_token);
+                  }
+                } catch (wsErr) {}
+                break;
+              }
+            } catch (e) {
+              console.warn(`Telegram auth attempt ${attempt + 1} failed:`, e);
+              if (attempt < 2) {
+                await new Promise((r) => setTimeout(r, 1200));
+              }
+            }
+          }
+        }
+      }
+
+      // 3. Handle registration resolution
       if (activeSessionUser) {
         setUser(activeSessionUser);
+        safeSetItem("vensto_cached_user", JSON.stringify(activeSessionUser));
         const isDirector = activeSessionUser.role === "director" || activeSessionUser.telegram_id === 1477103854;
         const resolvedUserId = activeSessionUser.id || 1;
         const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`) === "true";
@@ -330,12 +286,19 @@ export function App() {
           typeof activeSessionUser.username === "string" &&
           !activeSessionUser.username.startsWith("user_")
         );
-        setIsRegistered(isDirector || hasCreated || hasProfile || Boolean(activeSessionUser.is_registered));
+        const registered = isDirector || hasCreated || Boolean(activeSessionUser.is_registered) || hasProfile;
+        if (registered) {
+          safeSetItem(`vensto_account_created_${resolvedUserId}`, "true");
+        }
+        setIsRegistered(registered);
       } else {
-        // NEVER default to Director/Admin account! Open Email/Username login modal
-        setUser(null);
-        setIsRegistered(false);
-        setEmailAuthOpen(true);
+        // If inside Telegram WebApp and network timed out, don't force email modal or false registration
+        const isTelegram = Boolean(window.Telegram?.WebApp?.initData);
+        if (!isTelegram) {
+          setUser(null);
+          setIsRegistered(false);
+          setEmailAuthOpen(true);
+        }
       }
 
       // Check deep link parameters
@@ -628,13 +591,10 @@ export function App() {
           user={user}
           activeUser={activeChatUser}
           t={t}
-          pendingCallAccept={pendingCallAccept}
-          onClearPendingCall={() => setPendingCallAccept(null)}
           onOpenProfile={handleOpenProfile}
           onClose={() => {
             setChatOpen(false);
             setActiveChatUser(null);
-            setPendingCallAccept(null);
           }}
         />
       )}
@@ -645,78 +605,6 @@ export function App() {
           onOpenProfile={handleOpenProfile}
           onUnreadCountChanged={(count) => setUnreadNotificationsCount(count)}
         />
-      )}
-
-      {/* Global In-App Incoming Call Modal */}
-      {globalIncomingCall && (
-        <div className="fixed inset-0 z-100 bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-between p-8 text-white animate-in fade-in select-none">
-          {/* Top Info */}
-          <div className="w-full flex flex-col items-center pt-8 space-y-2">
-            <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold animate-pulse">
-              📞 Входящий звонок
-            </span>
-            <p className="text-xs text-slate-400">Venstogram HD Voice</p>
-          </div>
-
-          {/* Caller Details & Pulsing Rings */}
-          <div className="flex flex-col items-center space-y-4 my-auto">
-            <div className="relative flex items-center justify-center">
-              <div className="absolute w-36 h-36 rounded-full bg-emerald-500/20 animate-ping" />
-              <div className="absolute w-32 h-32 rounded-full bg-teal-500/30 animate-pulse" />
-              {globalIncomingCall.caller?.avatar_url && !globalIncomingCall.caller.avatar_url.includes("unsplash") && !globalIncomingCall.caller.avatar_url.includes("photo-") ? (
-                <img
-                  src={globalIncomingCall.caller.avatar_url}
-                  alt={globalIncomingCall.caller.username}
-                  className="w-24 h-24 rounded-full object-cover border-4 border-emerald-500 shadow-2xl z-10 relative"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                    if (e.currentTarget.nextElementSibling) {
-                      e.currentTarget.nextElementSibling.style.display = "flex";
-                    }
-                  }}
-                />
-              ) : (
-                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center text-3xl font-black border-4 border-white/20 shadow-2xl z-10 relative select-none">
-                  {(globalIncomingCall.caller?.first_name || globalIncomingCall.caller?.username || "U")[0].toUpperCase()}
-                </div>
-              )}
-            </div>
-
-            <div className="text-center">
-              <h3 className="text-2xl font-black tracking-tight text-white">
-                {globalIncomingCall.caller?.first_name || `@${globalIncomingCall.caller?.username}`}
-              </h3>
-              <p className="text-sm font-semibold text-pink-400 mt-0.5">
-                @{globalIncomingCall.caller?.username}
-              </p>
-            </div>
-          </div>
-
-          {/* Accept / Decline Buttons */}
-          <div className="w-full max-w-xs flex items-center justify-around pb-10">
-            {/* Decline */}
-            <div className="flex flex-col items-center space-y-2">
-              <button
-                onClick={handleDeclineGlobalCall}
-                className="w-18 h-18 rounded-full bg-rose-600 hover:bg-rose-500 active:scale-90 text-white flex items-center justify-center text-3xl shadow-2xl shadow-rose-600/50 transition"
-              >
-                ✕
-              </button>
-              <span className="text-xs text-slate-300 font-semibold">Отклонить</span>
-            </div>
-
-            {/* Accept */}
-            <div className="flex flex-col items-center space-y-2">
-              <button
-                onClick={handleAcceptGlobalCall}
-                className="w-18 h-18 rounded-full bg-emerald-500 hover:bg-emerald-400 active:scale-90 text-white flex items-center justify-center text-3xl shadow-2xl shadow-emerald-500/50 transition animate-bounce"
-              >
-                📞
-              </button>
-              <span className="text-xs text-emerald-400 font-bold">Принять</span>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* In-App Floating Message Toast */}
@@ -884,6 +772,7 @@ export function App() {
             setUser(u);
             setIsRegistered(true);
             safeSetItem(`vensto_account_created_${u?.id || 1}`, "true");
+            safeSetItem("vensto_cached_user", JSON.stringify(u));
             setEmailAuthOpen(false);
             loadAllContent();
           }}

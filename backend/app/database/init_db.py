@@ -1,4 +1,10 @@
 import asyncio
+import os
+import sys
+
+# Ensure backend root is in sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 import re
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, func
@@ -52,9 +58,19 @@ async def init_models():
         # Clean any legacy boy/girl stock photo avatars so everyone has their own uploaded avatar or initials badge
         try:
             await conn.execute(text("UPDATE users SET avatar_url = '' WHERE avatar_url LIKE '%unsplash%' OR avatar_url LIKE '%photo-%'"))
-        except Exception:
+            # Purge demo posts and demo reels completely
+            await conn.execute(text("DELETE FROM post_comments WHERE post_id IN (SELECT id FROM posts WHERE caption LIKE '%Xush kelibsiz Venstogram%' OR caption LIKE '%Samarqand Registon%' OR location LIKE '%Samarqand%')"))
+            await conn.execute(text("DELETE FROM post_likes WHERE post_id IN (SELECT id FROM posts WHERE caption LIKE '%Xush kelibsiz Venstogram%' OR caption LIKE '%Samarqand Registon%' OR location LIKE '%Samarqand%')"))
+            await conn.execute(text("DELETE FROM saved_items WHERE item_type = 'post' AND item_id IN (SELECT id FROM posts WHERE caption LIKE '%Xush kelibsiz Venstogram%' OR caption LIKE '%Samarqand Registon%' OR location LIKE '%Samarqand%')"))
+            await conn.execute(text("DELETE FROM posts WHERE caption LIKE '%Xush kelibsiz Venstogram%' OR caption LIKE '%Samarqand Registon%' OR location LIKE '%Samarqand%'"))
+
+            await conn.execute(text("DELETE FROM reel_comments WHERE reel_id IN (SELECT id FROM reels WHERE caption LIKE '%Toshkent shahar manzaralari%' OR caption LIKE '%Tog%' OR video_url LIKE '%commondatastorage%')"))
+            await conn.execute(text("DELETE FROM reel_likes WHERE reel_id IN (SELECT id FROM reels WHERE caption LIKE '%Toshkent shahar manzaralari%' OR caption LIKE '%Tog%' OR video_url LIKE '%commondatastorage%')"))
+            await conn.execute(text("DELETE FROM saved_items WHERE item_type = 'reel' AND item_id IN (SELECT id FROM reels WHERE caption LIKE '%Toshkent shahar manzaralari%' OR caption LIKE '%Tog%' OR video_url LIKE '%commondatastorage%')"))
+            await conn.execute(text("DELETE FROM reels WHERE caption LIKE '%Toshkent shahar manzaralari%' OR caption LIKE '%Tog%' OR video_url LIKE '%commondatastorage%'"))
+        except Exception as e:
             pass
-    print("[Database] All tables and columns successfully verified.")
+    print("[Database] All tables and columns successfully verified and demo media purged.")
 
 async def seed_demo_data():
     """Seeds Founder Director account and marketplace official listings."""
@@ -307,59 +323,47 @@ async def seed_demo_data():
         await session.commit()
         print(f"[Database] Verified {len(names)} Uzbek name marketplace listings (from $500) and Founder reserves.")
 
-        # 4. Seed initial Posts and Reels so feed and reels are never empty
-        from app.models.entities import Post, Reel
-        post_count = (await session.execute(select(func.count(Post.id)))).scalar() or 0
-        if post_count == 0:
-            p1 = Post(
-                user_id=director_id,
-                caption="Xush kelibsiz Venstogram platformasiga! 🚀 Bu yerda siz o'z videolaringiz va suratlaringizni joylashtirishingiz mumkin. Hammaga omad va yuqori qamrovlar!",
-                media_urls=["https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080"],
-                media_type="photo",
-                location="Toshkent, O'zbekiston",
-                likes_count=1240,
-                views_count=5820,
-                comments_count=48
-            )
-            p2 = Post(
-                user_id=director_id,
-                caption="Samarqand Registon maydoni kechki chiroqlar bilan. Go'zallik! ✨ #Samarkand #Uzbekistan #Venstogram",
-                media_urls=["https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1080"],
-                media_type="photo",
-                location="Samarqand, O'zbekiston",
-                likes_count=890,
-                views_count=3400,
-                comments_count=19
-            )
-            session.add_all([p1, p2])
+        # 4. Completely purge any demo posts and demo reels from Admin / Director account
+        from app.models.entities import Post, Reel, PostComment, PostLike, ReelComment, ReelLike, SavedItem
+        from sqlalchemy import delete
 
-        reel_count = (await session.execute(select(func.count(Reel.id)))).scalar() or 0
-        if reel_count == 0:
-            r1 = Reel(
-                user_id=director_id,
-                video_url="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-                thumbnail_url="https://images.unsplash.com/photo-1536240478700-b869070f9279?w=600",
-                caption="Toshkent shahar manzaralari va yangi Venstogram Reels! 🔥 Tomosha qiling va o'z videolaringizni yuklang!",
-                audio_title="Original Sound - Venstogram",
-                audio_author="Venstogram Official",
-                likes_count=3200,
-                views_count=18400,
-                comments_count=85
+        try:
+            # Purge demo posts
+            demo_posts_res = await session.execute(
+                select(Post.id).where(
+                    (Post.caption.like("%Xush kelibsiz Venstogram%")) |
+                    (Post.caption.like("%Samarqand Registon%")) |
+                    (Post.location.like("%Samarqand%"))
+                )
             )
-            r2 = Reel(
-                user_id=director_id,
-                video_url="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-                thumbnail_url="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600",
-                caption="Tog'lar va go'zal tabiat. Har kuni yangi sarguzashtlar! 🏔️✨",
-                audio_title="Chill Beats - Lo-Fi Tashkent",
-                audio_author="Uzbek Sound",
-                likes_count=1950,
-                views_count=12800,
-                comments_count=42
-            )
-            session.add_all([r1, r2])
+            demo_post_ids = demo_posts_res.scalars().all()
+            if demo_post_ids:
+                await session.execute(delete(PostComment).where(PostComment.post_id.in_(demo_post_ids)))
+                await session.execute(delete(PostLike).where(PostLike.post_id.in_(demo_post_ids)))
+                await session.execute(delete(SavedItem).where(SavedItem.item_type == "post", SavedItem.item_id.in_(demo_post_ids)))
+                await session.execute(delete(Post).where(Post.id.in_(demo_post_ids)))
+                print(f"[Database] Cleaned up {len(demo_post_ids)} demo posts.")
 
-        await session.commit()
+            # Purge demo reels
+            demo_reels_res = await session.execute(
+                select(Reel.id).where(
+                    (Reel.caption.like("%Toshkent shahar manzaralari%")) |
+                    (Reel.caption.like("%Tog'lar va go'zal tabiat%")) |
+                    (Reel.video_url.like("%commondatastorage%"))
+                )
+            )
+            demo_reel_ids = demo_reels_res.scalars().all()
+            if demo_reel_ids:
+                await session.execute(delete(ReelComment).where(ReelComment.reel_id.in_(demo_reel_ids)))
+                await session.execute(delete(ReelLike).where(ReelLike.reel_id.in_(demo_reel_ids)))
+                await session.execute(delete(SavedItem).where(SavedItem.item_type == "reel", SavedItem.item_id.in_(demo_reel_ids)))
+                await session.execute(delete(Reel).where(Reel.id.in_(demo_reel_ids)))
+                print(f"[Database] Cleaned up {len(demo_reel_ids)} demo reels.")
+
+            await session.commit()
+        except Exception as purge_err:
+            print(f"[Database Cleanup Warning] {purge_err}")
+            await session.rollback()
 
 if __name__ == "__main__":
     asyncio.run(init_models())

@@ -19,6 +19,11 @@ async def get_active_stories(
     res = await db.execute(
         select(Story)
         .options(selectinload(Story.author))
+        .join(User, Story.user_id == User.id)
+        .where(
+            User.is_registered == True,
+            User.is_banned == False
+        )
         .order_by(desc(Story.created_at))
     )
     stories = res.scalars().all()

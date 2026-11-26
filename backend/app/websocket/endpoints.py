@@ -75,34 +75,7 @@ async def websocket_live_endpoint(
                 if room:
                     ws_manager.leave_room(room, websocket)
 
-            # 2. WebRTC 1-on-1 Calls Signaling (Offer, Answer, ICE Candidate)
-            elif event_type in ("call_offer", "call_answer", "ice_candidate", "call_reject", "call_end"):
-                target_user_id = data.get("target_user_id")
-                if target_user_id is not None:
-                    try:
-                        target_uid_int = int(target_user_id)
-                    except (ValueError, TypeError):
-                        target_uid_int = target_user_id
 
-                    msg_body = {
-                        "event": event_type,
-                        "signal_type": event_type,
-                        "from_user_id": user_id,
-                        "target_user_id": target_uid_int,
-                        "call_id": data.get("call_id"),
-                        "payload": data.get("payload")
-                    }
-                    await ws_manager.send_personal_message(target_uid_int, msg_body)
-                    try:
-                        from app.api.chat import _pending_call_signals
-                        for q_key in set([target_uid_int, str(target_uid_int)]):
-                            if q_key not in _pending_call_signals:
-                                _pending_call_signals[q_key] = []
-                            _pending_call_signals[q_key].append(msg_body)
-                            if len(_pending_call_signals[q_key]) > 50:
-                                _pending_call_signals[q_key] = _pending_call_signals[q_key][-50:]
-                    except Exception:
-                        pass
 
             # 3. WebRTC Live PK Stream Signaling between Battle Host & Guest
             elif event_type in ("pk_stream_offer", "pk_stream_answer", "pk_stream_ice"):

@@ -146,12 +146,8 @@ async def search_users(
     from app.core.config import settings as _cfg
     is_requester_admin = (current_user.role in ("admin", "director") or current_user.telegram_id in _cfg.ADMIN_TELEGRAM_IDS)
     
-    # Only show verified registered users
-    reg_filter = or_(
-        User.is_registered == True,
-        User.birth_year != None,
-        and_(User.first_name != "", User.username != None, ~User.username.startswith("user_"))
-    )
+    # Strictly only show completed registered users
+    reg_filter = (User.is_registered == True)
     query = select(User).where(
         User.is_banned == False,
         reg_filter
@@ -382,18 +378,8 @@ async def get_suggested_users(
     from app.core.config import settings as _cfg
     is_req_admin = current_user and (current_user.role in ("admin", "director") or current_user.telegram_id in _cfg.ADMIN_TELEGRAM_IDS)
 
-    # Exclude admins/directors from public suggestions if viewer is regular user
-    admin_exclude = []
-    if not is_req_admin:
-        admin_res = await db.execute(select(User.id).where(or_(User.role.in_(["admin", "director"]), User.telegram_id.in_(_cfg.ADMIN_TELEGRAM_IDS))))
-        admin_exclude = admin_res.scalars().all()
-        excluded_ids.update(admin_exclude)
-
-    reg_filter = or_(
-        User.is_registered == True,
-        User.birth_year != None,
-        and_(User.first_name != "", User.username != None, ~User.username.startswith("user_"))
-    )
+    # Strictly only show completed registered users
+    reg_filter = (User.is_registered == True)
 
     stmt = (
         select(User)

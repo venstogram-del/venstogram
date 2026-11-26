@@ -108,7 +108,7 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request, db: AsyncSes
             "is_verified": user.is_verified,
             "birth_year": user.birth_year,
             "birth_date": user.birth_date,
-            "is_registered": bool(user.is_registered or user.birth_year or (user.username and not user.username.startswith("user_"))),
+            "is_registered": bool(user.is_registered or user.role == "director" or (user.birth_year and user.username and not user.username.startswith("user_"))),
             "wallet_coins": user.wallet_coins,
             "wallet_uzs": user.wallet_uzs,
             "language_code": user.language_code
@@ -158,7 +158,7 @@ async def dev_login(req: DevAuthRequest, db: AsyncSession = Depends(get_db)):
             "is_verified": user.is_verified,
             "birth_year": user.birth_year,
             "birth_date": user.birth_date,
-            "is_registered": bool(user.is_registered or user.birth_year or (user.username and not user.username.startswith("user_"))),
+            "is_registered": bool(user.is_registered or user.role == "director" or (user.birth_year and user.username and not user.username.startswith("user_"))),
             "wallet_coins": user.wallet_coins,
             "wallet_uzs": user.wallet_uzs,
             "language_code": user.language_code
@@ -193,7 +193,7 @@ async def get_me(current_user: User = Depends(get_current_user), db: AsyncSessio
         "wallet_uzs": current_user.wallet_uzs,
         "birth_year": current_user.birth_year,
         "birth_date": current_user.birth_date,
-        "is_registered": bool(current_user.is_registered or current_user.birth_year or (current_user.username and not current_user.username.startswith("user_"))),
+        "is_registered": bool(current_user.is_registered or current_user.role == "director" or (current_user.birth_year and current_user.username and not current_user.username.startswith("user_"))),
         "language_code": current_user.language_code,
         "biometric_enabled": current_user.biometric_enabled,
         "has_pin": bool(current_user.wallet_pin),
@@ -698,7 +698,7 @@ async def login_email(req: EmailLoginRequest, db: AsyncSession = Depends(get_db)
             "is_verified": user.is_verified,
             "birth_year": user.birth_year,
             "birth_date": user.birth_date,
-            "is_registered": bool(user.is_registered or user.birth_year or (user.username and not user.username.startswith("user_"))),
+            "is_registered": bool(user.is_registered or user.role == "director" or (user.birth_year and user.username and not user.username.startswith("user_"))),
             "wallet_coins": user.wallet_coins,
             "wallet_uzs": user.wallet_uzs,
             "language_code": user.language_code

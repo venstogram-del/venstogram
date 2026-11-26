@@ -289,15 +289,7 @@ export function ProfileView({
     }
   };
 
-  const handleUpdateAllowCalls = async (mode) => {
-    triggerHaptic("medium");
-    try {
-      await Api.patch("/auth/me", { allow_calls: mode });
-      onUpdateUser({ ...user, allow_calls: mode });
-    } catch (e) {
-      alert("Ошибка настройки звонков: " + e.message);
-    }
-  };
+
 
   const handleShareMyProfile = () => {
     triggerHaptic("light");
@@ -976,64 +968,7 @@ export function ProfileView({
                 </button>
               </div>
 
-              {/* Privacy: Incoming Calls Control (for Bloggers & Creators) */}
-              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
-                <div className="flex items-center space-x-2.5">
-                  <span className="text-lg">📞</span>
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">Входящие звонки</span>
-                    <span className="text-[10px] text-slate-500">
-                      {isDirector ? "Основатель: полная защита от спам-звонков" : "Кто может звонить вам (для авторов и блогеров)"}
-                    </span>
-                  </div>
-                </div>
 
-                {isDirector ? (
-                  <div className="bg-amber-100/80 border border-amber-300 p-2.5 rounded-xl text-[11px] text-amber-950 font-medium">
-                    <div className="flex items-center space-x-1 font-bold text-amber-900 mb-0.5">
-                      <span>👑</span>
-                      <span>Абсолютная защита Основателя:</span>
-                    </div>
-                    Никто не может совершить вам нежелательный звонок без приглашения. Вы можете звонить и писать любому пользователю платформы без ограничений.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-1 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateAllowCalls("all")}
-                      className={`py-1.5 px-1 text-center rounded-xl text-[10px] font-bold border transition ${
-                        (user?.allow_calls || "all") === "all"
-                          ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
-                      }`}
-                    >
-                      ✓ От всех
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateAllowCalls("followers")}
-                      className={`py-1.5 px-1 text-center rounded-xl text-[10px] font-bold border transition ${
-                        user?.allow_calls === "followers"
-                          ? "bg-sky-600 text-white border-sky-600 shadow-sm"
-                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
-                      }`}
-                    >
-                      👥 Взаимные
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateAllowCalls("none")}
-                      className={`py-1.5 px-1 text-center rounded-xl text-[10px] font-bold border transition ${
-                        user?.allow_calls === "none"
-                          ? "bg-rose-600 text-white border-rose-600 shadow-sm"
-                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
-                      }`}
-                    >
-                      ✕ Отключить
-                    </button>
-                  </div>
-                )}
-              </div>
 
               {/* Account Security (PIN & Biometrics) */}
               <div

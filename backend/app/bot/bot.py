@@ -495,7 +495,7 @@ if dp is not None:
                 [
                     InlineKeyboardButton(
                         text="🚀 Открыть Venstogram App",
-                        web_app=WebAppInfo(url=f"{settings.WEBAPP_URL.rstrip('/')}/?v=20261127_v24_admin_profile_and_calls")
+                        web_app=WebAppInfo(url=f"{settings.WEBAPP_URL.rstrip('/')}/?v=20261127_v25_no_calls_clean_demo")
                     )
                 ]
             ]

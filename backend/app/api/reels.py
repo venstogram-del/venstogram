@@ -29,8 +29,12 @@ async def get_reels(
     query = (
         select(Reel)
         .options(selectinload(Reel.author))
-        .where(Reel.is_flagged == False)
-        .join(User)
+        .join(User, Reel.user_id == User.id)
+        .where(
+            Reel.is_flagged == False,
+            User.is_registered == True,
+            User.is_banned == False
+        )
         .order_by(desc(friend_priority), desc(User.is_verified), desc(Reel.likes_count), desc(Reel.created_at))
         .offset(offset)
         .limit(limit)

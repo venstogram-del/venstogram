@@ -44,7 +44,9 @@ export const Api = {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ detail: "Network error" }));
-        throw new Error(errorData.detail || "Server error");
+        const err = new Error(errorData.detail || "Server error");
+        err.status = res.status;
+        throw err;
       }
 
       const data = await res.json();

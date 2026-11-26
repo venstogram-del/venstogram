@@ -203,6 +203,9 @@ export function RegistrationModal({ user, onComplete, onOpenEmailAuth, lang = "u
       try {
         localStorage.setItem(`vensto_account_created_${res.user?.id || 1}`, "true");
         localStorage.setItem("vensto_lang", currentLang);
+        if (res.user) {
+          localStorage.setItem("vensto_cached_user", JSON.stringify(res.user));
+        }
       } catch (e) {}
       if (onComplete) onComplete(res.user);
     } catch (err) {
@@ -262,6 +265,9 @@ export function RegistrationModal({ user, onComplete, onOpenEmailAuth, lang = "u
       try {
         localStorage.setItem(`vensto_account_created_${res.user?.id || 1}`, "true");
         localStorage.setItem("vensto_lang", currentLang);
+        if (res.user) {
+          localStorage.setItem("vensto_cached_user", JSON.stringify(res.user));
+        }
       } catch (e) {}
       if (onComplete) onComplete(res.user);
     } catch (err) {
@@ -376,6 +382,15 @@ export function RegistrationModal({ user, onComplete, onOpenEmailAuth, lang = "u
       try {
         localStorage.setItem(`vensto_account_created_${user?.id || 1}`, "true");
         localStorage.setItem("vensto_lang", currentLang);
+        const resolvedUser = res.user || {
+          ...user,
+          first_name: trimmedFirst,
+          last_name: lastName.trim(),
+          birth_year: bYear,
+          username: trimmedUser,
+          is_registered: true
+        };
+        localStorage.setItem("vensto_cached_user", JSON.stringify(resolvedUser));
       } catch (e) {}
 
       SoundEngine.playFanfare();
