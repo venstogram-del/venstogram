@@ -423,19 +423,38 @@ _pending_call_signals: dict = {}
 @router.post("/call/signal")
 async def send_call_signal(
     req: dict,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Relays WebRTC SDP offers, SDP answers, and ICE candidates between call participants.
     Delivers via active WebSocket with fallback queuing for HTTP polling.
     """
-    target_user_id = req.get("target_user_id")
+    raw_target_id = req.get("target_user_id")
     call_id = req.get("call_id")
     signal_type = req.get("signal_type") # "call_offer", "call_answer", "ice_candidate", "call_end"
     payload = req.get("payload")
 
-    if not target_user_id or not signal_type:
+    if raw_target_id is None or not signal_type:
         raise HTTPException(status_code=400, detail="Missing target_user_id or signal_type")
+
+    try:
+        target_uid_int = int(raw_target_id)
+    except (ValueError, TypeError):
+        target_uid_int = raw_target_id
+
+    # Resolve target user's database ID and telegram ID
+    target_db_id = target_uid_int
+    target_tg_id = None
+    try:
+        if isinstance(target_uid_int, int):
+            t_res = await db.execute(select(User).where((User.id == target_uid_int) | (User.telegram_id == target_uid_int)))
+            t_user = t_res.scalars().first()
+            if t_user:
+                target_db_id = t_user.id
+                target_tg_id = t_user.telegram_id
+    except Exception as e:
+        print("[Signaling user resolve note]", e)
 
     event_name = signal_type if signal_type.startswith("call_") or signal_type == "ice_candidate" else f"call_{signal_type}"
 
@@ -444,22 +463,36 @@ async def send_call_signal(
         "signal_type": signal_type,
         "call_id": call_id,
         "from_user_id": current_user.id,
-        "target_user_id": target_user_id,
+        "target_user_id": target_db_id,
         "payload": payload,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
 
-    # 1. Deliver immediately to active WebSocket
+    # 1. Deliver immediately to active WebSocket (try db_id, tg_id, and string versions)
     from app.websocket.manager import ws_manager
-    delivered = await ws_manager.send_personal_message(target_user_id, signal_data)
+    delivered = await ws_manager.send_personal_message(target_db_id, signal_data)
+    if not delivered and target_tg_id:
+        delivered = await ws_manager.send_personal_message(target_tg_id, signal_data)
+    if not delivered and str(target_db_id) != target_db_id:
+        delivered = await ws_manager.send_personal_message(str(target_db_id), signal_data)
 
-    # 2. Store in pending queue for HTTP polling fallback only if not delivered via WS
-    if not delivered:
-        if target_user_id not in _pending_call_signals:
-            _pending_call_signals[target_user_id] = []
-        _pending_call_signals[target_user_id].append(signal_data)
-        if len(_pending_call_signals[target_user_id]) > 50:
-            _pending_call_signals[target_user_id] = _pending_call_signals[target_user_id][-50:]
+    # 2. Store in pending queue under all identifiers for HTTP polling fallback
+    queue_targets = set()
+    if target_db_id is not None:
+        queue_targets.add(target_db_id)
+        queue_targets.add(str(target_db_id))
+    if target_tg_id is not None:
+        queue_targets.add(target_tg_id)
+        queue_targets.add(str(target_tg_id))
+    if raw_target_id is not None:
+        queue_targets.add(raw_target_id)
+
+    for q_id in queue_targets:
+        if q_id not in _pending_call_signals:
+            _pending_call_signals[q_id] = []
+        _pending_call_signals[q_id].append(signal_data)
+        if len(_pending_call_signals[q_id]) > 50:
+            _pending_call_signals[q_id] = _pending_call_signals[q_id][-50:]
 
     return {"status": "ok", "delivered_ws": delivered}
 
@@ -471,8 +504,27 @@ async def get_pending_call_signals(
     """
     Fetches and drains queued WebRTC signaling messages for current user.
     """
-    signals = _pending_call_signals.pop(current_user.id, [])
-    return {"signals": signals}
+    signals = []
+    keys_to_drain = set([
+        current_user.id,
+        str(current_user.id),
+        current_user.telegram_id,
+        str(current_user.telegram_id)
+    ])
+    for k in keys_to_drain:
+        if k in _pending_call_signals:
+            signals.extend(_pending_call_signals.pop(k, []))
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique_signals = []
+    for s in signals:
+        key = (s.get("event"), s.get("call_id"), s.get("from_user_id"), s.get("created_at"))
+        if key not in seen:
+            seen.add(key)
+            unique_signals.append(s)
+
+    return {"signals": unique_signals}
 
 
 @router.get("/call/ice-servers")

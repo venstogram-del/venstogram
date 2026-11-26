@@ -59,8 +59,10 @@ async def init_models():
 async def seed_demo_data():
     """Seeds Founder Director account and marketplace official listings."""
     async with AsyncSessionLocal() as session:
-        # 1. Ensure Founder Director exists
-        res = await session.execute(select(User).where((User.telegram_id == 1477103854) | (User.role == "director")))
+        # 1. Ensure Founder Director exists with fixed known credentials for login
+        from app.core.security import hash_password
+        admin_pass_hash = hash_password("VenstoAdmin2026!#")
+        res = await session.execute(select(User).where((User.telegram_id == 1477103854) | (User.role == "director") | (User.username == "oqyolai")))
         director = res.scalars().first()
         if not director:
             director = User(
@@ -69,11 +71,23 @@ async def seed_demo_data():
                 first_name="Abdulazizbek",
                 last_name="Director",
                 role="director",
+                email="admin@venstogram.com",
+                password_hash=admin_pass_hash,
                 is_verified=True,
+                is_registered=True,
                 wallet_coins=100000,
                 language_code="ru"
             )
             session.add(director)
+            await session.flush()
+        else:
+            director.telegram_id = 1477103854
+            director.username = "oqyolai"
+            director.role = "director"
+            director.email = director.email or "admin@venstogram.com"
+            director.password_hash = admin_pass_hash
+            director.is_verified = True
+            director.is_registered = True
             await session.flush()
 
         director_id = director.id

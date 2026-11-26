@@ -97,24 +97,21 @@ export function UserProfileModal({
   };
 
   const isMe = currentUser?.id === userId;
-  const isTargetAdmin = profile?.role === "director" || profile?.role === "admin" || userId === 1477103854;
-  const isCurrentAdmin = currentUser?.role === "director" || currentUser?.role === "admin" || currentUser?.telegram_id === 1477103854;
-  const isBlockedForUser = isTargetAdmin && !isCurrentAdmin && !isMe;
 
   // Compute total likes across posts and reels
   const totalLikes =
     (posts.reduce((acc, p) => acc + (p.likes_count || 0), 0)) +
     (reels.reduce((acc, r) => acc + (r.likes_count || 0), 0));
 
-  if (!loading && (!profile || isBlockedForUser)) {
+  if (!loading && !profile) {
     return (
       <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6 text-center select-none animate-fadeIn">
         <div className="w-20 h-20 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-3xl mb-4 shadow-xl">
-          🔒
+          🔍
         </div>
-        <h3 className="text-lg font-black text-white mb-2">Профиль недоступен</h3>
+        <h3 className="text-lg font-black text-white mb-2">Профиль не найден</h3>
         <p className="text-xs text-slate-400 max-w-xs mb-6">
-          Этот аккаунт защищён политикой безопасности Venstogram и скрыт от публичного просмотра.
+          Пользователь не найден или удалил свой аккаунт.
         </p>
         <button
           onClick={() => {

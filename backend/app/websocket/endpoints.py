@@ -15,23 +15,43 @@ async def websocket_live_endpoint(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    telegram_id = int(payload["sub"])
+    try:
+        telegram_id = int(payload["sub"])
+    except (ValueError, TypeError):
+        telegram_id = payload["sub"]
+
     db_user_id = None
+    user_tg_id = telegram_id
     try:
         from app.database.session import AsyncSessionLocal
         from app.models.entities import User
         from sqlalchemy import select
         async with AsyncSessionLocal() as db:
-            res = await db.execute(select(User.id).where(User.telegram_id == telegram_id))
-            db_user_id = res.scalars().first()
+            if isinstance(telegram_id, int):
+                res = await db.execute(select(User).where((User.telegram_id == telegram_id) | (User.id == telegram_id)))
+            else:
+                res = await db.execute(select(User).where(User.username == str(telegram_id)))
+            user_obj = res.scalars().first()
+            if user_obj:
+                db_user_id = user_obj.id
+                user_tg_id = user_obj.telegram_id
     except Exception as e:
         print("[WS Connect DB lookup note]", e)
 
-    await ws_manager.connect_user(telegram_id, websocket)
-    if db_user_id and db_user_id != telegram_id:
-        await ws_manager.connect_user(db_user_id, websocket)
+    identifiers = set()
+    if user_tg_id:
+        identifiers.add(user_tg_id)
+        identifiers.add(str(user_tg_id))
+    if db_user_id:
+        identifiers.add(db_user_id)
+        identifiers.add(str(db_user_id))
+    if not identifiers:
+        identifiers.add(telegram_id)
 
-    user_id = db_user_id or telegram_id
+    for ident in identifiers:
+        await ws_manager.connect_user(ident, websocket)
+
+    user_id = db_user_id or user_tg_id or telegram_id
 
     try:
         while True:
@@ -58,23 +78,29 @@ async def websocket_live_endpoint(
             # 2. WebRTC 1-on-1 Calls Signaling (Offer, Answer, ICE Candidate)
             elif event_type in ("call_offer", "call_answer", "ice_candidate", "call_reject", "call_end"):
                 target_user_id = data.get("target_user_id")
-                if target_user_id:
+                if target_user_id is not None:
+                    try:
+                        target_uid_int = int(target_user_id)
+                    except (ValueError, TypeError):
+                        target_uid_int = target_user_id
+
                     msg_body = {
                         "event": event_type,
                         "signal_type": event_type,
                         "from_user_id": user_id,
-                        "target_user_id": target_user_id,
+                        "target_user_id": target_uid_int,
                         "call_id": data.get("call_id"),
                         "payload": data.get("payload")
                     }
-                    await ws_manager.send_personal_message(target_user_id, msg_body)
+                    await ws_manager.send_personal_message(target_uid_int, msg_body)
                     try:
                         from app.api.chat import _pending_call_signals
-                        if target_user_id not in _pending_call_signals:
-                            _pending_call_signals[target_user_id] = []
-                        _pending_call_signals[target_user_id].append(msg_body)
-                        if len(_pending_call_signals[target_user_id]) > 50:
-                            _pending_call_signals[target_user_id] = _pending_call_signals[target_user_id][-50:]
+                        for q_key in set([target_uid_int, str(target_uid_int)]):
+                            if q_key not in _pending_call_signals:
+                                _pending_call_signals[q_key] = []
+                            _pending_call_signals[q_key].append(msg_body)
+                            if len(_pending_call_signals[q_key]) > 50:
+                                _pending_call_signals[q_key] = _pending_call_signals[q_key][-50:]
                     except Exception:
                         pass
 
@@ -91,11 +117,9 @@ async def websocket_live_endpoint(
                         }
                     )
 
-    except WebSocketDisconnect:
-        ws_manager.disconnect_user(telegram_id, websocket)
-        if db_user_id and db_user_id != telegram_id:
-            ws_manager.disconnect_user(db_user_id, websocket)
-    except Exception as e:
-        ws_manager.disconnect_user(telegram_id, websocket)
-        if db_user_id and db_user_id != telegram_id:
-            ws_manager.disconnect_user(db_user_id, websocket)
+    except (WebSocketDisconnect, Exception):
+        for ident in identifiers:
+            try:
+                ws_manager.disconnect_user(ident, websocket)
+            except Exception:
+                pass

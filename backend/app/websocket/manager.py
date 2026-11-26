@@ -38,9 +38,31 @@ class WebSocketConnectionManager:
         if room_name in self.rooms and websocket in self.rooms[room_name]:
             self.rooms[room_name].remove(websocket)
 
-    async def send_personal_message(self, user_id: int, message: Dict[str, Any]) -> bool:
+    async def send_personal_message(self, user_id: Any, message: Dict[str, Any]) -> bool:
         """Sends a JSON message to all active tabs of a specific user. Returns True if delivered."""
-        sockets = self.active_user_connections.get(user_id, [])
+        sockets: List[WebSocket] = []
+        # Check direct key
+        if user_id in self.active_user_connections:
+            sockets.extend(self.active_user_connections[user_id])
+        # Check int version
+        try:
+            uid_int = int(user_id)
+            if uid_int in self.active_user_connections:
+                for s in self.active_user_connections[uid_int]:
+                    if s not in sockets:
+                        sockets.append(s)
+        except (ValueError, TypeError):
+            pass
+        # Check str version
+        try:
+            uid_str = str(user_id)
+            if uid_str in self.active_user_connections:
+                for s in self.active_user_connections[uid_str]:
+                    if s not in sockets:
+                        sockets.append(s)
+        except Exception:
+            pass
+
         if not sockets:
             return False
 

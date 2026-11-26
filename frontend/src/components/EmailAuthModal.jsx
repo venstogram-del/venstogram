@@ -408,13 +408,13 @@ export function EmailAuthModal({ onClose, onAuthSuccess, initialMode = "login" }
           {mode === "login" && (
             <form onSubmit={handleLogin} className="space-y-3">
               <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Email:</label>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">Логин (Email или @никнейм):</label>
                 <input
-                  type="email"
+                  type="text"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="example@mail.com"
+                  placeholder="admin, @oqyolai или example@mail.com"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white outline-none focus:border-pink-500"
                 />
               </div>
@@ -458,13 +458,13 @@ export function EmailAuthModal({ onClose, onAuthSuccess, initialMode = "login" }
               </p>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Email:</label>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">Логин (Email или @никнейм):</label>
                 <input
-                  type="email"
+                  type="text"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="example@mail.com"
+                  placeholder="admin, @oqyolai или example@mail.com"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white outline-none focus:border-pink-500"
                 />
               </div>

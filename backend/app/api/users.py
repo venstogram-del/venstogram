@@ -156,9 +156,6 @@ async def search_users(
         User.is_banned == False,
         reg_filter
     )
-    if not is_requester_admin:
-        # Hide admin/director profiles from search results
-        query = query.where(~User.role.in_(["admin", "director"]), ~User.telegram_id.in_(_cfg.ADMIN_TELEGRAM_IDS))
     raw_q = q.strip()
     if raw_q:
         clean_q = raw_q.lower().lstrip("@")
@@ -220,13 +217,6 @@ async def get_user_public_profile(
     u = res.scalars().first()
     if not u or (u.telegram_id >= 9000000000 and not u.is_email_verified):
         raise HTTPException(status_code=404, detail="Profil topilmadi yoki tasdiqlanmagan / Пользователь не найден")
-
-    # Block regular users from viewing admin/director profiles
-    from app.core.config import settings as _settings
-    is_target_admin = (u.role in ("admin", "director") or u.telegram_id in _settings.ADMIN_TELEGRAM_IDS)
-    is_requester_admin = (current_user.role in ("admin", "director") or current_user.telegram_id in _settings.ADMIN_TELEGRAM_IDS)
-    if is_target_admin and not is_requester_admin and u.id != current_user.id:
-        raise HTTPException(status_code=403, detail="Этот профиль недоступен / Bu profil mavjud emas")
 
     posts_count = (await db.execute(select(func.count(Post.id)).where(Post.user_id == u.id))).scalar() or 0
     reels_count = (await db.execute(select(func.count(Reel.id)).where(Reel.user_id == u.id))).scalar() or 0

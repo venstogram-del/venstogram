@@ -202,11 +202,25 @@ export function App() {
     return () => clearInterval(interval);
   }, [user, globalIncomingCall, chatOpen]);
 
-  const handleAcceptGlobalCall = () => {
+  const handleAcceptGlobalCall = async () => {
     if (!globalIncomingCall) return;
     SoundEngine.stopRingtone();
     triggerHaptic("heavy");
     const call = globalIncomingCall;
+
+    // Pre-acquire microphone right inside user gesture click so browser permissions never stall in background
+    try {
+      if (typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: false
+        });
+        window.__vensto_prewarmed_stream = stream;
+      }
+    } catch (e) {
+      console.warn("[Global accept media prewarm note]", e);
+    }
+
     setGlobalIncomingCall(null);
     setActiveChatUser(call.caller);
     setPendingCallAccept(call);

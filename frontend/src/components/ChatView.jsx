@@ -181,12 +181,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
   const sendCallSignal = async (signalType, payload, targetUserId, callId) => {
     if (!targetUserId) return;
+    const cleanTargetId = Number(targetUserId) || targetUserId;
     try {
       if (window.__vensto_socket) {
         window.__vensto_socket.send({
           type: signalType,
           signal_type: signalType,
-          target_user_id: targetUserId,
+          target_user_id: cleanTargetId,
           call_id: callId,
           payload: payload
         });
@@ -195,7 +196,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
     try {
       await Api.post("/chats/call/signal", {
-        target_user_id: targetUserId,
+        target_user_id: cleanTargetId,
         call_id: callId,
         signal_type: signalType,
         payload: payload
@@ -598,7 +599,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       } catch (e) {}
     };
 
-    const interval = setInterval(checkIncomingAndSignals, 1800);
+    const interval = setInterval(checkIncomingAndSignals, 1000);
     return () => {
       if (unsub) unsub();
       clearInterval(interval);
@@ -1309,21 +1310,24 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     setIsCallMinimized(false);
 
     // 1. Acquire Receiver Local Media (Audio Only)
-    let localStream = null;
-    try {
-      localStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        video: false
-      });
-    } catch (advErr) {
-      console.warn("[Accept media advanced constraints failed, using simple fallback]", advErr);
+    let localStream = window.__vensto_prewarmed_stream || null;
+    window.__vensto_prewarmed_stream = null;
+    if (!localStream) {
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           video: false
         });
-      } catch (mediaErr) {
-        console.error("[Accept media error]", mediaErr);
+      } catch (advErr) {
+        console.warn("[Accept media advanced constraints failed, using simple fallback]", advErr);
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: false
+          });
+        } catch (mediaErr) {
+          console.error("[Accept media error]", mediaErr);
+        }
       }
     }
 
