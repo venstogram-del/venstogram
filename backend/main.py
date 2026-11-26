@@ -99,7 +99,7 @@ async def lifespan(app: FastAPI):
             await bot.delete_webhook(drop_pending_updates=True)
             try:
                 from aiogram.types import MenuButtonWebApp, WebAppInfo
-                base_url = f"{settings.WEBAPP_URL.rstrip('/')}/?v=20261126_v20_loudspeaker_fix"
+                base_url = f"{settings.WEBAPP_URL.rstrip('/')}/?v=20261126_v21_audio_only_call"
                 await bot.set_chat_menu_button(
                     menu_button=MenuButtonWebApp(
                         text="Venstogram 🚀",

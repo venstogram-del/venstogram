@@ -123,7 +123,7 @@ export function App() {
         };
         setGlobalIncomingCall({
           call_id: data.call_id,
-          call_type: data.call_type || (data.is_video ? "video" : "audio"),
+          call_type: "audio",
           caller: callerInfo
         });
         SoundEngine.playRingtone();
@@ -189,7 +189,7 @@ export function App() {
         if (res && res.has_incoming && res.caller) {
           setGlobalIncomingCall({
             call_id: res.call_id,
-            call_type: res.call_type || "video",
+            call_type: "audio",
             caller: res.caller
           });
           SoundEngine.playRingtone();
@@ -644,22 +644,22 @@ export function App() {
         <div className="fixed inset-0 z-100 bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-between p-8 text-white animate-in fade-in select-none">
           {/* Top Info */}
           <div className="w-full flex flex-col items-center pt-8 space-y-2">
-            <span className="text-xs uppercase tracking-widest text-pink-400 font-bold animate-pulse">
-              📹 Входящий видеозвонок HD
+            <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold animate-pulse">
+              📞 Входящий звонок
             </span>
-            <p className="text-xs text-slate-400">Venstogram WebRTC HD</p>
+            <p className="text-xs text-slate-400">Venstogram HD Voice</p>
           </div>
 
           {/* Caller Details & Pulsing Rings */}
           <div className="flex flex-col items-center space-y-4 my-auto">
             <div className="relative flex items-center justify-center">
-              <div className="absolute w-36 h-36 rounded-full bg-pink-500/20 animate-ping" />
-              <div className="absolute w-32 h-32 rounded-full bg-rose-500/30 animate-pulse" />
+              <div className="absolute w-36 h-36 rounded-full bg-emerald-500/20 animate-ping" />
+              <div className="absolute w-32 h-32 rounded-full bg-teal-500/30 animate-pulse" />
               {globalIncomingCall.caller?.avatar_url && !globalIncomingCall.caller.avatar_url.includes("unsplash") && !globalIncomingCall.caller.avatar_url.includes("photo-") ? (
                 <img
                   src={globalIncomingCall.caller.avatar_url}
                   alt={globalIncomingCall.caller.username}
-                  className="w-24 h-24 rounded-full object-cover border-4 border-pink-500 shadow-2xl z-10 relative"
+                  className="w-24 h-24 rounded-full object-cover border-4 border-emerald-500 shadow-2xl z-10 relative"
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
                     if (e.currentTarget.nextElementSibling) {
@@ -668,7 +668,7 @@ export function App() {
                   }}
                 />
               ) : (
-                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center text-3xl font-black border-4 border-white/20 shadow-2xl z-10 relative select-none">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center text-3xl font-black border-4 border-white/20 shadow-2xl z-10 relative select-none">
                   {(globalIncomingCall.caller?.first_name || globalIncomingCall.caller?.username || "U")[0].toUpperCase()}
                 </div>
               )}
@@ -703,7 +703,7 @@ export function App() {
                 onClick={handleAcceptGlobalCall}
                 className="w-18 h-18 rounded-full bg-emerald-500 hover:bg-emerald-400 active:scale-90 text-white flex items-center justify-center text-3xl shadow-2xl shadow-emerald-500/50 transition animate-bounce"
               >
-                📹
+                📞
               </button>
               <span className="text-xs text-emerald-400 font-bold">Принять</span>
             </div>

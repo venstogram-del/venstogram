@@ -40,23 +40,77 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     isCallMinimizedRef.current = isCallMinimized;
   }, [isCallMinimized]);
 
-  // WebRTC Audio & Video Media Refs
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
+  // WebRTC Audio Media Refs & Volume Monitors
   const remoteAudioRef = useRef(null);
   const remoteStreamRef = useRef(null);
   const remoteAudioStreamRef = useRef(null);
-  const remoteVideoStreamRef = useRef(null);
   const localStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const queuedIceCandidatesRef = useRef([]);
   const queuedRemoteOfferRef = useRef(null);
   const audioContextSourceRef = useRef(null);
   const audioGainNodeRef = useRef(null);
-  const [cameraFacing, setCameraFacing] = useState("user");
-  const [isCameraOff, setIsCameraOff] = useState(false);
   const [isAudioMutedByBrowser, setIsAudioMutedByBrowser] = useState(false);
   const [iceStatus, setIceStatus] = useState("");
+  const [localMicLevel, setLocalMicLevel] = useState(0);
+  const [remoteAudioLevel, setRemoteAudioLevel] = useState(0);
+  const localVolumeMonitorCleanupRef = useRef(null);
+  const remoteVolumeMonitorCleanupRef = useRef(null);
+
+  const initAndUnlockAudioContext = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        if (!window.__vensto_audio_ctx) {
+          window.__vensto_audio_ctx = new AudioCtx();
+        }
+        const ctx = window.__vensto_audio_ctx;
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+        // Play near-silent pulse to unlock audio hardware on iOS / Android
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        gain.gain.value = 0.001;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.05);
+      }
+    } catch (e) {}
+  };
+
+  const setupAudioVolumeMonitor = (stream, onVolume) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx || !stream || stream.getAudioTracks().length === 0) return null;
+      const ctx = new AudioCtx();
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 64;
+      src.connect(analyser);
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      let active = true;
+      const check = () => {
+        if (!active) return;
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        const avg = sum / (dataArray.length || 1);
+        const pct = Math.min(100, Math.round((avg / 128) * 100));
+        onVolume(pct);
+        requestAnimationFrame(check);
+      };
+      check();
+      return () => {
+        active = false;
+        try { src.disconnect(); } catch(e) {}
+        try { ctx.close(); } catch(e) {}
+      };
+    } catch(e) {
+      return null;
+    }
+  };
 
   // Real Audio Recording & Playback Refs
   const mediaRecorderRef = useRef(null);
@@ -123,10 +177,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       let newSdp = sdp;
       const fmtpRegex = new RegExp(`a=fmtp:${pt}\\s+[^\\r\\n]*`, "i");
       if (fmtpRegex.test(newSdp)) {
-        newSdp = newSdp.replace(fmtpRegex, `a=fmtp:${pt} minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=128000`);
+        newSdp = newSdp.replace(fmtpRegex, `a=fmtp:${pt} minptime=10;useinbandfec=1;maxaveragebitrate=64000`);
       } else {
         const rtpmapRegex = new RegExp(`(a=rtpmap:${pt}\\s+opus\/48000\/2[\\r\\n]+)`, "i");
-        newSdp = newSdp.replace(rtpmapRegex, `$1a=fmtp:${pt} minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=128000\r\n`);
+        newSdp = newSdp.replace(rtpmapRegex, `$1a=fmtp:${pt} minptime=10;useinbandfec=1;maxaveragebitrate=64000\r\n`);
       }
       return newSdp;
     } catch (e) {
@@ -191,12 +245,6 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       });
       remoteAudioStreamRef.current = null;
     }
-    if (remoteVideoStreamRef.current) {
-      remoteVideoStreamRef.current.getTracks().forEach((track) => {
-        try { track.stop(); } catch (e) {}
-      });
-      remoteVideoStreamRef.current = null;
-    }
     if (window.__vensto_audio_player) {
       try {
         window.__vensto_audio_player.pause();
@@ -207,11 +255,6 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       try { peerConnectionRef.current.close(); } catch (e) {}
       peerConnectionRef.current = null;
     }
-    if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null;
-      try { remoteVideoRef.current.pause(); } catch (e) {}
-    }
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = null;
       try { remoteAudioRef.current.pause(); } catch (e) {}
@@ -219,6 +262,16 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     queuedIceCandidatesRef.current = [];
     queuedRemoteOfferRef.current = null;
     setIceStatus("");
+    if (localVolumeMonitorCleanupRef.current) {
+      try { localVolumeMonitorCleanupRef.current(); } catch (e) {}
+      localVolumeMonitorCleanupRef.current = null;
+    }
+    if (remoteVolumeMonitorCleanupRef.current) {
+      try { remoteVolumeMonitorCleanupRef.current(); } catch (e) {}
+      remoteVolumeMonitorCleanupRef.current = null;
+    }
+    setLocalMicLevel(0);
+    setRemoteAudioLevel(0);
   };
 
   const handleHardClearCache = (e) => {
@@ -268,15 +321,6 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         window.__vensto_audio_player.play().catch(() => {});
       }
     } catch (e) {}
-    // 4. Unmute Video Tag so audio outputs through LOUDSPEAKER (Громкая связь)
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.muted = false;
-      remoteVideoRef.current.volume = 1.0;
-      try {
-        const vp = remoteVideoRef.current.play();
-        if (vp !== undefined) vp.catch(() => {});
-      } catch (e) {}
-    }
     setIsAudioMutedByBrowser(false);
   };
 
@@ -355,47 +399,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         window.__vensto_audio_player.play().then(() => setIsAudioMutedByBrowser(false)).catch(() => {});
       } catch(e) {}
 
-      // 4. Attach audio to video element stream so video element also plays sound
-      if (remoteVideoStreamRef.current) {
-        if (!remoteVideoStreamRef.current.getAudioTracks().some((t) => t.id === audioTrack.id)) {
-          remoteVideoStreamRef.current.addTrack(audioTrack);
-        }
-        if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== remoteVideoStreamRef.current) {
-          remoteVideoRef.current.srcObject = remoteVideoStreamRef.current;
-        }
+      // 4. Start real-time remote audio volume monitoring
+      if (remoteVolumeMonitorCleanupRef.current) {
+        try { remoteVolumeMonitorCleanupRef.current(); } catch (e) {}
       }
-    } else if (event.track?.kind === "video") {
-      const videoTrack = event.track;
-      try { videoTrack.enabled = true; } catch(e) {}
-
-      const videoStream = incomingStream || new MediaStream([videoTrack]);
-      // If audio track already arrived, attach it to video stream
-      if (remoteAudioStreamRef.current) {
-        remoteAudioStreamRef.current.getAudioTracks().forEach((at) => {
-          if (!videoStream.getAudioTracks().some((t) => t.id === at.id)) {
-            videoStream.addTrack(at);
-          }
-        });
-      }
-      remoteVideoStreamRef.current = videoStream;
-
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = videoStream;
-        remoteVideoRef.current.muted = false;
-        remoteVideoRef.current.volume = 1.0;
-        try {
-          const vp = remoteVideoRef.current.play();
-          if (vp !== undefined) {
-            vp.catch((err) => {
-              console.warn("[remoteVideo unmuted play failed, falling back to muted for video]", err);
-              if (remoteVideoRef.current) {
-                remoteVideoRef.current.muted = true;
-                remoteVideoRef.current.play().catch(() => {});
-              }
-            });
-          }
-        } catch (e) {}
-      }
+      remoteVolumeMonitorCleanupRef.current = setupAudioVolumeMonitor(audioStream, (vol) => {
+        setRemoteAudioLevel(vol);
+      });
     }
 
     setActiveCall((prev) => (prev ? { ...prev, isConnected: true } : null));
@@ -415,22 +425,30 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     }
   };
 
-  const applyRemoteOffer = async (offer, pc, targetUserId, callId, isVideo = false) => {
+  const applyRemoteOffer = async (offer, pc, targetUserId, callId) => {
     try {
       if (offer && offer.sdp) {
         offer.sdp = enhanceSdpForOpus(offer.sdp);
       }
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+      // Bind callee local audio track directly into transceivers created by caller's offer
+      const curStream = localStreamRef.current;
+      if (curStream) {
+        const transceivers = pc.getTransceivers();
+        const audioTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "audio");
+        const at = curStream.getAudioTracks()[0];
+        if (audioTransceiver && at) {
+          at.enabled = true;
+          try { await audioTransceiver.sender.replaceTrack(at); } catch (e) {}
+          audioTransceiver.direction = "sendrecv";
+        } else if (at) {
+          try { pc.addTrack(at, curStream); } catch (e) {}
+        }
+      }
+
       await flushQueuedCandidates(pc);
 
-      // Guarantee two-way send & receive on all transceivers
-      pc.getTransceivers().forEach((transceiver) => {
-        try {
-          if (transceiver.direction !== "sendrecv") {
-            transceiver.direction = "sendrecv";
-          }
-        } catch (e) {}
-      });
       let answer = await pc.createAnswer();
       answer.sdp = enhanceSdpForOpus(answer.sdp);
       await pc.setLocalDescription(answer);
@@ -440,12 +458,12 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     }
   };
 
-  const handleRemoteOffer = async (offer, fromUserId, callId, isVideo = false) => {
+  const handleRemoteOffer = async (offer, fromUserId, callId) => {
     const pc = peerConnectionRef.current;
     if (pc && (pc.signalingState === "stable" || pc.signalingState === "have-remote-offer")) {
-      await applyRemoteOffer(offer, pc, fromUserId, callId, isVideo);
+      await applyRemoteOffer(offer, pc, fromUserId, callId);
     } else if (!pc) {
-      queuedRemoteOfferRef.current = { offer, fromUserId, callId, isVideo };
+      queuedRemoteOfferRef.current = { offer, fromUserId, callId };
     }
   };
 
@@ -493,8 +511,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
           SoundEngine.playRingtone();
         }
       } else if (evt === "call_offer" || evt === "offer") {
-        const isVideoOffer = data.call_type === "video" || !!data.is_video || !!activeCall?.isVideo;
-        handleRemoteOffer(data.payload, data.from_user_id, data.call_id, isVideoOffer);
+        handleRemoteOffer(data.payload, data.from_user_id, data.call_id);
       } else if (evt === "call_answer" || evt === "answer") {
         handleRemoteAnswer(data.payload);
       } else if (evt === "ice_candidate" || evt === "candidate") {
@@ -649,22 +666,9 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     };
   }, [activeCall?.isConnected]);
 
-  // Synchronize and re-attach audio & video streams when call connects or view changes
+  // Synchronize and re-attach audio stream when call connects or view changes
   useEffect(() => {
     if (activeCall?.isConnected) {
-      // 1. Remote Video Playback (Strictly muted video stream to avoid mobile autoplay blockage)
-      if (remoteVideoRef.current && remoteVideoStreamRef.current) {
-        if (remoteVideoRef.current.srcObject !== remoteVideoStreamRef.current) {
-          remoteVideoRef.current.srcObject = remoteVideoStreamRef.current;
-        }
-        remoteVideoRef.current.muted = true;
-        try {
-          const p = remoteVideoRef.current.play();
-          if (p !== undefined) p.catch(() => {});
-        } catch (e) {}
-      }
-
-      // 2. Dedicated Audio Playback
       if (remoteAudioRef.current && remoteAudioStreamRef.current) {
         if (remoteAudioRef.current.srcObject !== remoteAudioStreamRef.current) {
           remoteAudioRef.current.srcObject = remoteAudioStreamRef.current;
@@ -677,18 +681,6 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             ap.then(() => setIsAudioMutedByBrowser(false))
               .catch(() => setIsAudioMutedByBrowser(true));
           }
-        } catch (e) {}
-      }
-
-      // 3. Local Camera Preview: MUST stay muted to avoid echo/feedback
-      if (localVideoRef.current && localStreamRef.current) {
-        if (localVideoRef.current.srcObject !== localStreamRef.current) {
-          localVideoRef.current.srcObject = localStreamRef.current;
-        }
-        localVideoRef.current.muted = true;
-        try {
-          const p = localVideoRef.current.play();
-          if (p !== undefined) p.catch(() => {});
         } catch (e) {}
       }
     }
@@ -1059,45 +1051,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     }
   };
 
-  // Handle Camera Flip
-  const handleFlipCamera = async () => {
-    if (!localStreamRef.current || !activeCall?.isVideo) return;
-    const newFacing = cameraFacing === "user" ? "environment" : "user";
-    setCameraFacing(newFacing);
-    try {
-      const oldVideoTrack = localStreamRef.current.getVideoTracks()[0];
-      if (oldVideoTrack) {
-        oldVideoTrack.stop();
-        localStreamRef.current.removeTrack(oldVideoTrack);
-      }
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: newFacing, width: { ideal: 640 }, height: { ideal: 480 } }
-      });
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      localStreamRef.current.addTrack(newVideoTrack);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = localStreamRef.current;
-      }
-      const pc = peerConnectionRef.current;
-      if (pc) {
-        const sender = pc.getSenders().find((s) => s.track && s.track.kind === "video");
-        if (sender) {
-          sender.replaceTrack(newVideoTrack);
-        }
-      }
-    } catch (err) {
-      console.warn("Camera flip failed:", err);
-    }
-  };
-
-  // Real WebRTC & Signaling Call System
-  const startCall = async (isVideo = true) => {
+  // Real WebRTC & Signaling Audio Call System
+  const startCall = async () => {
     if (!activePartner || !activePartner.id) return;
 
     triggerHaptic("heavy");
     SoundEngine.playRingtone();
     setIsCallMinimized(false);
-    setIsCameraOff(false);
 
     // Guarantee iOS Safari / mobile AudioSession is set to play-and-record
     if (typeof navigator !== "undefined" && navigator.audioSession) {
@@ -1125,34 +1085,26 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       window.__vensto_audio_player.play().catch(() => {});
     } catch (e) {}
 
-    // 1. Acquire Local Microphone & Optional Camera
+    // 1. Acquire Local Microphone (Audio Only - no camera prompt)
     let localStream = null;
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        video: isVideo ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false
+        video: false
       });
     } catch (advErr) {
       console.warn("[startCall advanced constraints failed, using simple fallback]", advErr);
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
           audio: true,
-          video: isVideo ? true : false
+          video: false
         });
       } catch (mediaErr) {
         console.error("[startCall media error]", mediaErr);
         SoundEngine.stopRingtone();
-        alert("Не удалось включить микрофон или камеру. Пожалуйста, разрешите доступ в настройках браузера.");
+        alert("Не удалось включить микрофон. Пожалуйста, разрешите доступ к микрофону в настройках браузера.");
         return;
       }
-    }
-
-    // Guarantee audio track presence even if device returned video-only stream
-    if (localStream && localStream.getAudioTracks().length === 0) {
-      try {
-        const audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioOnly.getAudioTracks().forEach((t) => localStream.addTrack(t));
-      } catch (e) {}
     }
 
     localStreamRef.current = localStream;
@@ -1161,13 +1113,21 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       t.onmute = () => console.log("[Local audio track muted by system]");
       t.onunmute = () => console.log("[Local audio track unmuted by system]");
     });
-    localStream.getVideoTracks().forEach((t) => (t.enabled = true));
+
+    // Monitor local microphone input level in real-time
+    if (localVolumeMonitorCleanupRef.current) {
+      try { localVolumeMonitorCleanupRef.current(); } catch (e) {}
+    }
+    localVolumeMonitorCleanupRef.current = setupAudioVolumeMonitor(localStream, (vol) => {
+      setLocalMicLevel(vol);
+    });
+    initAndUnlockAudioContext();
 
     let callId = null;
     try {
       const res = await Api.post("/chats/call/start", {
         recipient_id: activePartner.id,
-        call_type: isVideo ? "video" : "audio"
+        call_type: "audio"
       });
       callId = res.call_id;
     } catch (e) {
@@ -1182,37 +1142,23 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       partner: activePartner,
       isIncoming: false,
       isConnected: false,
-      isVideo,
+      isVideo: false,
       isMuted: false,
       callSeconds: 0
     });
-
-    // Attach local stream to preview element
-    setTimeout(() => {
-      if (localVideoRef.current && isVideo && localStream) {
-        localVideoRef.current.srcObject = localStream;
-        localVideoRef.current.muted = true;
-        try { localVideoRef.current.play().catch(() => {}); } catch(e) {}
-      }
-    }, 100);
 
     // 2. Initialize RTCPeerConnection
     const pc = new RTCPeerConnection(RTC_CONFIG);
     peerConnectionRef.current = pc;
     queuedIceCandidatesRef.current = [];
 
-    // ALWAYS add audio track FIRST so m-line 0 is audio on both peers
+    // Add audio track to peer connection
     localStream.getAudioTracks().forEach((track) => {
       track.enabled = true;
       pc.addTrack(track, localStream);
     });
-    // ALWAYS add video track SECOND so m-line 1 is video on both peers
-    localStream.getVideoTracks().forEach((track) => {
-      track.enabled = true;
-      pc.addTrack(track, localStream);
-    });
 
-    // Ensure all transceivers send and receive
+    // Ensure audio transceivers send and receive
     pc.getTransceivers().forEach((transceiver) => {
       try {
         if (transceiver.direction !== "sendrecv") {
@@ -1260,7 +1206,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
     // 3. Create SDP Offer with Opus HD and FEC
     try {
-      let offer = await pc.createOffer();
+      let offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: false
+      });
       offer.sdp = enhanceSdpForOpus(offer.sdp);
       await pc.setLocalDescription(offer);
       const targetPid = activePartner?.id || activePartnerRef.current?.id;
@@ -1319,7 +1268,6 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     triggerHaptic("heavy");
     SoundEngine.stopRingtone();
     setIncomingCall(null);
-    const isVideo = callToAccept.call_type === "video";
     const partnerUser = callToAccept.caller || activePartner || {
       id: callToAccept.caller_id || 1,
       username: "user",
@@ -1327,7 +1275,6 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       avatar_url: null
     };
     const targetUserId = partnerUser?.id || callToAccept.caller_id;
-    setIsCameraOff(false);
 
     try {
       await Api.post("/chats/call/accept", { call_id: callToAccept.call_id });
@@ -1364,37 +1311,29 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       partner: partnerUser,
       isIncoming: true,
       isConnected: true,
-      isVideo,
+      isVideo: false,
       isMuted: false,
       callSeconds: 0
     });
     setIsCallMinimized(false);
 
-    // 1. Acquire Receiver Local Media
+    // 1. Acquire Receiver Local Media (Audio Only)
     let localStream = null;
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        video: isVideo ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false
+        video: false
       });
     } catch (advErr) {
       console.warn("[Accept media advanced constraints failed, using simple fallback]", advErr);
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
           audio: true,
-          video: isVideo ? true : false
+          video: false
         });
       } catch (mediaErr) {
         console.error("[Accept media error]", mediaErr);
       }
-    }
-
-    // Guarantee audio track presence even if device returned video-only stream
-    if (localStream && localStream.getAudioTracks().length === 0) {
-      try {
-        const audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioOnly.getAudioTracks().forEach((t) => localStream.addTrack(t));
-      } catch (e) {}
     }
 
     localStreamRef.current = localStream;
@@ -1404,42 +1343,19 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         t.onmute = () => console.log("[Local audio track muted by system]");
         t.onunmute = () => console.log("[Local audio track unmuted by system]");
       });
-      localStream.getVideoTracks().forEach((t) => (t.enabled = true));
-    }
 
-    setTimeout(() => {
-      if (localVideoRef.current && isVideo && localStream) {
-        localVideoRef.current.srcObject = localStream;
-        localVideoRef.current.muted = true;
-        try { localVideoRef.current.play().catch(() => {}); } catch(e) {}
+      // Monitor local microphone input level in real-time
+      if (localVolumeMonitorCleanupRef.current) {
+        try { localVolumeMonitorCleanupRef.current(); } catch (e) {}
       }
-    }, 100);
+      localVolumeMonitorCleanupRef.current = setupAudioVolumeMonitor(localStream, (vol) => {
+        setLocalMicLevel(vol);
+      });
+    }
 
     // 2. Initialize RTCPeerConnection
     const pc = new RTCPeerConnection(RTC_CONFIG);
     peerConnectionRef.current = pc;
-
-    if (localStream) {
-      // ALWAYS add audio track FIRST so m-line 0 is audio on both peers
-      localStream.getAudioTracks().forEach((track) => {
-        track.enabled = true;
-        pc.addTrack(track, localStream);
-      });
-      // ALWAYS add video track SECOND so m-line 1 is video on both peers
-      localStream.getVideoTracks().forEach((track) => {
-        track.enabled = true;
-        pc.addTrack(track, localStream);
-      });
-    }
-
-    // Ensure all transceivers send and receive
-    pc.getTransceivers().forEach((transceiver) => {
-      try {
-        if (transceiver.direction !== "sendrecv") {
-          transceiver.direction = "sendrecv";
-        }
-      } catch (e) {}
-    });
 
     // Handle remote tracks
     pc.ontrack = attachRemoteTrack;
@@ -1476,8 +1392,8 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
     // 3. Process queued remote offer if received
     if (queuedRemoteOfferRef.current) {
-      const { offer, fromUserId, callId, isVideo: queuedIsVideo } = queuedRemoteOfferRef.current;
-      await applyRemoteOffer(offer, pc, fromUserId || targetUserId, callId || callToAccept.call_id, queuedIsVideo || isVideo);
+      const { offer, fromUserId, callId } = queuedRemoteOfferRef.current;
+      await applyRemoteOffer(offer, pc, fromUserId || targetUserId, callId || callToAccept.call_id);
       queuedRemoteOfferRef.current = null;
     }
   };
@@ -1606,12 +1522,12 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                 🔄
               </button>
               <button
-                onClick={() => startCall(true)}
-                className="px-3 py-2 text-slate-800 hover:text-pink-600 bg-slate-100 hover:bg-pink-50 rounded-xl border border-slate-200 hover:border-pink-300 transition-all shadow-sm flex items-center space-x-1.5 active:scale-95"
-                title="Видеозвонок HD"
+                onClick={() => startCall()}
+                className="px-3.5 py-2 text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl shadow-md flex items-center space-x-1.5 active:scale-95 transition"
+                title="Позвонить"
               >
-                <span className="text-base">📹</span>
-                <span className="text-xs font-bold">Видеозвонок</span>
+                <span className="text-base">📞</span>
+                <span className="text-xs font-black">Позвонить</span>
               </button>
             </div>
           </div>
@@ -2020,11 +1936,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         }}
         autoPlay
         playsInline
-        className="w-1 h-1 opacity-0 absolute pointer-events-none"
-        style={{ zIndex: 1, left: "0px", bottom: "0px" }}
+        style={{ position: "fixed", left: "-9999px", bottom: "-9999px", width: "10px", height: "10px" }}
       />
 
-      {/* Floating Picture-in-Picture (PIP) Call Widget when Minimized */}
+      {/* Floating Call Widget when Minimized */}
       {activeCall && isCallMinimized && (
         <div
           onClick={() => {
@@ -2034,26 +1949,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
           className="fixed bottom-20 right-4 z-60 bg-slate-900/95 border-2 border-emerald-500 rounded-3xl p-3 shadow-2xl backdrop-blur-md flex items-center space-x-3 cursor-pointer animate-in slide-in-from-right"
         >
           <div className="relative w-12 h-12 rounded-full overflow-hidden ring-2 ring-emerald-500/50 bg-slate-950 flex items-center justify-center">
-            {activeCall.isVideo && (remoteVideoStreamRef.current || remoteStreamRef.current) ? (
-              <video
-                ref={(el) => {
-                  if (el && remoteVideoStreamRef.current && el.srcObject !== remoteVideoStreamRef.current) {
-                    el.srcObject = remoteVideoStreamRef.current;
-                    try { el.play().catch(() => {}); } catch(e) {}
-                  }
-                }}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-            ) : activeCall?.partner?.avatar_url && !activeCall.partner.avatar_url.includes("unsplash") ? (
+            {activeCall?.partner?.avatar_url && !activeCall.partner.avatar_url.includes("unsplash") ? (
               <img
                 src={activeCall.partner.avatar_url}
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-tr from-pink-500 to-amber-500 flex items-center justify-center font-bold text-white text-xs select-none">
+              <div className="w-full h-full bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center font-bold text-white text-xs select-none">
                 {(activeCall?.partner?.first_name || activeCall?.partner?.username || "U")[0].toUpperCase()}
               </div>
             )}
@@ -2083,145 +1985,19 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         </div>
       )}
 
-      {/* Fullscreen WebRTC Call Overlay when NOT Minimized */}
+      {/* Fullscreen Voice Call Screen */}
       {activeCall && !isCallMinimized && (
         <div
           onClick={() => {
-            // Screen tap: guarantees user activation for audio
             unmuteAllAudio();
           }}
-          className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between overflow-hidden animate-in fade-in select-none"
+          className="fixed inset-0 z-50 bg-gradient-to-b from-slate-950 via-slate-900 to-black flex flex-col justify-between overflow-hidden animate-in fade-in select-none text-white"
         >
-          {/* State 1: Outgoing Call Ringing (Waiting for Recipient to Answer) */}
-          {!activeCall.isConnected ? (
-            <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-950 to-black flex flex-col items-center justify-center space-y-6 p-6 text-center z-10">
-              <div className="relative flex items-center justify-center">
-                <div className="absolute w-44 h-44 rounded-full bg-pink-500/15 animate-ping" />
-                <div className="absolute w-36 h-36 rounded-full bg-rose-500/25 animate-pulse" />
-                {activeCall?.partner?.avatar_url && !activeCall.partner.avatar_url.includes("unsplash") ? (
-                  <img
-                    src={activeCall.partner.avatar_url}
-                    className="w-28 h-28 rounded-full object-cover ring-4 ring-pink-500 shadow-2xl relative z-10"
-                  />
-                ) : (
-                  <div className="w-28 h-28 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center font-black text-white text-4xl shadow-2xl relative z-10 select-none">
-                    {(activeCall?.partner?.first_name || activeCall?.partner?.username || "U")[0].toUpperCase()}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-1 relative z-10">
-                <h2 className="text-2xl font-black text-white">{activeCall?.partner?.first_name || "Собеседник"}</h2>
-                <p className="text-xs text-pink-400 font-mono">@{activeCall?.partner?.username || "user"}</p>
-                <div className="pt-3">
-                  <span className="inline-flex items-center space-x-2 bg-slate-900/90 border border-pink-500/40 px-3.5 py-1.5 rounded-full text-xs font-semibold text-pink-300 animate-pulse">
-                    <span>{activeCall.isVideo ? "📹 Видеовызов..." : "📞 Аудиовызов..."}</span>
-                    <span>Идут гудки</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* State 2: Active Connected Call */
-            activeCall.isVideo ? (
-              <div className="absolute inset-0 bg-slate-950 flex items-center justify-center overflow-hidden">
-                <video
-                  ref={(el) => {
-                    remoteVideoRef.current = el;
-                    if (el && remoteVideoStreamRef.current && el.srcObject !== remoteVideoStreamRef.current) {
-                      el.srcObject = remoteVideoStreamRef.current;
-                      try {
-                        const p = el.play();
-                        if (p !== undefined) p.catch(() => {});
-                      } catch(e) {}
-                    }
-                  }}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-                {isAudioMutedByBrowser && (
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      unmuteAllAudio();
-                    }}
-                    className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 text-white px-5 py-2.5 rounded-full shadow-2xl font-bold text-xs flex items-center space-x-2 animate-bounce cursor-pointer border-2 border-white/80 active:scale-95 transition-transform"
-                  >
-                    <span className="text-base animate-pulse">🔊</span>
-                    <span>Нажмите сюда, чтобы включить звук</span>
-                  </div>
-                )}
-                {!(remoteVideoStreamRef.current || remoteStreamRef.current) && (
-                  <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center space-y-3 p-6 text-center">
-                    {activeCall?.partner?.avatar_url && !activeCall.partner.avatar_url.includes("unsplash") ? (
-                      <img
-                        src={activeCall.partner.avatar_url}
-                        className="w-28 h-28 rounded-full object-cover ring-4 ring-pink-500/80 shadow-2xl animate-pulse"
-                      />
-                    ) : (
-                      <div className="w-28 h-28 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center font-black text-white text-4xl shadow-2xl animate-pulse select-none">
-                        {(activeCall?.partner?.first_name || activeCall?.partner?.username || "U")[0].toUpperCase()}
-                      </div>
-                    )}
-                    <h2 className="text-xl font-black text-white">{activeCall?.partner?.first_name || "Собеседник"}</h2>
-                    <p className="text-xs text-pink-400 font-semibold animate-pulse">
-                      🟢 {iceStatus ? `Соединение: ${iceStatus}` : "Подключение видеопотока HD..."}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-950 to-black flex flex-col items-center justify-center space-y-5 p-6 text-center">
-                <div className="relative">
-                  {activeCall?.partner?.avatar_url && !activeCall.partner.avatar_url.includes("unsplash") ? (
-                    <img
-                      src={activeCall.partner.avatar_url}
-                      className="w-32 h-32 rounded-full object-cover ring-4 ring-emerald-500 shadow-2xl"
-                    />
-                  ) : (
-                    <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center font-black text-white text-5xl shadow-2xl select-none">
-                      {(activeCall?.partner?.first_name || activeCall?.partner?.username || "U")[0].toUpperCase()}
-                    </div>
-                  )}
-                  <span className="absolute -inset-2 rounded-full border-2 border-emerald-400 animate-ping opacity-60 pointer-events-none" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-black text-white">{activeCall?.partner?.first_name || "Собеседник"}</h2>
-                  <span className="text-xs text-pink-400 font-mono">@{activeCall?.partner?.username || "user"}</span>
-                  <span className="text-xs text-emerald-400 font-mono font-bold block mt-2">
-                    🟢 Идет аудиоразговор ({formatCallTime(activeCall.callSeconds)})
-                  </span>
-                </div>
-              </div>
-            )
-          )}
-
-          {/* Floating Local Camera Video Preview (PIP in corner) - ONLY WHEN CONNECTED */}
-          {activeCall.isVideo && activeCall.isConnected && (
-            <div className="absolute top-16 right-4 z-20 w-28 h-40 sm:w-36 sm:h-48 rounded-2xl overflow-hidden border-2 border-pink-500/80 shadow-2xl bg-slate-900">
-              <video
-                ref={(el) => {
-                  localVideoRef.current = el;
-                  if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
-                    el.srcObject = localStreamRef.current;
-                    try { el.play().catch(() => {}); } catch(e) {}
-                  }
-                }}
-                autoPlay
-                playsInline
-                muted
-                className={`w-full h-full object-cover ${cameraFacing === "user" ? "scale-x-[-1]" : ""}`}
-              />
-              <div className="absolute bottom-1 right-1 bg-black/60 px-1.5 py-0.5 rounded text-[9px] text-white font-mono">
-                Вы
-              </div>
-            </div>
-          )}
-
           {/* Top Bar with Call Timer & Minimize */}
           <div className="relative z-30 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 triggerHaptic("light");
                 setIsCallMinimized(true);
               }}
@@ -2232,7 +2008,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
             <div className="flex items-center space-x-2">
               <button
-                onClick={handleHardClearCache}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleHardClearCache();
+                }}
                 className="bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-600/50 text-[10px] font-bold px-2.5 py-1.5 rounded-2xl backdrop-blur-md shadow-lg active:scale-95 transition"
                 title="Очистить кэш Telegram и перезагрузить"
               >
@@ -2250,7 +2029,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                   className="bg-emerald-950/90 active:scale-95 cursor-pointer backdrop-blur-md px-2.5 py-1.5 rounded-2xl border border-emerald-500/60 text-[10px] font-bold text-emerald-300 shadow-lg flex items-center space-x-1"
                   title="Нажмите для проверки динамика и звука"
                 >
-                  <span>🔊 HD [v2.0]</span>
+                  <span>🔊 HD Голос</span>
                   {iceStatus && (
                     <span className="text-[9px] opacity-80 font-mono">({iceStatus === "connected" || iceStatus === "completed" ? "OK" : iceStatus})</span>
                   )}
@@ -2259,13 +2038,131 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             </div>
           </div>
 
+          {/* Center: Friend Avatar, Animated Audio Pulse & Real-time Volume Meters */}
+          <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-6 text-center">
+            {/* Avatar with Sound Waves */}
+            <div className="relative flex items-center justify-center">
+              {/* Outer pulsing ring tied to remote voice volume */}
+              <div
+                className="absolute rounded-full bg-emerald-500/20 transition-all duration-100 pointer-events-none"
+                style={{
+                  width: `${160 + (remoteAudioLevel * 0.8)}px`,
+                  height: `${160 + (remoteAudioLevel * 0.8)}px`,
+                  opacity: activeCall.isConnected ? 0.3 + (remoteAudioLevel / 150) : 0.2
+                }}
+              />
+              <div
+                className="absolute rounded-full bg-teal-500/30 transition-all duration-100 pointer-events-none"
+                style={{
+                  width: `${140 + (remoteAudioLevel * 0.4)}px`,
+                  height: `${140 + (remoteAudioLevel * 0.4)}px`,
+                }}
+              />
+              {activeCall?.partner?.avatar_url && !activeCall.partner.avatar_url.includes("unsplash") ? (
+                <img
+                  src={activeCall.partner.avatar_url}
+                  className="w-32 h-32 rounded-full object-cover ring-4 ring-emerald-500 shadow-2xl relative z-10"
+                />
+              ) : (
+                <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center font-black text-white text-5xl shadow-2xl relative z-10 select-none">
+                  {(activeCall?.partner?.first_name || activeCall?.partner?.username || "U")[0].toUpperCase()}
+                </div>
+              )}
+              {activeCall.isConnected && (
+                <span className="absolute bottom-1 right-2 z-20 w-5 h-5 bg-emerald-500 rounded-full ring-4 ring-slate-950 flex items-center justify-center text-[10px]">
+                  📞
+                </span>
+              )}
+            </div>
+
+            {/* Partner Info */}
+            <div className="space-y-1">
+              <h2 className="text-2xl font-black text-white tracking-wide">
+                {activeCall?.partner?.first_name || "Собеседник"} {activeCall?.partner?.last_name || ""}
+              </h2>
+              <p className="text-xs text-emerald-400 font-mono font-semibold">
+                @{activeCall?.partner?.username || "user"}
+              </p>
+              <div className="pt-2">
+                <span className="inline-flex items-center space-x-2 bg-slate-900/90 border border-emerald-500/40 px-4 py-1.5 rounded-full text-xs font-semibold text-emerald-300">
+                  {activeCall.isConnected ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-1" />
+                      <span>Разговор идет • {formatCallTime(activeCall.callSeconds)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse mr-1" />
+                      <span>{activeCall.isIncoming ? "Входящий звонок..." : "Идут гудки..."}</span>
+                    </>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {/* Real-time Voice Volume Indicators */}
+            {activeCall.isConnected && (
+              <div className="w-full max-w-xs bg-slate-900/80 border border-slate-800 rounded-2xl p-3.5 space-y-2.5 backdrop-blur-md shadow-xl">
+                {/* Remote voice meter */}
+                <div className="space-y-1 text-left">
+                  <div className="flex justify-between text-[11px] font-bold">
+                    <span className="text-emerald-400 flex items-center space-x-1">
+                      <span>🔊</span>
+                      <span>Собеседник:</span>
+                    </span>
+                    <span className="text-slate-400 font-mono">{remoteAudioLevel}%</span>
+                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full transition-all duration-75 rounded-full"
+                      style={{ width: `${Math.max(4, remoteAudioLevel)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Local mic meter */}
+                <div className="space-y-1 text-left">
+                  <div className="flex justify-between text-[11px] font-bold">
+                    <span className="text-cyan-400 flex items-center space-x-1">
+                      <span>🎙️</span>
+                      <span>Ваш микрофон:</span>
+                    </span>
+                    <span className="text-slate-400 font-mono">{activeCall.isMuted ? "ВЫКЛ" : `${localMicLevel}%`}</span>
+                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-75 rounded-full ${
+                        activeCall.isMuted ? "bg-amber-600" : "bg-gradient-to-r from-cyan-500 to-blue-400"
+                      }`}
+                      style={{ width: activeCall.isMuted ? "0%" : `${Math.max(4, localMicLevel)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isAudioMutedByBrowser && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  unmuteAllAudio();
+                }}
+                className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-2.5 rounded-full shadow-2xl font-bold text-xs flex items-center space-x-2 animate-bounce cursor-pointer border-2 border-white/80 active:scale-95 transition-transform"
+              >
+                <span className="text-base animate-pulse">🔊</span>
+                <span>Нажмите сюда, чтобы включить звук</span>
+              </div>
+            )}
+          </div>
+
           {/* Bottom Call Controls */}
-          <div className="relative z-30 p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex items-center justify-center space-x-5">
+          <div className="relative z-30 p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex items-center justify-center space-x-6">
             {activeCall.isConnected && (
               <>
                 {/* Mute Mic */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     triggerHaptic("medium");
                     const willMute = !activeCall.isMuted;
                     if (localStreamRef.current) {
@@ -2274,7 +2171,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                     setActiveCall({ ...activeCall, isMuted: willMute });
                   }}
                   className={`p-4 rounded-full text-xl shadow-xl transition-all active:scale-90 ${
-                    activeCall.isMuted ? "bg-amber-600 text-white" : "bg-slate-800/90 text-white border border-slate-700"
+                    activeCall.isMuted ? "bg-amber-600 text-white" : "bg-slate-800/90 text-white border border-slate-700 hover:bg-slate-700"
                   }`}
                   title={activeCall.isMuted ? "Включить микрофон" : "Выключить микрофон"}
                 >
@@ -2287,51 +2184,20 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                     e.stopPropagation();
                     unmuteAllAudio();
                   }}
-                  className="p-4 rounded-full text-xl shadow-xl bg-slate-800/90 text-white border border-slate-700 active:scale-90"
-                  title="Громкая связь / динамик"
+                  className="p-4 rounded-full text-xl shadow-xl bg-slate-800/90 text-white border border-slate-700 hover:bg-slate-700 active:scale-90"
+                  title="Громкая связь / Усиление звука"
                 >
                   🔊
                 </button>
-
-                {/* Video Flip (if video call) */}
-                {activeCall.isVideo && (
-                  <button
-                    onClick={() => {
-                      triggerHaptic("medium");
-                      handleFlipCamera();
-                    }}
-                    className="p-4 rounded-full bg-slate-800/90 hover:bg-slate-700 text-white text-xl shadow-xl border border-slate-700 transition active:scale-90"
-                    title="Переключить камеру (передняя/задняя)"
-                  >
-                    🔄
-                  </button>
-                )}
-
-                {/* Camera Off/On (if video call) */}
-                {activeCall.isVideo && (
-                  <button
-                    onClick={() => {
-                      triggerHaptic("medium");
-                      const willBeOff = !isCameraOff;
-                      setIsCameraOff(willBeOff);
-                      if (localStreamRef.current) {
-                        localStreamRef.current.getVideoTracks().forEach((t) => (t.enabled = !willBeOff));
-                      }
-                    }}
-                    className={`p-4 rounded-full text-xl shadow-xl transition active:scale-90 ${
-                      isCameraOff ? "bg-rose-600 text-white" : "bg-slate-800/90 text-white border border-slate-700"
-                    }`}
-                    title={isCameraOff ? "Включить камеру" : "Выключить камеру"}
-                  >
-                    {isCameraOff ? "🚫" : "📹"}
-                  </button>
-                )}
               </>
             )}
 
             {/* End Call */}
             <button
-              onClick={endCall}
+              onClick={(e) => {
+                e.stopPropagation();
+                endCall();
+              }}
               className="p-5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-2xl shadow-2xl shadow-rose-600/50 transition active:scale-90 ring-4 ring-rose-500/30"
               title="Завершить звонок"
             >
@@ -2353,18 +2219,18 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                   className="w-24 h-24 rounded-full object-cover ring-4 ring-emerald-500 animate-pulse shadow-xl"
                 />
               ) : (
-                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center font-black text-white text-3xl shadow-xl ring-4 ring-emerald-500 animate-pulse select-none">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center font-black text-white text-3xl shadow-xl ring-4 ring-emerald-500 animate-pulse select-none">
                   {(incomingCall.caller?.first_name || incomingCall.caller?.username || "U")[0].toUpperCase()}
                 </div>
               )}
               <span className="absolute bottom-0 right-0 w-7 h-7 bg-emerald-500 rounded-full flex items-center justify-center text-xs text-white shadow-md">
-                {incomingCall.call_type === "video" ? "📹" : "📞"}
+                📞
               </span>
             </div>
 
             <div>
               <span className="text-[11px] text-emerald-400 font-bold uppercase tracking-wider block animate-pulse">
-                Входящий {incomingCall.call_type === "video" ? "видеозвонок" : "аудиозвонок"}...
+                Входящий звонок...
               </span>
               <h3 className="text-lg font-black text-white mt-1">
                 {incomingCall.caller?.first_name}
@@ -2386,7 +2252,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                 onClick={() => handleAcceptIncomingCall()}
                 className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/30 active:scale-95 animate-bounce transition"
               >
-                <span>🟢 Принять</span>
+                <span>📞 Принять</span>
               </button>
             </div>
           </div>

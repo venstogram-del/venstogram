@@ -221,7 +221,7 @@ async def start_call(
 ):
     from app.core.config import settings
     recipient_id = req.get("recipient_id")
-    call_type = req.get("call_type", "video") # "audio" or "video"
+    call_type = req.get("call_type", "audio") # "audio" only
 
     rec_res = await db.execute(select(User).where(User.id == recipient_id))
     recipient = rec_res.scalars().first()
