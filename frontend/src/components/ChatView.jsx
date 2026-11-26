@@ -56,6 +56,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
   const [cameraFacing, setCameraFacing] = useState("user");
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [isAudioMutedByBrowser, setIsAudioMutedByBrowser] = useState(false);
+  const [iceStatus, setIceStatus] = useState("");
 
   // Real Audio Recording & Playback Refs
   const mediaRecorderRef = useRef(null);
@@ -101,10 +102,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
       { urls: "stun:stun2.l.google.com:19302" },
-      { urls: "stun:openrelay.metered.ca:80" },
-      { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-      { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
-      { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+      { urls: "stun:stun3.l.google.com:19302" },
+      { urls: "stun:stun4.l.google.com:19302" },
+      { urls: "stun:stun.cloudflare.com:3478" },
+      { urls: "stun:global.stun.twilio.com:3478" },
+      { urls: "stun:standard.relay.metered.ca:80" },
+      { urls: "turn:standard.relay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:standard.relay.metered.ca:80?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
     ],
     bundlePolicy: "max-bundle",
     rtcpMuxPolicy: "require",
@@ -113,19 +117,21 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
 
   const enhanceSdpForOpus = (sdp) => {
     if (!sdp || typeof sdp !== "string") return sdp;
-    let newSdp = sdp;
-    if (newSdp.includes("a=fmtp:111")) {
-      newSdp = newSdp.replace(
-        /a=fmtp:111 .*/g,
-        "a=fmtp:111 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=128000"
-      );
-    } else if (newSdp.includes("a=rtpmap:111 opus/48000/2")) {
-      newSdp = newSdp.replace(
-        "a=rtpmap:111 opus/48000/2",
-        "a=rtpmap:111 opus/48000/2\r\na=fmtp:111 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=128000"
-      );
+    try {
+      const opusMatch = sdp.match(/a=rtpmap:(\d+)\s+opus\/48000\/2/i);
+      const pt = opusMatch ? opusMatch[1] : "111";
+      let newSdp = sdp;
+      const fmtpRegex = new RegExp(`a=fmtp:${pt}\\s+[^\\r\\n]*`, "i");
+      if (fmtpRegex.test(newSdp)) {
+        newSdp = newSdp.replace(fmtpRegex, `a=fmtp:${pt} minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=128000`);
+      } else {
+        const rtpmapRegex = new RegExp(`(a=rtpmap:${pt}\\s+opus\/48000\/2[\\r\\n]+)`, "i");
+        newSdp = newSdp.replace(rtpmapRegex, `$1a=fmtp:${pt} minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=128000\r\n`);
+      }
+      return newSdp;
+    } catch (e) {
+      return sdp;
     }
-    return newSdp;
   };
 
   const sendCallSignal = async (signalType, payload, targetUserId, callId) => {
@@ -158,6 +164,10 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     if (audioContextSourceRef.current) {
       try { audioContextSourceRef.current.disconnect(); } catch (e) {}
       audioContextSourceRef.current = null;
+    }
+    if (window.__vensto_audio_ctx) {
+      try { window.__vensto_audio_ctx.close(); } catch (e) {}
+      window.__vensto_audio_ctx = null;
     }
     if (audioGainNodeRef.current) {
       try { audioGainNodeRef.current.disconnect(); } catch (e) {}
@@ -208,6 +218,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     }
     queuedIceCandidatesRef.current = [];
     queuedRemoteOfferRef.current = null;
+    setIceStatus("");
   };
 
   const handleHardClearCache = (e) => {
@@ -227,7 +238,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     if (typeof navigator !== "undefined" && navigator.audioSession) {
       try { navigator.audioSession.type = "play-and-record"; } catch (e) {}
     }
-    // 1. Dedicated Audio Tag Playback
+
+    // 1. Resume Web Audio API Context
+    try {
+      if (window.__vensto_audio_ctx && window.__vensto_audio_ctx.state === "suspended") {
+        window.__vensto_audio_ctx.resume().catch(() => {});
+      }
+    } catch (e) {}
+
+    // 2. Dedicated Audio Tag Playback
     if (remoteAudioStreamRef.current && remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = remoteAudioStreamRef.current;
       remoteAudioRef.current.muted = false;
@@ -240,7 +259,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         }
       } catch (e) {}
     }
-    // 2. Native JS Audio Player Fallback
+    // 3. Native JS Audio Player Fallback
     try {
       if (window.__vensto_audio_player && remoteAudioStreamRef.current) {
         window.__vensto_audio_player.srcObject = remoteAudioStreamRef.current;
@@ -249,7 +268,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         window.__vensto_audio_player.play().catch(() => {});
       }
     } catch (e) {}
-    // 3. Unmute Video Tag so audio outputs through LOUDSPEAKER (Громкая связь)
+    // 4. Unmute Video Tag so audio outputs through LOUDSPEAKER (Громкая связь)
     if (remoteVideoRef.current) {
       remoteVideoRef.current.muted = false;
       remoteVideoRef.current.volume = 1.0;
@@ -262,11 +281,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
   };
 
   const attachRemoteTrack = (event) => {
-    console.log("[WebRTC ontrack] Track received:", event.track?.kind, event.track?.id);
+    console.log("[WebRTC ontrack] Track received:", event.track?.kind, event.track?.id, "streams:", event.streams?.length);
 
     if (typeof navigator !== "undefined" && navigator.audioSession) {
       try { navigator.audioSession.type = "play-and-record"; } catch (e) {}
     }
+
+    const incomingStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
 
     if (event.track?.kind === "audio") {
       const audioTrack = event.track;
@@ -276,26 +297,65 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         audioTrack.onunmute = () => console.log("[Remote audio track unmuted by system]");
       } catch(e) {}
 
-      // Build MediaStream with the audio track already inside it
-      const freshAudioStream = new MediaStream([audioTrack]);
-      remoteAudioStreamRef.current = freshAudioStream;
+      // Keep reference to stream containing the audio track
+      const audioStream = incomingStream || new MediaStream([audioTrack]);
+      remoteAudioStreamRef.current = audioStream;
 
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = freshAudioStream;
-        remoteAudioRef.current.volume = 1.0;
-        remoteAudioRef.current.muted = false;
-        const ap = remoteAudioRef.current.play();
-        if (ap !== undefined) {
-          ap.then(() => {
-            setIsAudioMutedByBrowser(false);
-          }).catch((err) => {
-            console.warn("[remoteAudio autoplay note]", err);
-            setIsAudioMutedByBrowser(true);
-          });
+      // 1. Direct Web Audio API Hardware Route (Bypasses HTML autoplay blocks & muted tags)
+      try {
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtxClass) {
+          if (!window.__vensto_audio_ctx) {
+            window.__vensto_audio_ctx = new AudioCtxClass();
+          }
+          const ctx = window.__vensto_audio_ctx;
+          if (ctx.state === "suspended") {
+            ctx.resume().catch(() => {});
+          }
+          if (audioContextSourceRef.current) {
+            try { audioContextSourceRef.current.disconnect(); } catch (e) {}
+          }
+          const src = ctx.createMediaStreamSource(audioStream);
+          audioContextSourceRef.current = src;
+          src.connect(ctx.destination);
+          console.log("[WebRTC WebAudio] Audio routed directly to hardware output!");
         }
+      } catch (webaudioErr) {
+        console.warn("[WebAudio routing failed]", webaudioErr);
       }
 
-      // Also attach audio track to video stream for Loudspeaker output
+      // 2. Play via dedicated <audio> tag
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = audioStream;
+        remoteAudioRef.current.volume = 1.0;
+        remoteAudioRef.current.muted = false;
+        try {
+          const ap = remoteAudioRef.current.play();
+          if (ap !== undefined) {
+            ap.then(() => {
+              setIsAudioMutedByBrowser(false);
+            }).catch((err) => {
+              console.warn("[remoteAudio autoplay note]", err);
+              setIsAudioMutedByBrowser(true);
+            });
+          }
+        } catch (e) {}
+      }
+
+      // 3. Native Audio Player Fallback
+      try {
+        if (!window.__vensto_audio_player) {
+          window.__vensto_audio_player = new Audio();
+          window.__vensto_audio_player.autoplay = true;
+          window.__vensto_audio_player.playsInline = true;
+        }
+        window.__vensto_audio_player.srcObject = audioStream;
+        window.__vensto_audio_player.volume = 1.0;
+        window.__vensto_audio_player.muted = false;
+        window.__vensto_audio_player.play().then(() => setIsAudioMutedByBrowser(false)).catch(() => {});
+      } catch(e) {}
+
+      // 4. Attach audio to video element stream so video element also plays sound
       if (remoteVideoStreamRef.current) {
         if (!remoteVideoStreamRef.current.getAudioTracks().some((t) => t.id === audioTrack.id)) {
           remoteVideoStreamRef.current.addTrack(audioTrack);
@@ -304,42 +364,55 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
           remoteVideoRef.current.srcObject = remoteVideoStreamRef.current;
         }
       }
-
-      // Native Audio Player Fallback
-      try {
-        if (!window.__vensto_audio_player) {
-          window.__vensto_audio_player = new Audio();
-          window.__vensto_audio_player.autoplay = true;
-          window.__vensto_audio_player.playsInline = true;
-        }
-        window.__vensto_audio_player.srcObject = freshAudioStream;
-        window.__vensto_audio_player.volume = 1.0;
-        window.__vensto_audio_player.muted = false;
-        window.__vensto_audio_player.play().then(() => setIsAudioMutedByBrowser(false)).catch(() => {});
-      } catch(e) {}
     } else if (event.track?.kind === "video") {
       const videoTrack = event.track;
       try { videoTrack.enabled = true; } catch(e) {}
 
-      const freshVideoStream = new MediaStream([videoTrack]);
-      // If audio track already arrived, attach it to video stream as well
+      const videoStream = incomingStream || new MediaStream([videoTrack]);
+      // If audio track already arrived, attach it to video stream
       if (remoteAudioStreamRef.current) {
         remoteAudioStreamRef.current.getAudioTracks().forEach((at) => {
-          freshVideoStream.addTrack(at);
+          if (!videoStream.getAudioTracks().some((t) => t.id === at.id)) {
+            videoStream.addTrack(at);
+          }
         });
       }
-      remoteVideoStreamRef.current = freshVideoStream;
+      remoteVideoStreamRef.current = videoStream;
 
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = freshVideoStream;
-        remoteVideoRef.current.muted = true; // Initially muted for autoplay, unmuted on user tap
-        const vp = remoteVideoRef.current.play();
-        if (vp !== undefined) vp.catch(() => {});
+        remoteVideoRef.current.srcObject = videoStream;
+        remoteVideoRef.current.muted = false;
+        remoteVideoRef.current.volume = 1.0;
+        try {
+          const vp = remoteVideoRef.current.play();
+          if (vp !== undefined) {
+            vp.catch((err) => {
+              console.warn("[remoteVideo unmuted play failed, falling back to muted for video]", err);
+              if (remoteVideoRef.current) {
+                remoteVideoRef.current.muted = true;
+                remoteVideoRef.current.play().catch(() => {});
+              }
+            });
+          }
+        } catch (e) {}
       }
     }
 
     setActiveCall((prev) => (prev ? { ...prev, isConnected: true } : null));
     SoundEngine.stopRingtone();
+  };
+
+  const flushQueuedCandidates = async (pc) => {
+    while (queuedIceCandidatesRef.current && queuedIceCandidatesRef.current.length > 0) {
+      const cand = queuedIceCandidatesRef.current.shift();
+      if (cand && cand.candidate) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (e) {
+          console.warn("[flushQueuedCandidates err]", e);
+        }
+      }
+    }
   };
 
   const applyRemoteOffer = async (offer, pc, targetUserId, callId, isVideo = false) => {
@@ -348,10 +421,8 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         offer.sdp = enhanceSdpForOpus(offer.sdp);
       }
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      while (queuedIceCandidatesRef.current.length > 0) {
-        const cand = queuedIceCandidatesRef.current.shift();
-        try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch (e) {}
-      }
+      await flushQueuedCandidates(pc);
+
       // Guarantee two-way send & receive on all transceivers
       pc.getTransceivers().forEach((transceiver) => {
         try {
@@ -386,10 +457,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
           answer.sdp = enhanceSdpForOpus(answer.sdp);
         }
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
-        while (queuedIceCandidatesRef.current.length > 0) {
-          const cand = queuedIceCandidatesRef.current.shift();
-          try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch (e) {}
-        }
+        await flushQueuedCandidates(pc);
       } catch (err) {
         console.error("[setRemoteDescription Answer error]", err);
       }
@@ -397,6 +465,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
   };
 
   const handleRemoteCandidate = async (candidate) => {
+    if (!candidate || !candidate.candidate) return;
     const pc = peerConnectionRef.current;
     if (pc && pc.remoteDescription && pc.remoteDescription.type) {
       try {
@@ -1155,13 +1224,37 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     // Handle remote tracks
     pc.ontrack = attachRemoteTrack;
 
-    // Handle ICE candidates
+    // Handle ICE candidates with full serialization
     pc.onicecandidate = (event) => {
-      if (event.candidate) {
+      if (event.candidate && event.candidate.candidate) {
+        const candData = {
+          candidate: event.candidate.candidate,
+          sdpMid: event.candidate.sdpMid,
+          sdpMLineIndex: event.candidate.sdpMLineIndex,
+          usernameFragment: event.candidate.usernameFragment
+        };
         const targetPid = activePartner?.id || activePartnerRef.current?.id;
         if (targetPid && callId) {
-          sendCallSignal("ice_candidate", event.candidate, targetPid, callId);
+          sendCallSignal("ice_candidate", candData, targetPid, callId);
         }
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log("[WebRTC Caller ICE State]:", pc.iceConnectionState);
+      setIceStatus(pc.iceConnectionState);
+      if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+        setActiveCall((prev) => (prev ? { ...prev, isConnected: true } : null));
+        unmuteAllAudio();
+      } else if (pc.iceConnectionState === "failed") {
+        try { if (pc.restartIce) pc.restartIce(); } catch (e) {}
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log("[WebRTC Caller Connection State]:", pc.connectionState);
+      if (pc.connectionState === "connected") {
+        unmuteAllAudio();
       }
     };
 
@@ -1352,8 +1445,32 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     pc.ontrack = attachRemoteTrack;
 
     pc.onicecandidate = (event) => {
-      if (event.candidate && targetUserId && callToAccept.call_id) {
-        sendCallSignal("ice_candidate", event.candidate, targetUserId, callToAccept.call_id);
+      if (event.candidate && event.candidate.candidate && targetUserId && callToAccept.call_id) {
+        const candData = {
+          candidate: event.candidate.candidate,
+          sdpMid: event.candidate.sdpMid,
+          sdpMLineIndex: event.candidate.sdpMLineIndex,
+          usernameFragment: event.candidate.usernameFragment
+        };
+        sendCallSignal("ice_candidate", candData, targetUserId, callToAccept.call_id);
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log("[WebRTC Callee ICE State]:", pc.iceConnectionState);
+      setIceStatus(pc.iceConnectionState);
+      if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+        setActiveCall((prev) => (prev ? { ...prev, isConnected: true } : null));
+        unmuteAllAudio();
+      } else if (pc.iceConnectionState === "failed") {
+        try { if (pc.restartIce) pc.restartIce(); } catch (e) {}
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log("[WebRTC Callee Connection State]:", pc.connectionState);
+      if (pc.connectionState === "connected") {
+        unmuteAllAudio();
       }
     };
 
@@ -2012,12 +2129,14 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                     remoteVideoRef.current = el;
                     if (el && remoteVideoStreamRef.current && el.srcObject !== remoteVideoStreamRef.current) {
                       el.srcObject = remoteVideoStreamRef.current;
-                      try { el.play().catch(() => {}); } catch(e) {}
+                      try {
+                        const p = el.play();
+                        if (p !== undefined) p.catch(() => {});
+                      } catch(e) {}
                     }
                   }}
                   autoPlay
                   playsInline
-                  muted
                   className="w-full h-full object-cover"
                 />
                 {isAudioMutedByBrowser && (
@@ -2046,7 +2165,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                     )}
                     <h2 className="text-xl font-black text-white">{activeCall?.partner?.first_name || "Собеседник"}</h2>
                     <p className="text-xs text-pink-400 font-semibold animate-pulse">
-                      🟢 Подключение видеопотока HD...
+                      🟢 {iceStatus ? `Соединение: ${iceStatus}` : "Подключение видеопотока HD..."}
                     </p>
                   </div>
                 )}
@@ -2123,8 +2242,18 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                 {activeCall.isConnected ? `🟢 ${formatCallTime(activeCall.callSeconds)}` : "📞 Вызов..."}
               </div>
               {activeCall.isConnected && (
-                <div className="bg-emerald-950/80 backdrop-blur-md px-2.5 py-1.5 rounded-2xl border border-emerald-500/50 text-[10px] font-bold text-emerald-300 shadow-lg">
-                  🔊 HD [v1.9]
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    unmuteAllAudio();
+                  }}
+                  className="bg-emerald-950/90 active:scale-95 cursor-pointer backdrop-blur-md px-2.5 py-1.5 rounded-2xl border border-emerald-500/60 text-[10px] font-bold text-emerald-300 shadow-lg flex items-center space-x-1"
+                  title="Нажмите для проверки динамика и звука"
+                >
+                  <span>🔊 HD [v2.0]</span>
+                  {iceStatus && (
+                    <span className="text-[9px] opacity-80 font-mono">({iceStatus === "connected" || iceStatus === "completed" ? "OK" : iceStatus})</span>
+                  )}
                 </div>
               )}
             </div>

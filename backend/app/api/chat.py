@@ -478,7 +478,7 @@ async def get_pending_call_signals(
 @router.get("/call/ice-servers")
 async def get_ice_servers():
     """
-    Returns public STUN servers for WebRTC NAT traversal.
+    Returns public STUN and reliable TURN servers for WebRTC NAT traversal.
     """
     return {
         "iceServers": [
@@ -486,7 +486,12 @@ async def get_ice_servers():
             {"urls": "stun:stun1.l.google.com:19302"},
             {"urls": "stun:stun2.l.google.com:19302"},
             {"urls": "stun:stun3.l.google.com:19302"},
-            {"urls": "stun:stun4.l.google.com:19302"}
+            {"urls": "stun:stun4.l.google.com:19302"},
+            {"urls": "stun:stun.cloudflare.com:3478"},
+            {"urls": "stun:global.stun.twilio.com:3478"},
+            {"urls": "stun:standard.relay.metered.ca:80"},
+            {"urls": "turn:standard.relay.metered.ca:80", "username": "openrelayproject", "credential": "openrelayproject"},
+            {"urls": "turn:standard.relay.metered.ca:80?transport=tcp", "username": "openrelayproject", "credential": "openrelayproject"}
         ]
     }
 

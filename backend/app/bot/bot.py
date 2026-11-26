@@ -20,7 +20,7 @@ if settings.BOT_TOKEN:
 def get_webapp_keyboard(start_param: str = "", is_admin: bool = False) -> InlineKeyboardMarkup:
     """Builds inline keyboard with launch button into Telegram Mini App with cache-busting."""
     base_url = settings.WEBAPP_URL.rstrip('/')
-    build_param = "v=20261126_v19_loudspeaker_fix"
+    build_param = "v=20261126_v20_loudspeaker_fix"
     if start_param:
         app_url = f"{base_url}/?startapp={start_param}&{build_param}"
     else:
@@ -52,7 +52,7 @@ async def send_bot_push_notification(
         return False
     try:
         base_url = settings.WEBAPP_URL.rstrip('/')
-        build_param = "v=20261126_v19_loudspeaker_fix"
+        build_param = "v=20261126_v20_loudspeaker_fix"
         app_url = f"{base_url}/?startapp={start_param}&{build_param}" if start_param else f"{base_url}/?{build_param}"
         kb = InlineKeyboardMarkup(
             inline_keyboard=[
