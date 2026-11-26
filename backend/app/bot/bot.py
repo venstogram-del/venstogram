@@ -18,11 +18,13 @@ if settings.BOT_TOKEN:
     dp = Dispatcher()
 
 def get_webapp_keyboard(start_param: str = "", is_admin: bool = False) -> InlineKeyboardMarkup:
-    """Builds inline keyboard with launch button into Telegram Mini App."""
-    import time
-    base_url = settings.WEBAPP_URL
-    delim = "&" if "?" in base_url else "?"
-    app_url = f"{base_url}{delim}startapp={start_param}&t={int(time.time())}" if start_param else f"{base_url}{delim}t={int(time.time())}"
+    """Builds inline keyboard with launch button into Telegram Mini App with cache-busting."""
+    base_url = settings.WEBAPP_URL.rstrip('/')
+    build_param = "v=20261126_v19_loudspeaker_fix"
+    if start_param:
+        app_url = f"{base_url}/?startapp={start_param}&{build_param}"
+    else:
+        app_url = f"{base_url}/?{build_param}"
     is_https = app_url.startswith("https://")
     
     if is_https:
@@ -49,7 +51,9 @@ async def send_bot_push_notification(
     if not bot:
         return False
     try:
-        app_url = f"{settings.WEBAPP_URL}?startapp={start_param}" if start_param else settings.WEBAPP_URL
+        base_url = settings.WEBAPP_URL.rstrip('/')
+        build_param = "v=20261126_v19_loudspeaker_fix"
+        app_url = f"{base_url}/?startapp={start_param}&{build_param}" if start_param else f"{base_url}/?{build_param}"
         kb = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
@@ -491,7 +495,7 @@ if dp is not None:
                 [
                     InlineKeyboardButton(
                         text="🚀 Открыть Venstogram App",
-                        web_app=WebAppInfo(url=settings.WEBAPP_URL)
+                        web_app=WebAppInfo(url=f"{settings.WEBAPP_URL.rstrip('/')}/?v=20261126_v19_loudspeaker_fix")
                     )
                 ]
             ]

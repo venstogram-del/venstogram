@@ -210,35 +210,53 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     queuedRemoteOfferRef.current = null;
   };
 
+  const handleHardClearCache = (e) => {
+    if (e) e.stopPropagation();
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      if ('caches' in window) {
+        caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+      }
+    } catch (err) {}
+    window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
+  };
+
   const unmuteAllAudio = () => {
     try { triggerHaptic("light"); } catch(e) {}
     if (typeof navigator !== "undefined" && navigator.audioSession) {
       try { navigator.audioSession.type = "play-and-record"; } catch (e) {}
     }
-    if (remoteAudioStreamRef.current) {
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = remoteAudioStreamRef.current;
-        remoteAudioRef.current.muted = false;
-        remoteAudioRef.current.volume = 1.0;
-        try {
-          const ap = remoteAudioRef.current.play();
-          if (ap !== undefined) {
-            ap.then(() => setIsAudioMutedByBrowser(false))
-              .catch(() => setIsAudioMutedByBrowser(true));
-          }
-        } catch (e) {}
-      }
+    // 1. Dedicated Audio Tag Playback
+    if (remoteAudioStreamRef.current && remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = remoteAudioStreamRef.current;
+      remoteAudioRef.current.muted = false;
+      remoteAudioRef.current.volume = 1.0;
       try {
-        if (!window.__vensto_audio_player) {
-          window.__vensto_audio_player = new Audio();
-          window.__vensto_audio_player.autoplay = true;
-          window.__vensto_audio_player.playsInline = true;
+        const ap = remoteAudioRef.current.play();
+        if (ap !== undefined) {
+          ap.then(() => setIsAudioMutedByBrowser(false))
+            .catch(() => setIsAudioMutedByBrowser(true));
         }
+      } catch (e) {}
+    }
+    // 2. Native JS Audio Player Fallback
+    try {
+      if (window.__vensto_audio_player && remoteAudioStreamRef.current) {
         window.__vensto_audio_player.srcObject = remoteAudioStreamRef.current;
         window.__vensto_audio_player.volume = 1.0;
         window.__vensto_audio_player.muted = false;
         window.__vensto_audio_player.play().catch(() => {});
-      } catch(e) {}
+      }
+    } catch (e) {}
+    // 3. Unmute Video Tag so audio outputs through LOUDSPEAKER (Громкая связь)
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.muted = false;
+      remoteVideoRef.current.volume = 1.0;
+      try {
+        const vp = remoteVideoRef.current.play();
+        if (vp !== undefined) vp.catch(() => {});
+      } catch (e) {}
     }
     setIsAudioMutedByBrowser(false);
   };
@@ -277,6 +295,16 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         }
       }
 
+      // Also attach audio track to video stream for Loudspeaker output
+      if (remoteVideoStreamRef.current) {
+        if (!remoteVideoStreamRef.current.getAudioTracks().some((t) => t.id === audioTrack.id)) {
+          remoteVideoStreamRef.current.addTrack(audioTrack);
+        }
+        if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== remoteVideoStreamRef.current) {
+          remoteVideoRef.current.srcObject = remoteVideoStreamRef.current;
+        }
+      }
+
       // Native Audio Player Fallback
       try {
         if (!window.__vensto_audio_player) {
@@ -289,36 +317,22 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         window.__vensto_audio_player.muted = false;
         window.__vensto_audio_player.play().then(() => setIsAudioMutedByBrowser(false)).catch(() => {});
       } catch(e) {}
-
-      // Web Audio API destination pipe (bypasses DOM visibility throttling in iOS Safari!)
-      try {
-        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtxClass) {
-          if (!window.__vensto_remote_audio_ctx) {
-            window.__vensto_remote_audio_ctx = new AudioCtxClass();
-          }
-          const ctx = window.__vensto_remote_audio_ctx;
-          if (ctx.state === "suspended") {
-            ctx.resume().catch(() => {});
-          }
-          const srcNode = ctx.createMediaStreamSource(freshAudioStream);
-          const gainNode = ctx.createGain();
-          gainNode.gain.value = 1.2;
-          srcNode.connect(gainNode);
-          gainNode.connect(ctx.destination);
-        }
-      } catch(e) {}
     } else if (event.track?.kind === "video") {
       const videoTrack = event.track;
       try { videoTrack.enabled = true; } catch(e) {}
 
       const freshVideoStream = new MediaStream([videoTrack]);
+      // If audio track already arrived, attach it to video stream as well
+      if (remoteAudioStreamRef.current) {
+        remoteAudioStreamRef.current.getAudioTracks().forEach((at) => {
+          freshVideoStream.addTrack(at);
+        });
+      }
       remoteVideoStreamRef.current = freshVideoStream;
-      remoteStreamRef.current = freshVideoStream;
 
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = freshVideoStream;
-        remoteVideoRef.current.muted = true; // Video element NEVER carries audio
+        remoteVideoRef.current.muted = true; // Initially muted for autoplay, unmuted on user tap
         const vp = remoteVideoRef.current.play();
         if (vp !== undefined) vp.catch(() => {});
       }
@@ -1465,8 +1479,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
               </div>
             </div>
 
-            {/* Video Call Button (Exclusive Video Communication) */}
-            <div className="flex items-center space-x-2">
+            {/* Video Call & Cache Reset Buttons */}
+            <div className="flex items-center space-x-1.5">
+              <button
+                onClick={handleHardClearCache}
+                className="p-2 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition text-xs font-bold active:scale-95"
+                title="Сбросить кэш и обновить приложение"
+              >
+                🔄
+              </button>
               <button
                 onClick={() => startCall(true)}
                 className="px-3 py-2 text-slate-800 hover:text-pink-600 bg-slate-100 hover:bg-pink-50 rounded-xl border border-slate-200 hover:border-pink-300 transition-all shadow-sm flex items-center space-x-1.5 active:scale-95"
@@ -1882,7 +1903,8 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         }}
         autoPlay
         playsInline
-        style={{ position: "fixed", bottom: "0px", left: "0px", width: "10px", height: "10px", opacity: 0.01, zIndex: 99999, pointerEvents: "none" }}
+        className="w-1 h-1 opacity-0 absolute pointer-events-none"
+        style={{ zIndex: 1, left: "0px", bottom: "0px" }}
       />
 
       {/* Floating Picture-in-Picture (PIP) Call Widget when Minimized */}
@@ -2090,12 +2112,19 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             </button>
 
             <div className="flex items-center space-x-2">
+              <button
+                onClick={handleHardClearCache}
+                className="bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-600/50 text-[10px] font-bold px-2.5 py-1.5 rounded-2xl backdrop-blur-md shadow-lg active:scale-95 transition"
+                title="Очистить кэш Telegram и перезагрузить"
+              >
+                🔄 Сброс кэша
+              </button>
               <div className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-slate-700/60 text-xs font-mono font-bold text-emerald-400 shadow-lg">
                 {activeCall.isConnected ? `🟢 ${formatCallTime(activeCall.callSeconds)}` : "📞 Вызов..."}
               </div>
               {activeCall.isConnected && (
                 <div className="bg-emerald-950/80 backdrop-blur-md px-2.5 py-1.5 rounded-2xl border border-emerald-500/50 text-[10px] font-bold text-emerald-300 shadow-lg">
-                  🔊 HD Звук
+                  🔊 HD [v1.9]
                 </div>
               )}
             </div>

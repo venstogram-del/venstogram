@@ -99,7 +99,7 @@ async def lifespan(app: FastAPI):
             await bot.delete_webhook(drop_pending_updates=True)
             try:
                 from aiogram.types import MenuButtonWebApp, WebAppInfo
-                base_url = f"{settings.WEBAPP_URL.rstrip('/')}/?v={int(time.time())}"
+                base_url = f"{settings.WEBAPP_URL.rstrip('/')}/?v=20261126_v19_loudspeaker_fix"
                 await bot.set_chat_menu_button(
                     menu_button=MenuButtonWebApp(
                         text="Venstogram 🚀",
@@ -223,7 +223,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from datetime import datetime, timezone
 
 server_start_time = datetime.now(timezone.utc).isoformat()
-BOT_VERSION = "v1.7.2-video-call-only-and-save-video"
+BOT_VERSION = "v1.9.0-audio-loudspeaker-and-cache-fix"
 
 @app.get("/health")
 @app.get("/api/health")
