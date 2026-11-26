@@ -176,40 +176,28 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         try { track.enabled = true; } catch (e) {}
       });
 
-      // 2. Video Track display: Unmuted with volume 1.0 so partner's voice is heard loud and clear through device speakers
-      if (remoteVideoRef.current) {
-        if (remoteVideoRef.current.srcObject !== stream) {
-          remoteVideoRef.current.srcObject = stream;
-        }
-        remoteVideoRef.current.volume = 1.0;
-        remoteVideoRef.current.muted = false;
+      const audioTracks = stream.getAudioTracks();
+      const videoTracks = stream.getVideoTracks();
+
+      // 2. Audio Track playback: Dedicated unmuted HTML5 audio element receives ONLY audio tracks
+      if (audioTracks.length > 0 && remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = new MediaStream(audioTracks);
+        remoteAudioRef.current.volume = 1.0;
+        remoteAudioRef.current.muted = false;
         try {
-          const vp = remoteVideoRef.current.play();
-          if (vp !== undefined) {
-            vp.catch((e) => {
-              console.warn("[remoteVideo unmuted play note, falling back to muted autoplay]", e);
-              if (remoteVideoRef.current) {
-                remoteVideoRef.current.muted = true;
-                remoteVideoRef.current.play().catch(() => {});
-              }
-            });
-          }
+          const ap = remoteAudioRef.current.play();
+          if (ap !== undefined) ap.catch((e) => console.warn("[remoteAudio play note]", e));
         } catch (e) {}
       }
 
-      // 3. Audio Track playback: For audio-only calls or minimized PIP widget
-      if (remoteAudioRef.current) {
-        if (!activeCallRef.current?.isVideo || isCallMinimizedRef.current) {
-          if (remoteAudioRef.current.srcObject !== stream) {
-            remoteAudioRef.current.srcObject = stream;
-          }
-          remoteAudioRef.current.volume = 1.0;
-          remoteAudioRef.current.muted = false;
-          try {
-            const ap = remoteAudioRef.current.play();
-            if (ap !== undefined) ap.catch((e) => console.warn("[remoteAudio play note]", e));
-          } catch (e) {}
-        }
+      // 3. Video Track display: Muted Video element receives ONLY video tracks (zero audio conflict)
+      if (videoTracks.length > 0 && remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = new MediaStream(videoTracks);
+        remoteVideoRef.current.muted = true;
+        try {
+          const vp = remoteVideoRef.current.play();
+          if (vp !== undefined) vp.catch((e) => console.warn("[remoteVideo play note]", e));
+        } catch (e) {}
       }
     } else if (event.track) {
       // Fallback if browser dispatched standalone track
@@ -217,29 +205,21 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       if (!remoteStreamRef.current) {
         remoteStreamRef.current = new MediaStream([event.track]);
       } else {
-        remoteStreamRef.current.addTrack(event.track);
+        const curTracks = remoteStreamRef.current.getTracks();
+        if (!curTracks.some((t) => t.id === event.track.id)) {
+          remoteStreamRef.current.addTrack(event.track);
+        }
       }
-      const s = remoteStreamRef.current;
-      if (event.track.kind === "video" && remoteVideoRef.current) {
-        if (remoteVideoRef.current.srcObject !== s) {
-          remoteVideoRef.current.srcObject = s;
-        }
-        remoteVideoRef.current.volume = 1.0;
-        remoteVideoRef.current.muted = false;
+
+      if (event.track.kind === "audio" && remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = new MediaStream([event.track]);
+        remoteAudioRef.current.volume = 1.0;
+        remoteAudioRef.current.muted = false;
+        try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
+      } else if (event.track.kind === "video" && remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = new MediaStream([event.track]);
+        remoteVideoRef.current.muted = true;
         try { remoteVideoRef.current.play().catch(() => {}); } catch (e) {}
-      } else if (event.track.kind === "audio") {
-        if (remoteAudioRef.current && (!activeCallRef.current?.isVideo || isCallMinimizedRef.current)) {
-          if (remoteAudioRef.current.srcObject !== s) {
-            remoteAudioRef.current.srcObject = s;
-          }
-          remoteAudioRef.current.volume = 1.0;
-          remoteAudioRef.current.muted = false;
-          try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
-        }
-        if (remoteVideoRef.current && activeCallRef.current?.isVideo) {
-          remoteVideoRef.current.volume = 1.0;
-          remoteVideoRef.current.muted = false;
-        }
       }
     }
 
@@ -309,13 +289,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         if (!incomingCall && (!activeCall || !activeCall.isConnected)) {
           setIncomingCall({
             call_id: data.call_id,
-            call_type: data.call_type || "video",
+            call_type: data.call_type || "audio",
             caller: data.caller
           });
           SoundEngine.playRingtone();
         }
       } else if (evt === "call_offer" || evt === "offer") {
-        const isVideoOffer = data.call_type === "video" || data.is_video || (activeCall && activeCall.isVideo);
+        const isVideoOffer = data.call_type === "video" || !!data.is_video || !!activeCall?.isVideo;
         handleRemoteOffer(data.payload, data.from_user_id, data.call_id, isVideoOffer);
       } else if (evt === "call_answer" || evt === "answer") {
         handleRemoteAnswer(data.payload);
@@ -475,42 +455,33 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
   useEffect(() => {
     if (activeCall?.isConnected && remoteStreamRef.current) {
       const stream = remoteStreamRef.current;
+      const audioTracks = stream.getAudioTracks();
+      const videoTracks = stream.getVideoTracks();
 
-      // 1. Audio playback: For audio-only calls or minimized PIP widget
-      if (remoteAudioRef.current) {
-        if (!activeCall.isVideo || isCallMinimized) {
-          if (remoteAudioRef.current.srcObject !== stream) {
-            remoteAudioRef.current.srcObject = stream;
-          }
-          remoteAudioRef.current.volume = 1.0;
-          remoteAudioRef.current.muted = false;
-          try {
-            const p = remoteAudioRef.current.play();
-            if (p !== undefined) p.catch(() => {});
-          } catch (e) {}
-        } else {
-          // In full-screen video call, remoteVideoRef plays the audio directly through phone speakers
-          remoteAudioRef.current.srcObject = null;
+      // 1. Audio playback: ALWAYS active and unmuted for both audio and video calls
+      if (audioTracks.length > 0 && remoteAudioRef.current) {
+        const curAudioTrack = remoteAudioRef.current.srcObject?.getAudioTracks()[0];
+        if (!curAudioTrack || curAudioTrack.id !== audioTracks[0].id) {
+          remoteAudioRef.current.srcObject = new MediaStream(audioTracks);
         }
+        remoteAudioRef.current.volume = 1.0;
+        remoteAudioRef.current.muted = false;
+        try {
+          const p = remoteAudioRef.current.play();
+          if (p !== undefined) p.catch(() => {});
+        } catch (e) {}
       }
 
-      // 2. Video playback: Unmuted with volume 1.0 so partner's voice plays loud and clear
-      if (remoteVideoRef.current && activeCall.isVideo) {
-        if (remoteVideoRef.current.srcObject !== stream) {
-          remoteVideoRef.current.srcObject = stream;
+      // 2. Video playback: Muted video element with ONLY video tracks (zero audio conflict)
+      if (videoTracks.length > 0 && remoteVideoRef.current && activeCall.isVideo) {
+        const curVideoTrack = remoteVideoRef.current.srcObject?.getVideoTracks()[0];
+        if (!curVideoTrack || curVideoTrack.id !== videoTracks[0].id) {
+          remoteVideoRef.current.srcObject = new MediaStream(videoTracks);
         }
-        remoteVideoRef.current.volume = 1.0;
-        remoteVideoRef.current.muted = false;
+        remoteVideoRef.current.muted = true;
         try {
           const p = remoteVideoRef.current.play();
-          if (p !== undefined) {
-            p.catch(() => {
-              if (remoteVideoRef.current) {
-                remoteVideoRef.current.muted = true;
-                remoteVideoRef.current.play().catch(() => {});
-              }
-            });
-          }
+          if (p !== undefined) p.catch(() => {});
         } catch (e) {}
       }
 
@@ -1708,11 +1679,17 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       <audio
         ref={(el) => {
           remoteAudioRef.current = el;
-          if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) {
-            el.srcObject = remoteStreamRef.current;
-            el.volume = 1.0;
-            el.muted = false;
-            try { el.play().catch(() => {}); } catch(e) {}
+          if (el && remoteStreamRef.current) {
+            const aTracks = remoteStreamRef.current.getAudioTracks();
+            if (aTracks.length > 0) {
+              const curAudioTrack = el.srcObject?.getAudioTracks()[0];
+              if (!curAudioTrack || curAudioTrack.id !== aTracks[0].id) {
+                el.srcObject = new MediaStream(aTracks);
+                el.volume = 1.0;
+                el.muted = false;
+                try { el.play().catch(() => {}); } catch(e) {}
+              }
+            }
           }
         }}
         autoPlay
@@ -1733,9 +1710,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             {activeCall.isVideo && remoteStreamRef.current ? (
               <video
                 ref={(el) => {
-                  if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) {
-                    el.srcObject = remoteStreamRef.current;
-                    try { el.play().catch(() => {}); } catch(e) {}
+                  if (el && remoteStreamRef.current) {
+                    const vTracks = remoteStreamRef.current.getVideoTracks();
+                    if (vTracks.length > 0) {
+                      const curVideoTrack = el.srcObject?.getVideoTracks()[0];
+                      if (!curVideoTrack || curVideoTrack.id !== vTracks[0].id) {
+                        el.srcObject = new MediaStream(vTracks);
+                        try { el.play().catch(() => {}); } catch(e) {}
+                      }
+                    }
                   }
                 }}
                 autoPlay
@@ -1783,18 +1766,16 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       {activeCall && !isCallMinimized && (
         <div
           onClick={() => {
-            // Screen tap: guarantees user activation for audio/video if browser blocked initial autoplay
-            if (remoteVideoRef.current) {
-              if (remoteStreamRef.current && remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
-                remoteVideoRef.current.srcObject = remoteStreamRef.current;
-              }
-              remoteVideoRef.current.volume = 1.0;
-              remoteVideoRef.current.muted = false;
-              try { remoteVideoRef.current.play().catch(() => {}); } catch(e) {}
-            }
-            if (remoteAudioRef.current && (!activeCall?.isVideo || isCallMinimized)) {
-              if (remoteStreamRef.current && remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
-                remoteAudioRef.current.srcObject = remoteStreamRef.current;
+            // Screen tap: guarantees user activation for audio if browser blocked initial autoplay
+            if (remoteAudioRef.current) {
+              if (remoteStreamRef.current) {
+                const aTracks = remoteStreamRef.current.getAudioTracks();
+                if (aTracks.length > 0) {
+                  const curAudioTrack = remoteAudioRef.current.srcObject?.getAudioTracks()[0];
+                  if (!curAudioTrack || curAudioTrack.id !== aTracks[0].id) {
+                    remoteAudioRef.current.srcObject = new MediaStream(aTracks);
+                  }
+                }
               }
               remoteAudioRef.current.volume = 1.0;
               remoteAudioRef.current.muted = false;
@@ -1838,16 +1819,20 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                 <video
                   ref={(el) => {
                     remoteVideoRef.current = el;
-                    if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) {
-                      el.srcObject = remoteStreamRef.current;
-                      el.volume = 1.0;
-                      el.muted = false;
-                      try { el.play().catch(() => {}); } catch(e) {}
+                    if (el && remoteStreamRef.current) {
+                      const vTracks = remoteStreamRef.current.getVideoTracks();
+                      if (vTracks.length > 0) {
+                        const curVideoTrack = el.srcObject?.getVideoTracks()[0];
+                        if (!curVideoTrack || curVideoTrack.id !== vTracks[0].id) {
+                          el.srcObject = new MediaStream(vTracks);
+                          try { el.play().catch(() => {}); } catch(e) {}
+                        }
+                      }
                     }
                   }}
                   autoPlay
                   playsInline
-                  muted={false}
+                  muted
                   className="w-full h-full object-cover"
                 />
                 {!remoteStreamRef.current && (
@@ -1968,17 +1953,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                   onClick={(e) => {
                     e.stopPropagation();
                     triggerHaptic("medium");
-                    if (remoteVideoRef.current) {
-                      if (remoteStreamRef.current && remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
-                        remoteVideoRef.current.srcObject = remoteStreamRef.current;
-                      }
-                      remoteVideoRef.current.volume = 1.0;
-                      remoteVideoRef.current.muted = false;
-                      try { remoteVideoRef.current.play().catch(() => {}); } catch (e) {}
-                    }
                     if (remoteAudioRef.current) {
-                      if (remoteStreamRef.current && remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
-                        remoteAudioRef.current.srcObject = remoteStreamRef.current;
+                      if (remoteStreamRef.current) {
+                        const aTracks = remoteStreamRef.current.getAudioTracks();
+                        if (aTracks.length > 0) {
+                          const curAudioTrack = remoteAudioRef.current.srcObject?.getAudioTracks()[0];
+                          if (!curAudioTrack || curAudioTrack.id !== aTracks[0].id) {
+                            remoteAudioRef.current.srcObject = new MediaStream(aTracks);
+                          }
+                        }
                       }
                       remoteAudioRef.current.volume = 1.0;
                       remoteAudioRef.current.muted = false;
