@@ -187,6 +187,12 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       });
       remoteVideoStreamRef.current = null;
     }
+    if (window.__vensto_audio_player) {
+      try {
+        window.__vensto_audio_player.pause();
+        window.__vensto_audio_player.srcObject = null;
+      } catch(e) {}
+    }
     if (peerConnectionRef.current) {
       try { peerConnectionRef.current.close(); } catch (e) {}
       peerConnectionRef.current = null;
@@ -209,19 +215,30 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     if (typeof navigator !== "undefined" && navigator.audioSession) {
       try { navigator.audioSession.type = "play-and-record"; } catch (e) {}
     }
-    if (remoteAudioRef.current) {
-      if (remoteAudioStreamRef.current && remoteAudioRef.current.srcObject !== remoteAudioStreamRef.current) {
+    if (remoteAudioStreamRef.current) {
+      if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = remoteAudioStreamRef.current;
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.volume = 1.0;
+        try {
+          const ap = remoteAudioRef.current.play();
+          if (ap !== undefined) {
+            ap.then(() => setIsAudioMutedByBrowser(false))
+              .catch(() => setIsAudioMutedByBrowser(true));
+          }
+        } catch (e) {}
       }
-      remoteAudioRef.current.muted = false;
-      remoteAudioRef.current.volume = 1.0;
       try {
-        const ap = remoteAudioRef.current.play();
-        if (ap !== undefined) {
-          ap.then(() => setIsAudioMutedByBrowser(false))
-            .catch(() => setIsAudioMutedByBrowser(true));
+        if (!window.__vensto_audio_player) {
+          window.__vensto_audio_player = new Audio();
+          window.__vensto_audio_player.autoplay = true;
+          window.__vensto_audio_player.playsInline = true;
         }
-      } catch (e) {}
+        window.__vensto_audio_player.srcObject = remoteAudioStreamRef.current;
+        window.__vensto_audio_player.volume = 1.0;
+        window.__vensto_audio_player.muted = false;
+        window.__vensto_audio_player.play().catch(() => {});
+      } catch(e) {}
     }
     setIsAudioMutedByBrowser(false);
   };
@@ -233,50 +250,20 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       try { navigator.audioSession.type = "play-and-record"; } catch (e) {}
     }
 
-    if (!remoteStreamRef.current) {
-      remoteStreamRef.current = new MediaStream();
-    }
-    const targetStream = remoteStreamRef.current;
+    if (event.track?.kind === "audio") {
+      const audioTrack = event.track;
+      try {
+        audioTrack.enabled = true;
+        audioTrack.onmute = () => console.log("[Remote audio track muted by system]");
+        audioTrack.onunmute = () => console.log("[Remote audio track unmuted by system]");
+      } catch(e) {}
 
-    if (event.track) {
-      try { event.track.enabled = true; } catch (e) {}
-      if (!targetStream.getTracks().some((t) => t.id === event.track.id)) {
-        targetStream.addTrack(event.track);
-      }
-    }
-    if (event.streams && event.streams[0]) {
-      event.streams[0].getTracks().forEach((track) => {
-        try { track.enabled = true; } catch (e) {}
-        if (!targetStream.getTracks().some((t) => t.id === track.id)) {
-          targetStream.addTrack(track);
-        }
-      });
-    }
-
-    // 1. Dedicated Remote Audio Pipeline: Audio stream is NEVER passed to video element
-    const audioTracks = targetStream.getAudioTracks();
-    if (audioTracks.length > 0) {
-      audioTracks.forEach((t) => {
-        try {
-          t.enabled = true;
-          t.onmute = () => console.log("[Remote audio track muted by system]");
-          t.onunmute = () => console.log("[Remote audio track unmuted by system]");
-        } catch (e) {}
-      });
-
-      if (!remoteAudioStreamRef.current) {
-        remoteAudioStreamRef.current = new MediaStream();
-      }
-      audioTracks.forEach((t) => {
-        if (!remoteAudioStreamRef.current.getTracks().some((cur) => cur.id === t.id)) {
-          remoteAudioStreamRef.current.addTrack(t);
-        }
-      });
+      // Build MediaStream with the audio track already inside it
+      const freshAudioStream = new MediaStream([audioTrack]);
+      remoteAudioStreamRef.current = freshAudioStream;
 
       if (remoteAudioRef.current) {
-        if (remoteAudioRef.current.srcObject !== remoteAudioStreamRef.current) {
-          remoteAudioRef.current.srcObject = remoteAudioStreamRef.current;
-        }
+        remoteAudioRef.current.srcObject = freshAudioStream;
         remoteAudioRef.current.volume = 1.0;
         remoteAudioRef.current.muted = false;
         const ap = remoteAudioRef.current.play();
@@ -289,31 +276,31 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
           });
         }
       }
-    }
 
-    // 2. Dedicated Remote Video Pipeline: Video element is ALWAYS muted to prevent autoplay blocks
-    const videoTracks = targetStream.getVideoTracks();
-    if (videoTracks.length > 0) {
-      videoTracks.forEach((t) => { try { t.enabled = true; } catch (e) {} });
-
-      if (!remoteVideoStreamRef.current) {
-        remoteVideoStreamRef.current = new MediaStream();
-      }
-      videoTracks.forEach((t) => {
-        if (!remoteVideoStreamRef.current.getTracks().some((cur) => cur.id === t.id)) {
-          remoteVideoStreamRef.current.addTrack(t);
+      // Native Audio Player Fallback
+      try {
+        if (!window.__vensto_audio_player) {
+          window.__vensto_audio_player = new Audio();
+          window.__vensto_audio_player.autoplay = true;
+          window.__vensto_audio_player.playsInline = true;
         }
-      });
+        window.__vensto_audio_player.srcObject = freshAudioStream;
+        window.__vensto_audio_player.volume = 1.0;
+        window.__vensto_audio_player.muted = false;
+        window.__vensto_audio_player.play().then(() => setIsAudioMutedByBrowser(false)).catch(() => {});
+      } catch(e) {}
+    } else if (event.track?.kind === "video") {
+      const videoTrack = event.track;
+      try { videoTrack.enabled = true; } catch(e) {}
+
+      const freshVideoStream = new MediaStream([videoTrack]);
+      remoteVideoStreamRef.current = freshVideoStream;
 
       if (remoteVideoRef.current) {
-        if (remoteVideoRef.current.srcObject !== remoteVideoStreamRef.current) {
-          remoteVideoRef.current.srcObject = remoteVideoStreamRef.current;
-        }
-        remoteVideoRef.current.muted = true; // Video element NEVER mutes or touches audio
+        remoteVideoRef.current.srcObject = freshVideoStream;
+        remoteVideoRef.current.muted = true; // Video element NEVER carries audio
         const vp = remoteVideoRef.current.play();
-        if (vp !== undefined) {
-          vp.catch(() => {});
-        }
+        if (vp !== undefined) vp.catch(() => {});
       }
     }
 
@@ -1024,6 +1011,16 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       remoteAudioRef.current.muted = false;
       try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
     }
+    try {
+      if (!window.__vensto_audio_player) {
+        window.__vensto_audio_player = new Audio();
+        window.__vensto_audio_player.autoplay = true;
+        window.__vensto_audio_player.playsInline = true;
+      }
+      window.__vensto_audio_player.volume = 1.0;
+      window.__vensto_audio_player.muted = false;
+      window.__vensto_audio_player.play().catch(() => {});
+    } catch (e) {}
 
     // 1. Acquire Local Microphone & Optional Camera
     let localStream = null;
@@ -1224,6 +1221,16 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       remoteAudioRef.current.muted = false;
       try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
     }
+    try {
+      if (!window.__vensto_audio_player) {
+        window.__vensto_audio_player = new Audio();
+        window.__vensto_audio_player.autoplay = true;
+        window.__vensto_audio_player.playsInline = true;
+      }
+      window.__vensto_audio_player.volume = 1.0;
+      window.__vensto_audio_player.muted = false;
+      window.__vensto_audio_player.play().catch(() => {});
+    } catch (e) {}
 
     setActiveCall({
       id: callToAccept.call_id,

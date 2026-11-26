@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
     DEBUG: bool = os.getenv("DEBUG", "True").lower() in ("true", "1", "t")
-    WEBAPP_URL: str = os.getenv("WEBAPP_URL", "https://marijuana-hawk-breakdown-characterized.trycloudflare.com/app")
+    WEBAPP_URL: str = os.getenv("WEBAPP_URL", "https://venstogram.onrender.com/app")
     
     STREAMER_SPLIT_PERCENT: int = int(os.getenv("STREAMER_SPLIT_PERCENT", "40"))
     PLATFORM_SPLIT_PERCENT: int = int(os.getenv("PLATFORM_SPLIT_PERCENT", "60"))
