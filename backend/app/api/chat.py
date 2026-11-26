@@ -228,44 +228,7 @@ async def start_call(
     if not recipient:
         raise HTTPException(status_code=404, detail="Собеседник не найден")
 
-    # Protection: Nobody can call the Founder/Director, but Founder can call anyone!
-    is_recipient_founder = (
-        recipient.role == "director" or
-        recipient.telegram_id in settings.ADMIN_TELEGRAM_IDS or
-        (recipient.username and recipient.username.lower() in ["sherzodbek", "venstogram", "admin"])
-    )
-    is_caller_founder = (
-        current_user.role == "director" or
-        current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS or
-        (current_user.username and current_user.username.lower() in ["sherzodbek", "venstogram", "admin"])
-    )
-
-    if is_recipient_founder and not is_caller_founder:
-        raise HTTPException(
-            status_code=403,
-            detail="Основатель платформы принимает звонки только по личному приглашению. Вы можете отправить текстовое сообщение в личные сообщения."
-        )
-
-    # Privacy check for regular users & bloggers (Founder is completely unrestricted!)
-    if not is_caller_founder:
-        recipient_allow = getattr(recipient, "allow_calls", "all") or "all"
-        if recipient_allow == "none":
-            raise HTTPException(
-                status_code=403,
-                detail=f"Пользователь @{recipient.username} отключил(а) входящие звонки в настройках приватности."
-            )
-        elif recipient_allow == "followers":
-            from app.models.entities import Follow
-            f_res = await db.execute(
-                select(Follow.id).where(Follow.follower_id == recipient.id, Follow.following_id == current_user.id)
-            )
-            if not f_res.scalars().first():
-                raise HTTPException(
-                    status_code=403,
-                    detail=f"Пользователь @{recipient.username} принимает звонки только от взаимных подписок."
-                )
-
-    # Create new call session in ringing state
+    # Create new call session in ringing state (open to all users)
     call = CallSession(
         caller_id=current_user.id,
         receiver_id=recipient.id,
