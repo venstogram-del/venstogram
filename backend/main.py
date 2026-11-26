@@ -27,41 +27,53 @@ keepalive_task: asyncio.Task = None
 async def anti_sleep_keepalive():
     """
     Continuous background self-ping loop that keeps Render awake 24/7.
-    Sends external HTTPS requests to https://venstogram.onrender.com every 4 minutes.
+    Sends external HTTPS and local HTTP requests every 150 seconds to prevent cold sleep.
     """
     import urllib.request
+    import ssl
     
     # Initial wait after container starts
-    await asyncio.sleep(25)
+    await asyncio.sleep(15)
     
-    urls_to_ping = [
-        "https://venstogram.onrender.com/health",
-        "https://venstogram.onrender.com/api/ping"
-    ]
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
     
     while True:
         try:
+            port = os.getenv("PORT", "8000")
+            urls = [
+                f"http://127.0.0.1:{port}/health",
+                f"http://localhost:{port}/health",
+                "https://venstogram.onrender.com/health",
+                "https://venstogram.onrender.com/api/ping"
+            ]
+            webapp_url = os.getenv("WEBAPP_URL", "")
+            if webapp_url and webapp_url.startswith("http"):
+                clean_base = webapp_url.rstrip("/").replace("/app", "")
+                urls.append(f"{clean_base}/health")
+            
             loop = asyncio.get_running_loop()
-            for url in urls_to_ping:
+            for u in set(urls):
                 try:
-                    def _do_ping(u):
+                    def _do_ping(url_str):
                         req = urllib.request.Request(
-                            u,
-                            headers={"User-Agent": "Venstogram-AntiSleep-KeepAlive/1.0"}
+                            url_str,
+                            headers={"User-Agent": "Venstogram-247-AlwaysAlive/2.0"}
                         )
-                        with urllib.request.urlopen(req, timeout=12) as resp:
+                        with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
                             return resp.status
-                    status = await loop.run_in_executor(None, _do_ping, url)
+                    status = await loop.run_in_executor(None, _do_ping, u)
                     if settings.DEBUG:
-                        print(f"[Anti-Sleep] KeepAlive ping to {url} -> {status}")
+                        print(f"[Anti-Sleep] KeepAlive ping to {u} -> {status}")
                 except Exception:
                     pass
         except Exception as err:
             if settings.DEBUG:
                 print(f"[Anti-Sleep Error] {err}")
         
-        # Ping every 240 seconds (4 minutes). Render's sleep timeout is 15 minutes.
-        await asyncio.sleep(240)
+        # Ping every 150 seconds (2.5 minutes). Render free tier sleeps after 15 minutes of inactivity.
+        await asyncio.sleep(150)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

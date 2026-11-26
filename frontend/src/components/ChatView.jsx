@@ -53,6 +53,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
   const audioGainNodeRef = useRef(null);
   const [cameraFacing, setCameraFacing] = useState("user");
   const [isCameraOff, setIsCameraOff] = useState(false);
+  const [isAudioMutedByBrowser, setIsAudioMutedByBrowser] = useState(false);
 
   // Real Audio Recording & Playback Refs
   const mediaRecorderRef = useRef(null);
@@ -98,10 +99,13 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
       { urls: "stun:stun2.l.google.com:19302" },
-      { urls: "stun:stun3.l.google.com:19302" },
-      { urls: "stun:stun4.l.google.com:19302" },
-      { urls: "stun:stun.cloudflare.com:3478" }
+      { urls: "stun:openrelay.metered.ca:80" },
+      { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
     ],
+    bundlePolicy: "max-bundle",
+    rtcpMuxPolicy: "require",
     iceCandidatePoolSize: 10
   };
 
@@ -169,6 +173,25 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     queuedRemoteOfferRef.current = null;
   };
 
+  const unmuteAllAudio = () => {
+    try { triggerHaptic("light"); } catch(e) {}
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = false;
+      remoteAudioRef.current.volume = 1.0;
+      try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.muted = false;
+      remoteVideoRef.current.volume = 1.0;
+      try { remoteVideoRef.current.play().catch(() => {}); } catch (e) {}
+    }
+    try {
+      const ctx = getAudioContext();
+      if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+    } catch (e) {}
+    setIsAudioMutedByBrowser(false);
+  };
+
   const routeRemoteAudio = (stream) => {
     if (!stream) return;
     const audioTracks = stream.getAudioTracks();
@@ -186,13 +209,37 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       }
       remoteAudioRef.current.volume = 1.0;
       remoteAudioRef.current.muted = false;
-      try {
-        const ap = remoteAudioRef.current.play();
-        if (ap !== undefined) ap.catch(() => {});
-      } catch (e) {}
+      const ap = remoteAudioRef.current.play();
+      if (ap !== undefined) {
+        ap.then(() => {
+          setIsAudioMutedByBrowser(false);
+        }).catch((err) => {
+          console.warn("[remoteAudio autoplay note]", err);
+          setIsAudioMutedByBrowser(true);
+        });
+      }
     }
 
-    // 3. Web Audio API pipeline (Unlocks direct hardware speaker in WebViews & mobile)
+    // 3. Play audio through <video> element as well
+    if (remoteVideoRef.current) {
+      if (remoteVideoRef.current.srcObject !== stream) {
+        remoteVideoRef.current.srcObject = stream;
+      }
+      remoteVideoRef.current.volume = 1.0;
+      remoteVideoRef.current.muted = false;
+      const vp = remoteVideoRef.current.play();
+      if (vp !== undefined) {
+        vp.catch(() => {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.muted = true;
+            remoteVideoRef.current.play().catch(() => {});
+          }
+          setIsAudioMutedByBrowser(true);
+        });
+      }
+    }
+
+    // 4. Web Audio API pipeline
     try {
       const ctx = getAudioContext();
       if (ctx) {
@@ -202,17 +249,14 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         if (!audioContextSourceRef.current) {
           const source = ctx.createMediaStreamSource(stream);
           const gain = ctx.createGain();
-          gain.gain.value = 1.35; // Amplification for crystal clear & loud voice
+          gain.gain.value = 1.4; // Amplification for loud & clear voice
           source.connect(gain);
           gain.connect(ctx.destination);
           audioContextSourceRef.current = source;
           audioGainNodeRef.current = gain;
-          console.log("[routeRemoteAudio] Connected to Web Audio speaker output");
         }
       }
-    } catch (err) {
-      console.warn("[routeRemoteAudio Web Audio note]", err);
-    }
+    } catch (err) {}
   };
 
   const attachRemoteTrack = (event) => {
@@ -243,19 +287,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     targetStream.getAudioTracks().forEach((t) => { try { t.enabled = true; } catch (e) {} });
     targetStream.getVideoTracks().forEach((t) => { try { t.enabled = true; } catch (e) {} });
 
-    // Video display: MUST be muted={true} so mobile browsers never block video or silence audio devices!
-    if (remoteVideoRef.current) {
-      if (remoteVideoRef.current.srcObject !== targetStream) {
-        remoteVideoRef.current.srcObject = targetStream;
-      }
-      remoteVideoRef.current.muted = true;
-      try {
-        const vp = remoteVideoRef.current.play();
-        if (vp !== undefined) vp.catch(() => {});
-      } catch (e) {}
-    }
-
-    // Audio: route through Web Audio API + Audio element
+    // Route audio and attach video
     routeRemoteAudio(targetStream);
 
     setActiveCall((prev) => (prev ? { ...prev, isConnected: true } : null));
@@ -498,12 +530,12 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     if (activeCall?.isConnected && remoteStreamRef.current) {
       const stream = remoteStreamRef.current;
 
-      // 1. Remote Video Playback (Muted so browser never blocks video stream)
+      // 1. Remote Video Playback
       if (remoteVideoRef.current) {
         if (remoteVideoRef.current.srcObject !== stream) {
           remoteVideoRef.current.srcObject = stream;
         }
-        remoteVideoRef.current.muted = true;
+        remoteVideoRef.current.volume = 1.0;
         try {
           const p = remoteVideoRef.current.play();
           if (p !== undefined) p.catch(() => {});
@@ -942,7 +974,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     let localStream = null;
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true },
         video: isVideo ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false
       });
     } catch (advErr) {
@@ -1141,7 +1173,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     let localStream = null;
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true },
         video: isVideo ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false
       });
     } catch (advErr) {
@@ -1751,7 +1783,8 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         }}
         autoPlay
         playsInline
-        style={{ position: "fixed", top: "-100px", left: "-100px", width: "10px", height: "10px", pointerEvents: "none" }}
+        className="w-1 h-1 opacity-1 absolute pointer-events-none"
+        style={{ zIndex: 1, left: "0px", bottom: "0px" }}
       />
 
       {/* Floating Picture-in-Picture (PIP) Call Widget when Minimized */}
@@ -1818,9 +1851,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         <div
           onClick={() => {
             // Screen tap: guarantees user activation for audio
-            if (remoteStreamRef.current) {
-              routeRemoteAudio(remoteStreamRef.current);
-            }
+            unmuteAllAudio();
           }}
           className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between overflow-hidden animate-in fade-in select-none"
         >
@@ -1861,15 +1892,27 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                     remoteVideoRef.current = el;
                     if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) {
                       el.srcObject = remoteStreamRef.current;
-                      el.muted = true;
+                      el.volume = 1.0;
+                      el.muted = false;
                       try { el.play().catch(() => {}); } catch(e) {}
                     }
                   }}
                   autoPlay
                   playsInline
-                  muted
                   className="w-full h-full object-cover"
                 />
+                {isAudioMutedByBrowser && (
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      unmuteAllAudio();
+                    }}
+                    className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 text-white px-5 py-2.5 rounded-full shadow-2xl font-bold text-xs flex items-center space-x-2 animate-bounce cursor-pointer border-2 border-white/80 active:scale-95 transition-transform"
+                  >
+                    <span className="text-base animate-pulse">🔊</span>
+                    <span>Нажмите сюда, чтобы включить звук</span>
+                  </div>
+                )}
                 {!remoteStreamRef.current && (
                   <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center space-y-3 p-6 text-center">
                     {activeCall?.partner?.avatar_url && !activeCall.partner.avatar_url.includes("unsplash") ? (
@@ -1987,10 +2030,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    triggerHaptic("medium");
-                    if (remoteStreamRef.current) {
-                      routeRemoteAudio(remoteStreamRef.current);
-                    }
+                    unmuteAllAudio();
                   }}
                   className="p-4 rounded-full text-xl shadow-xl bg-slate-800/90 text-white border border-slate-700 active:scale-90"
                   title="Громкая связь / динамик"
