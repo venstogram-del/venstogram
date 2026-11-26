@@ -25,6 +25,7 @@ import { EmailAuthModal } from "./components/EmailAuthModal.jsx";
 export function App() {
   const safeGetItem = (k) => { try { return localStorage.getItem(k); } catch(e) { return null; } };
   const safeSetItem = (k, v) => { try { localStorage.setItem(k, v); } catch(e) {} };
+  const safeRemoveItem = (k) => { try { localStorage.removeItem(k); } catch(e) {} };
 
   const [lang, setLang] = useState(getInitialLanguage());
   const t = translations[lang] || translations.ru;
@@ -255,82 +256,72 @@ export function App() {
   // Move authenticateUser declaration before useEffect so it is never accessed before initialization
   const authenticateUser = async () => {
     try {
-      const initData = window.Telegram?.WebApp?.initData;
-      const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user || null;
-      let authResult = null;
+      let activeSessionUser = null;
 
-      if (initData) {
+      // 1. First prioritize saved session JWT token from localStorage
+      const savedToken = safeGetItem("vensto_token");
+      if (savedToken) {
         try {
-          authResult = await Api.post("/auth/telegram", { init_data: initData });
-        } catch (e) {
-          console.warn("Telegram auth API failed, using fallback:", e);
-        }
-      }
-
-      if (!authResult || !authResult.user) {
-        // Fallback for browser preview / local dev or initData mismatch
-        const targetTgId = tgUser?.id || 1477103854;
-        const targetUsername = tgUser?.username || "oqyolai";
-        const targetFirstName = tgUser?.first_name || "Admin";
-
-        try {
-          authResult = await Api.post("/auth/dev-login", {
-            telegram_id: targetTgId,
-            username: targetUsername,
-            first_name: targetFirstName,
-            last_name: tgUser?.last_name || ""
-          });
-        } catch (e) {
-          console.error("dev-login failed", e);
-        }
-      }
-
-      if (authResult && authResult.user) {
-        Api.setToken(authResult.access_token);
-        setUser(authResult.user);
-        try {
-          if (!window.__vensto_socket) {
-            new RealtimeSocket(authResult.access_token);
+          Api.setToken(savedToken);
+          const me = await Api.get("/auth/me");
+          if (me && me.id) {
+            activeSessionUser = me;
+            try {
+              if (!window.__vensto_socket) {
+                new RealtimeSocket(savedToken);
+              }
+            } catch (wsErr) {}
           }
-        } catch (wsErr) {
-          console.warn("[App WS Error]", wsErr);
+        } catch (meErr) {
+          console.warn("[Session token invalid or expired, re-authenticating]", meErr);
+          safeRemoveItem("vensto_token");
+          Api.setToken("");
         }
-      } else {
-        // Safe ultimate fallback user so app never stays blank
-        setUser({
-          id: 1,
-          telegram_id: tgUser?.id || 1477103854,
-          username: tgUser?.username || "oqyolai",
-          first_name: tgUser?.first_name || "Vensto",
-          last_name: tgUser?.last_name || "Director",
-          role: "director",
-          wallet_coins: 100000,
-          is_verified: true
-        });
       }
 
-      // Check if registration / account creation onboarding is needed
-      const currentResolvedUser = authResult?.user || {
-        id: tgUser?.id || 1,
-        username: tgUser?.username || "user",
-        first_name: tgUser?.first_name || "User",
-        role: "user"
-      };
-      const isDirector = currentResolvedUser?.role === "director" || currentResolvedUser?.telegram_id === 1477103854;
-      const resolvedUserId = currentResolvedUser?.id || 1;
-      const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`) === "true";
-      const hasProfile = Boolean(
-        currentResolvedUser?.birth_year &&
-        currentResolvedUser?.first_name &&
-        currentResolvedUser?.username &&
-        typeof currentResolvedUser.username === "string" &&
-        !currentResolvedUser.username.startsWith("user_")
-      );
+      // 2. Try Telegram WebApp initData HMAC authentication if no saved token session
+      if (!activeSessionUser) {
+        const initData = window.Telegram?.WebApp?.initData;
+        if (initData) {
+          try {
+            const authResult = await Api.post("/auth/telegram", { init_data: initData });
+            if (authResult && authResult.user) {
+              Api.setToken(authResult.access_token);
+              safeSetItem("vensto_token", authResult.access_token);
+              activeSessionUser = authResult.user;
+              try {
+                if (!window.__vensto_socket) {
+                  new RealtimeSocket(authResult.access_token);
+                }
+              } catch (wsErr) {
+                console.warn("[App WS Error]", wsErr);
+              }
+            }
+          } catch (e) {
+            console.warn("Telegram auth API failed:", e);
+          }
+        }
+      }
 
-      if (isDirector || hasCreated || hasProfile) {
-        setIsRegistered(true);
+      // 3. Handle resolution
+      if (activeSessionUser) {
+        setUser(activeSessionUser);
+        const isDirector = activeSessionUser.role === "director" || activeSessionUser.telegram_id === 1477103854;
+        const resolvedUserId = activeSessionUser.id || 1;
+        const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`) === "true";
+        const hasProfile = Boolean(
+          activeSessionUser.birth_year &&
+          activeSessionUser.first_name &&
+          activeSessionUser.username &&
+          typeof activeSessionUser.username === "string" &&
+          !activeSessionUser.username.startsWith("user_")
+        );
+        setIsRegistered(isDirector || hasCreated || hasProfile || Boolean(activeSessionUser.is_registered));
       } else {
+        // NEVER default to Director/Admin account! Open Email/Username login modal
+        setUser(null);
         setIsRegistered(false);
+        setEmailAuthOpen(true);
       }
 
       // Check deep link parameters
@@ -361,7 +352,10 @@ export function App() {
         }
       } catch (e) {}
     } catch (err) {
-      console.error("[Auth Error]", err);
+      console.error("[authenticateUser fatal error]", err);
+      setUser(null);
+      setIsRegistered(false);
+      setEmailAuthOpen(true);
     } finally {
       setLoading(false);
     }

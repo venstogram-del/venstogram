@@ -1056,5 +1056,125 @@ async def reject_coin_order(
     return {"status": "ok", "order_id": order.id, "message": f"Заявка #{order.id} отклонена"}
 
 
+# ─────────── ALL REGISTERED USERS (for admin panel) ───────────
+
+@router.get("/users/all")
+async def get_all_users(
+    limit: int = 100,
+    offset: int = 0,
+    q: str = "",
+    admin_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Return all registered users for the admin panel user database."""
+    query = select(User).order_by(desc(User.created_at)).offset(offset).limit(limit)
+    if q:
+        q_like = f"%{q}%"
+        query = query.where(
+            or_(
+                User.username.ilike(q_like),
+                User.first_name.ilike(q_like),
+                User.last_name.ilike(q_like),
+                User.email.ilike(q_like)
+            )
+        )
+    res = await db.execute(query)
+    users = res.scalars().all()
+    total = (await db.execute(select(func.count(User.id)))).scalar() or 0
+    return {
+        "total": total,
+        "users": [
+            {
+                "id": u.id,
+                "telegram_id": u.telegram_id,
+                "username": u.username,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "email": u.email,
+                "role": u.role,
+                "is_verified": u.is_verified,
+                "is_registered": bool(u.is_registered or u.birth_year or (u.username and not u.username.startswith("user_"))),
+                "is_banned": getattr(u, "is_banned", False),
+                "wallet_coins": u.wallet_coins,
+                "created_at": u.created_at.isoformat() if u.created_at else None,
+                "last_active": u.last_active.isoformat() if u.last_active else None,
+                "avatar_url": u.avatar_url
+            }
+            for u in users
+        ]
+    }
+
+
+@router.post("/users/{user_id}/promote")
+async def promote_user_to_admin(
+    user_id: int,
+    req: dict = {},
+    admin_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Promote a user to admin/moderator role. Only director can do this."""
+    if admin_user.role != "director" and admin_user.telegram_id not in [1477103854, 8787674425]:
+        raise HTTPException(status_code=403, detail="Только Директор может назначать администраторов")
+
+    res = await db.execute(select(User).where(User.id == user_id))
+    target = res.scalars().first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    new_role = req.get("role", "admin")
+    if new_role not in ("admin", "moderator", "user", "director"):
+        new_role = "admin"
+
+    old_role = target.role
+    target.role = new_role
+    if new_role in ("admin", "director"):
+        target.is_verified = True
+
+    audit = AdminAuditLog(
+        admin_id=admin_user.id,
+        action=f"promote_user_to_{new_role}",
+        details={"user_id": user_id, "old_role": old_role, "new_role": new_role, "username": target.username}
+    )
+    db.add(audit)
+    await db.commit()
+
+    return {
+        "status": "ok",
+        "user_id": user_id,
+        "username": target.username,
+        "new_role": new_role,
+        "message": f"Пользователь @{target.username} назначен {new_role}"
+    }
+
+
+@router.post("/users/{user_id}/ban")
+async def ban_user_admin(
+    user_id: int,
+    req: dict = {},
+    admin_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Ban or unban a user."""
+    res = await db.execute(select(User).where(User.id == user_id))
+    target = res.scalars().first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    new_ban_state = not bool(getattr(target, "is_banned", False))
+    target.is_banned = new_ban_state
+    if new_ban_state:
+        target.ban_reason = req.get("reason", "Нарушение правил платформы")
+
+    audit = AdminAuditLog(
+        admin_id=admin_user.id,
+        action="ban_user" if new_ban_state else "unban_user",
+        details={"user_id": user_id, "username": target.username}
+    )
+    db.add(audit)
+    await db.commit()
+    action_text = "заблокирован" if new_ban_state else "разблокирован"
+    return {"status": "ok", "is_banned": new_ban_state, "message": f"Пользователь @{target.username} {action_text}"}
+
+
 
 

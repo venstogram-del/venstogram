@@ -151,6 +151,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     return () => clearInterval(interval);
   }, [activePartner]);
 
+  // ICE servers — STUN (free) + TURN relay via a.relay.metered.ca (confirmed reachable)
   const RTC_CONFIG = {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
@@ -160,32 +161,22 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       { urls: "stun:stun4.l.google.com:19302" },
       { urls: "stun:stun.cloudflare.com:3478" },
       { urls: "stun:global.stun.twilio.com:3478" },
-      { urls: "stun:standard.relay.metered.ca:80" },
-      { urls: "turn:standard.relay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-      { urls: "turn:standard.relay.metered.ca:80?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+      { urls: "stun:a.relay.metered.ca:80" },
+      // TURN relay — a.relay.metered.ca confirmed reachable (port 80 and 443)
+      { urls: "turn:a.relay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:a.relay.metered.ca:80?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:a.relay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:a.relay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
     ],
     bundlePolicy: "max-bundle",
     rtcpMuxPolicy: "require",
-    iceCandidatePoolSize: 10
+    iceCandidatePoolSize: 10,
+    iceTransportPolicy: "all"
   };
 
   const enhanceSdpForOpus = (sdp) => {
-    if (!sdp || typeof sdp !== "string") return sdp;
-    try {
-      const opusMatch = sdp.match(/a=rtpmap:(\d+)\s+opus\/48000\/2/i);
-      const pt = opusMatch ? opusMatch[1] : "111";
-      let newSdp = sdp;
-      const fmtpRegex = new RegExp(`a=fmtp:${pt}\\s+[^\\r\\n]*`, "i");
-      if (fmtpRegex.test(newSdp)) {
-        newSdp = newSdp.replace(fmtpRegex, `a=fmtp:${pt} minptime=10;useinbandfec=1;maxaveragebitrate=64000`);
-      } else {
-        const rtpmapRegex = new RegExp(`(a=rtpmap:${pt}\\s+opus\/48000\/2[\\r\\n]+)`, "i");
-        newSdp = newSdp.replace(rtpmapRegex, `$1a=fmtp:${pt} minptime=10;useinbandfec=1;maxaveragebitrate=64000\r\n`);
-      }
-      return newSdp;
-    } catch (e) {
-      return sdp;
-    }
+    // Keep native SDP intact so Chrome, Safari, and WebKit negotiate standard Opus without negotiation error
+    return sdp;
   };
 
   const sendCallSignal = async (signalType, payload, targetUserId, callId) => {
@@ -292,35 +283,39 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       try { navigator.audioSession.type = "play-and-record"; } catch (e) {}
     }
 
-    // 1. Resume Web Audio API Context
+    // 1. Resume Web Audio API Context for monitors
     try {
       if (window.__vensto_audio_ctx && window.__vensto_audio_ctx.state === "suspended") {
         window.__vensto_audio_ctx.resume().catch(() => {});
       }
     } catch (e) {}
 
-    // 2. Dedicated Audio Tag Playback
-    if (remoteAudioStreamRef.current && remoteAudioRef.current) {
-      remoteAudioRef.current.srcObject = remoteAudioStreamRef.current;
-      remoteAudioRef.current.muted = false;
-      remoteAudioRef.current.volume = 1.0;
-      try {
-        const ap = remoteAudioRef.current.play();
-        if (ap !== undefined) {
-          ap.then(() => setIsAudioMutedByBrowser(false))
-            .catch(() => setIsAudioMutedByBrowser(true));
+    // 2. Play remote audio via dedicated audio element
+    const stream = remoteAudioStreamRef.current;
+    if (stream) {
+      const audioEl = remoteAudioRef.current;
+      if (audioEl) {
+        if (audioEl.srcObject !== stream) {
+          audioEl.srcObject = stream;
         }
-      } catch (e) {}
-    }
-    // 3. Native JS Audio Player Fallback
-    try {
-      if (window.__vensto_audio_player && remoteAudioStreamRef.current) {
-        window.__vensto_audio_player.srcObject = remoteAudioStreamRef.current;
-        window.__vensto_audio_player.volume = 1.0;
-        window.__vensto_audio_player.muted = false;
-        window.__vensto_audio_player.play().catch(() => {});
+        audioEl.muted = false;
+        audioEl.volume = 1.0;
+        try {
+          const ap = audioEl.play();
+          if (ap !== undefined) {
+            ap.then(() => setIsAudioMutedByBrowser(false))
+              .catch(() => setIsAudioMutedByBrowser(true));
+          }
+        } catch (e) {}
+      } else if (window.__vensto_audio_player) {
+        try {
+          window.__vensto_audio_player.srcObject = stream;
+          window.__vensto_audio_player.volume = 1.0;
+          window.__vensto_audio_player.muted = false;
+          window.__vensto_audio_player.play().catch(() => {});
+        } catch (e) {}
       }
-    } catch (e) {}
+    }
     setIsAudioMutedByBrowser(false);
   };
 
@@ -345,30 +340,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       const audioStream = incomingStream || new MediaStream([audioTrack]);
       remoteAudioStreamRef.current = audioStream;
 
-      // 1. Direct Web Audio API Hardware Route (Bypasses HTML autoplay blocks & muted tags)
-      try {
-        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtxClass) {
-          if (!window.__vensto_audio_ctx) {
-            window.__vensto_audio_ctx = new AudioCtxClass();
-          }
-          const ctx = window.__vensto_audio_ctx;
-          if (ctx.state === "suspended") {
-            ctx.resume().catch(() => {});
-          }
-          if (audioContextSourceRef.current) {
-            try { audioContextSourceRef.current.disconnect(); } catch (e) {}
-          }
-          const src = ctx.createMediaStreamSource(audioStream);
-          audioContextSourceRef.current = src;
-          src.connect(ctx.destination);
-          console.log("[WebRTC WebAudio] Audio routed directly to hardware output!");
-        }
-      } catch (webaudioErr) {
-        console.warn("[WebAudio routing failed]", webaudioErr);
-      }
-
-      // 2. Play via dedicated <audio> tag
+      // 1. Play via dedicated <audio> tag
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = audioStream;
         remoteAudioRef.current.volume = 1.0;
@@ -384,22 +356,22 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             });
           }
         } catch (e) {}
+      } else {
+        // Fallback to JS Audio player if audio tag not ready
+        try {
+          if (!window.__vensto_audio_player) {
+            window.__vensto_audio_player = new Audio();
+            window.__vensto_audio_player.autoplay = true;
+            window.__vensto_audio_player.playsInline = true;
+          }
+          window.__vensto_audio_player.srcObject = audioStream;
+          window.__vensto_audio_player.volume = 1.0;
+          window.__vensto_audio_player.muted = false;
+          window.__vensto_audio_player.play().then(() => setIsAudioMutedByBrowser(false)).catch(() => {});
+        } catch(e) {}
       }
 
-      // 3. Native Audio Player Fallback
-      try {
-        if (!window.__vensto_audio_player) {
-          window.__vensto_audio_player = new Audio();
-          window.__vensto_audio_player.autoplay = true;
-          window.__vensto_audio_player.playsInline = true;
-        }
-        window.__vensto_audio_player.srcObject = audioStream;
-        window.__vensto_audio_player.volume = 1.0;
-        window.__vensto_audio_player.muted = false;
-        window.__vensto_audio_player.play().then(() => setIsAudioMutedByBrowser(false)).catch(() => {});
-      } catch(e) {}
-
-      // 4. Start real-time remote audio volume monitoring
+      // 2. Start real-time remote audio volume monitoring (isolated analyser, no output feedback)
       if (remoteVolumeMonitorCleanupRef.current) {
         try { remoteVolumeMonitorCleanupRef.current(); } catch (e) {}
       }
@@ -432,24 +404,43 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       }
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
+      // Wait up to 3.5s for local microphone stream if it's currently being requested
+      let waitMs = 0;
+      while (!localStreamRef.current && waitMs < 3500) {
+        await new Promise((r) => setTimeout(r, 100));
+        waitMs += 100;
+      }
+
       // Bind callee local audio track directly into transceivers created by caller's offer
       const curStream = localStreamRef.current;
       if (curStream) {
+        curStream.getAudioTracks().forEach((track) => {
+          track.enabled = true;
+          try {
+            const senders = pc.getSenders();
+            const existing = senders.find((s) => s.track && s.track.kind === "audio");
+            if (existing) {
+              existing.replaceTrack(track);
+            } else {
+              pc.addTrack(track, curStream);
+            }
+          } catch (e) {}
+        });
+
         const transceivers = pc.getTransceivers();
-        const audioTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "audio");
-        const at = curStream.getAudioTracks()[0];
-        if (audioTransceiver && at) {
-          at.enabled = true;
-          try { await audioTransceiver.sender.replaceTrack(at); } catch (e) {}
-          audioTransceiver.direction = "sendrecv";
-        } else if (at) {
-          try { pc.addTrack(at, curStream); } catch (e) {}
-        }
+        transceivers.forEach((t) => {
+          if (t.receiver?.track?.kind === "audio") {
+            try { t.direction = "sendrecv"; } catch (e) {}
+          }
+        });
       }
 
       await flushQueuedCandidates(pc);
 
-      let answer = await pc.createAnswer();
+      let answer = await pc.createAnswer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: false
+      });
       answer.sdp = enhanceSdpForOpus(answer.sdp);
       await pc.setLocalDescription(answer);
       sendCallSignal("call_answer", answer, targetUserId, callId);
@@ -1357,6 +1348,18 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
     const pc = new RTCPeerConnection(RTC_CONFIG);
     peerConnectionRef.current = pc;
 
+    // Immediately add local audio tracks to peer connection
+    if (localStream) {
+      localStream.getAudioTracks().forEach((track) => {
+        track.enabled = true;
+        try {
+          pc.addTrack(track, localStream);
+        } catch (e) {
+          console.warn("[Callee addTrack error]", e);
+        }
+      });
+    }
+
     // Handle remote tracks
     pc.ontrack = attachRemoteTrack;
 
@@ -1936,7 +1939,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         }}
         autoPlay
         playsInline
-        style={{ position: "fixed", left: "-9999px", bottom: "-9999px", width: "10px", height: "10px" }}
+        style={{ position: "fixed", bottom: 0, left: 0, width: "1px", height: "1px", opacity: 0.01, pointerEvents: "none", zIndex: -1 }}
       />
 
       {/* Floating Call Widget when Minimized */}

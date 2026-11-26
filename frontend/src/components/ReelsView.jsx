@@ -525,7 +525,7 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
                 <span>🔗</span>
                 <span>{t?.copyLink || "Ссылка"}</span>
               </button>
-              {(currentReel.author?.id === user?.id || currentReel.user_id === user?.id || user?.role === "director") && (
+              {(Boolean(user?.id && (currentReel.user_id === user.id || currentReel.author?.id === user.id)) || user?.role === "director" || user?.telegram_id === 1477103854) && (
                 <button
                   onClick={() => {
                     setShowReelOptionsMenu(false);

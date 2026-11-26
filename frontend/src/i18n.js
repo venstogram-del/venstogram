@@ -408,12 +408,15 @@ export const translations = {
   }
 };
 
+// Aliases for seamless locale resolution
+translations.uz = translations.uz_latn;
+
 export function getInitialLanguage() {
   let saved = null;
   try {
     saved = localStorage.getItem("vensto_lang");
   } catch (e) {}
-  if (saved && translations[saved]) return saved;
+  if (saved && (translations[saved] || saved === "uz")) return saved === "uz" ? "uz_latn" : saved;
 
   const tgLang = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code;
   if (tgLang) {

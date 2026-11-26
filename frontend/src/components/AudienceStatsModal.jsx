@@ -4,10 +4,10 @@ import { triggerHaptic } from "../telegram.js";
 export function AudienceStatsModal({ post, onClose }) {
   if (!post) return null;
 
-  const views = post.views_count || post.views || 1240;
-  const likes = post.likes_count || post.likes || 180;
-  const comments = post.comments_count || post.comments || 12;
-  const uniqueReach = Math.round(views * 0.78);
+  const views = Number(post.views_count ?? post.views ?? 0);
+  const likes = Number(post.likes_count ?? post.likes ?? 0);
+  const comments = Number(post.comments_count ?? post.comments ?? 0);
+  const uniqueReach = views;
 
   const ageData = [
     { range: "18 – 24 yosh", pct: 48, count: Math.round(uniqueReach * 0.48) },

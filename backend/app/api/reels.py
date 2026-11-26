@@ -61,7 +61,7 @@ async def get_reels(
 
     output = []
     for r in reels:
-        r.views_count += 1
+        # Do NOT auto-increment views on every feed fetch
         output.append({
             "id": r.id,
             "video_url": r.video_url,
@@ -315,8 +315,8 @@ async def delete_reel(
     """
     Deletes a Reel (or Post). Allowed for Reel author or Director/Moderator/Admin.
     """
-    is_admin = (
-        current_user.role in ("director", "moderator", "admin", "it_admin", "developer") or
+    is_director = (
+        current_user.role == "director" or
         current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS
     )
 
@@ -330,8 +330,8 @@ async def delete_reel(
         if not post:
             raise HTTPException(status_code=404, detail="Reel не найден")
 
-        if post.user_id != current_user.id and not is_admin:
-            raise HTTPException(status_code=403, detail="Вы можете удалять только свои публикации")
+        if post.user_id != current_user.id and not is_director:
+            raise HTTPException(status_code=403, detail="Вы можете удалять только свои собственные публикации")
 
         await db.execute(delete(PostComment).where(PostComment.post_id == post.id))
         await db.execute(delete(PostLike).where(PostLike.post_id == post.id))
@@ -341,8 +341,8 @@ async def delete_reel(
         await db.commit()
         return {"status": "ok", "message": "Публикация успешно удалена", "deleted_id": reel_id}
 
-    if reel.user_id != current_user.id and not is_admin:
-        raise HTTPException(status_code=403, detail="Вы можете удалять только свои Reels")
+    if reel.user_id != current_user.id and not is_director:
+        raise HTTPException(status_code=403, detail="Вы можете удалять только свои собственные Reels")
 
     # Also clean up any Post created with this video URL
     if reel.video_url:

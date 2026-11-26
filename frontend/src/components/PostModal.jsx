@@ -234,7 +234,7 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
           </div>
 
           <div className="flex items-center space-x-2">
-            {(currentPost.author?.id === currentUser?.id || currentPost.user_id === currentUser?.id || (currentPost.author?.username && currentUser?.username && currentPost.author.username === currentUser.username) || currentUser?.role === "director" || currentUser?.role === "moderator" || currentUser?.role === "admin") && (
+            {(Boolean(currentUser?.id && (currentPost.user_id === currentUser.id || currentPost.author?.id === currentUser.id)) || currentUser?.role === "director" || currentUser?.telegram_id === 1477103854) && (
               <button
                 onClick={handleDeletePost}
                 disabled={deleting}

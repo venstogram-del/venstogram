@@ -37,11 +37,20 @@ async def check_username(
     if cleaned.startswith("@"):
         cleaned = cleaned[1:]
 
-    if not re.match(r"^[a-zA-Z0-9_]{3,32}$", cleaned):
+    if cleaned.isdigit():
         return {
             "available": False,
             "username": cleaned,
-            "message": "Никнейм должен быть от 3 до 32 символов (латинские буквы, цифры и _)",
+            "message": "Числовые никнеймы (1, 2, 7...) эксклюзивны и доступны только на Маркетплейсе!",
+            "is_current": False,
+            "suggestions": []
+        }
+
+    if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]{2,31}$", cleaned):
+        return {
+            "available": False,
+            "username": cleaned,
+            "message": "Никнейм должен начинаться с буквы и содержать от 3 до 32 символов (латинские буквы, цифры и _)",
             "is_current": False,
             "suggestions": []
         }
@@ -134,10 +143,22 @@ async def search_users(
     """
     Search users by @username, first name, last name, or bio (Лупа / поиск друзей).
     """
+    from app.core.config import settings as _cfg
+    is_requester_admin = (current_user.role in ("admin", "director") or current_user.telegram_id in _cfg.ADMIN_TELEGRAM_IDS)
+    
+    # Only show verified registered users
+    reg_filter = or_(
+        User.is_registered == True,
+        User.birth_year != None,
+        and_(User.first_name != "", User.username != None, ~User.username.startswith("user_"))
+    )
     query = select(User).where(
         User.is_banned == False,
-        or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+        reg_filter
     )
+    if not is_requester_admin:
+        # Hide admin/director profiles from search results
+        query = query.where(~User.role.in_(["admin", "director"]), ~User.telegram_id.in_(_cfg.ADMIN_TELEGRAM_IDS))
     raw_q = q.strip()
     if raw_q:
         clean_q = raw_q.lower().lstrip("@")
@@ -199,6 +220,13 @@ async def get_user_public_profile(
     u = res.scalars().first()
     if not u or (u.telegram_id >= 9000000000 and not u.is_email_verified):
         raise HTTPException(status_code=404, detail="Profil topilmadi yoki tasdiqlanmagan / Пользователь не найден")
+
+    # Block regular users from viewing admin/director profiles
+    from app.core.config import settings as _settings
+    is_target_admin = (u.role in ("admin", "director") or u.telegram_id in _settings.ADMIN_TELEGRAM_IDS)
+    is_requester_admin = (current_user.role in ("admin", "director") or current_user.telegram_id in _settings.ADMIN_TELEGRAM_IDS)
+    if is_target_admin and not is_requester_admin and u.id != current_user.id:
+        raise HTTPException(status_code=403, detail="Этот профиль недоступен / Bu profil mavjud emas")
 
     posts_count = (await db.execute(select(func.count(Post.id)).where(Post.user_id == u.id))).scalar() or 0
     reels_count = (await db.execute(select(func.count(Reel.id)).where(Reel.user_id == u.id))).scalar() or 0
@@ -361,12 +389,28 @@ async def get_suggested_users(
         f_res = await db.execute(select(Follow.following_id).where(Follow.follower_id == cur_id))
         excluded_ids.update(f_res.scalars().all())
     
+    from app.core.config import settings as _cfg
+    is_req_admin = current_user and (current_user.role in ("admin", "director") or current_user.telegram_id in _cfg.ADMIN_TELEGRAM_IDS)
+
+    # Exclude admins/directors from public suggestions if viewer is regular user
+    admin_exclude = []
+    if not is_req_admin:
+        admin_res = await db.execute(select(User.id).where(or_(User.role.in_(["admin", "director"]), User.telegram_id.in_(_cfg.ADMIN_TELEGRAM_IDS))))
+        admin_exclude = admin_res.scalars().all()
+        excluded_ids.update(admin_exclude)
+
+    reg_filter = or_(
+        User.is_registered == True,
+        User.birth_year != None,
+        and_(User.first_name != "", User.username != None, ~User.username.startswith("user_"))
+    )
+
     stmt = (
         select(User)
         .where(
             User.id.notin_(list(excluded_ids) if excluded_ids else [0]),
             User.is_banned == False,
-            or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+            reg_filter
         )
         .order_by(User.is_verified.desc(), User.last_active.desc())
         .limit(limit)

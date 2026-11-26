@@ -279,7 +279,7 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
               </div>
 
             <div className="flex items-center space-x-1">
-              {(post.author?.id === user?.id || post.user_id === user?.id || user?.role === "director") && (
+              {(Boolean(user?.id && (post.user_id === user.id || post.author?.id === user.id)) || user?.role === "director" || user?.telegram_id === 1477103854) && (
                 <button
                   type="button"
                   onClick={(e) => {

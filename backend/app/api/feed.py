@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc, case, delete
+from sqlalchemy import select, desc, case, delete, func
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -65,8 +65,7 @@ async def get_feed(
 
     output = []
     for p in posts:
-        # Increment views
-        p.views_count += 1
+        # Do NOT increment views on feed list — views only counted on individual post open
         output.append({
             "id": p.id,
             "caption": p.caption,
@@ -269,6 +268,8 @@ async def add_post_comment(
     }
 
 
+_VIEWED_POSTS = set()
+
 @router.get("/{post_id}")
 async def get_single_post(
     post_id: int,
@@ -282,7 +283,18 @@ async def get_single_post(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    post.views_count += 1
+    # Only count unique views per user, and ensure views cannot exceed real registered user count
+    view_key = (post.id, current_user.id)
+    if view_key not in _VIEWED_POSTS:
+        _VIEWED_POSTS.add(view_key)
+        post.views_count += 1
+
+    # Cap views by real registered user count so numbers are 100% realistic
+    total_users_res = await db.execute(select(func.count(User.id)).where(User.is_banned == False))
+    total_users = total_users_res.scalar() or 1
+    if post.views_count > total_users:
+        post.views_count = total_users
+
     await db.commit()
 
     like_check = await db.execute(
@@ -382,8 +394,9 @@ async def delete_post(
     """
     Deletes a publication (or Reel). Allowed for the author of the post or Director/Moderator/Admin.
     """
-    is_admin = (
-        current_user.role in ("director", "moderator", "admin", "it_admin", "developer") or
+    # Only the actual author or official Director can delete
+    is_director = (
+        current_user.role == "director" or
         current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS
     )
 
@@ -398,8 +411,8 @@ async def delete_post(
         if not reel:
             raise HTTPException(status_code=404, detail="Публикация не найдена")
 
-        if reel.user_id != current_user.id and not is_admin:
-            raise HTTPException(status_code=403, detail="Вы можете удалять только свои публикации")
+        if reel.user_id != current_user.id and not is_director:
+            raise HTTPException(status_code=403, detail="Вы можете удалять только свои собственные публикации")
 
         await db.execute(delete(ReelComment).where(ReelComment.reel_id == reel.id))
         await db.execute(delete(ReelLike).where(ReelLike.reel_id == reel.id))
@@ -410,8 +423,8 @@ async def delete_post(
         return {"status": "ok", "message": "Публикация успешно удалена", "deleted_id": post_id}
 
     # Post found - check permission
-    if post.user_id != current_user.id and not is_admin:
-        raise HTTPException(status_code=403, detail="Вы можете удалять только свои публикации")
+    if post.user_id != current_user.id and not is_director:
+        raise HTTPException(status_code=403, detail="Вы можете удалять только свои собственные публикации")
 
     # Also clean up any Reel that was synced from this video post
     if post.media_urls:

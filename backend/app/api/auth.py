@@ -120,7 +120,14 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request, db: AsyncSes
 async def dev_login(req: DevAuthRequest, db: AsyncSession = Depends(get_db)):
     """
     Login endpoint for local development, web browser testing, and demo accounts.
+    Admin/Director IDs are strictly protected from dev-login.
     """
+    if req.telegram_id in settings.ADMIN_TELEGRAM_IDS or req.username == "oqyolai":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Вход под учётной записью Администратора через dev-login строго запрещён."
+        )
+
     res = await db.execute(select(User).where(User.telegram_id == req.telegram_id))
     user = res.scalars().first()
     if not user:
@@ -213,10 +220,16 @@ async def update_profile(
         if new_username.startswith("@"):
             new_username = new_username[1:]
 
-        if not re.match(r"^[a-zA-Z0-9_]{3,32}$", new_username):
+        if new_username.isdigit():
             raise HTTPException(
                 status_code=400,
-                detail="Никнейм может содержать только латинские буквы, цифры и символ подчеркивания _ (от 3 до 32 символов)."
+                detail="Числовые никнеймы (1, 2, 3...) эксклюзивны и доступны только для покупки на Маркетплейсе!"
+            )
+
+        if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]{2,31}$", new_username):
+            raise HTTPException(
+                status_code=400,
+                detail="Никнейм должен начинаться с буквы и содержать от 3 до 32 символов (латинские буквы, цифры и _)."
             )
 
         if is_sacred_username(new_username):
@@ -639,10 +652,15 @@ async def login_email(req: EmailLoginRequest, db: AsyncSession = Depends(get_db)
     Login with Email or Username and Password.
     Allows login from any device or phone with either email or @username.
     """
-    clean_login = req.email.lower().strip().replace("@", "")
+    raw_login = req.email.strip().lower()
+    clean_username = raw_login.lstrip("@")
     res = await db.execute(
         select(User).where(
-            or_(func.lower(User.email) == clean_login, func.lower(User.username) == clean_login)
+            or_(
+                func.lower(User.email) == raw_login,
+                func.lower(User.username) == clean_username,
+                func.lower(User.username) == raw_login
+            )
         )
     )
     user = res.scalars().first()

@@ -32,7 +32,7 @@ export function Header({
   };
 
   const getLangLabel = (code) => {
-    if (code === "uz_latn") return "UZ";
+    if (code === "uz_latn" || code === "uz") return "UZ";
     if (code === "en") return "EN";
     return "RU";
   };
@@ -58,7 +58,7 @@ export function Header({
         <button
           onClick={() => {
             triggerHaptic("selection");
-            const next = lang === "uz_latn" ? "ru" : (lang === "ru" ? "en" : "uz_latn");
+            const next = (lang === "uz_latn" || lang === "uz") ? "ru" : (lang === "ru" ? "en" : "uz_latn");
             if (onLanguageChange) onLanguageChange(next);
           }}
           className="px-2 py-1 text-[11px] font-black bg-slate-100 hover:bg-slate-200 text-pink-600 rounded-xl border border-slate-200 transition-colors flex items-center space-x-1"

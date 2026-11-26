@@ -208,6 +208,7 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
               <div className="flex space-x-2 overflow-x-auto pb-1 no-scrollbar">
                 {[
                   { id: "all", label: "🌟 Все" },
+                  { id: "numeric_rare", label: "🔢 Номерные 1-10 ($1000-$3000)" },
                   { id: "ultra_rare", label: "💎 Эксклюзив & 2-значные ($30,000)" },
                   { id: "uzbek_cities", label: "🏛️ Города ($3,000+)" },
                   { id: "uzbek_names", label: "🇺🇿 Узбекские имена ($500)" },
@@ -256,6 +257,11 @@ export function MarketplaceView({ user, t, onUpdateUser }) {
                         <div>
                           <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                             <span className="text-xl font-black text-slate-900 tracking-tight">@{item.username}</span>
+                            {item.category === "numeric_rare" && (
+                              <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-sm">
+                                🔢 НОМЕРНОЙ (${priceUsd})
+                              </span>
+                            )}
                             {(item.category === "ultra_rare" || item.username === "ou" || item.username === "uz" || item.username === "uzb") && (
                               <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300 shadow-sm">
                                 💎 ЭКСКЛЮЗИВ ({item.username.length <= 2 ? "$30,000" : "$5,000"})

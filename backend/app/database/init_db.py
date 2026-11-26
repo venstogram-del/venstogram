@@ -214,6 +214,44 @@ async def seed_demo_data():
                 existing_res.price_uzs = 0.0
                 existing_res.seller_id = director_id
 
+        # 2d. Seed Exclusive Numeric Usernames ($1,000 – $3,000)
+        # Numbers 1 to 10 can ONLY be obtained via Marketplace, registration with numbers is forbidden
+        NUMERIC_USERNAMES_SALE = [
+            ("1", 1000),
+            ("2", 1000),
+            ("3", 1200),
+            ("4", 1400),
+            ("5", 1500),
+            ("6", 1800),
+            ("7", 2000),
+            ("8", 2200),
+            ("9", 2500),
+            ("10", 3000),
+        ]
+        for num_un, num_price in NUMERIC_USERNAMES_SALE:
+            chk = await session.execute(select(UsernameListing).where(func.lower(UsernameListing.username) == num_un.lower()))
+            existing_num = chk.scalars().first()
+            n_uzs = float(num_price * 13000)
+            if not existing_num:
+                nl = UsernameListing(
+                    username=num_un,
+                    seller_id=director_id,
+                    category="numeric_rare",
+                    price_usd=num_price,
+                    price_uzs=n_uzs,
+                    current_price_coins=num_price * 10,
+                    buyout_price_coins=num_price * 10,
+                    is_sold=False,
+                    expires_at=datetime.now(timezone.utc) + timedelta(days=3650)
+                )
+                session.add(nl)
+            else:
+                existing_num.price_usd = num_price
+                existing_num.price_uzs = n_uzs
+                existing_num.category = "numeric_rare"
+                existing_num.seller_id = director_id
+                existing_num.is_sold = False
+
         # 3. Seed Uzbek male & female names ($500+)
         combined_raw = NAMES_RAW + "," + FEMALE_NAMES_RAW
         raw_list = [clean_name(n) for n in combined_raw.split(",") if clean_name(n)]
