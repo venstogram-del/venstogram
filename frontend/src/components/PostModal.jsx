@@ -262,9 +262,9 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
 
         {/* Media Container */}
         <div className="bg-black max-h-72 sm:max-h-80 flex items-center justify-center overflow-hidden relative">
-          {isVideoMedia(currentPost.media_urls?.[0], currentPost.media_type) ? (
+          {isVideoMedia(currentPost.video_url || currentPost.media_urls?.[0], currentPost.media_type) || Boolean(currentPost.video_url) ? (
             <video
-              src={currentPost.media_urls?.[0]}
+              src={currentPost.video_url || currentPost.media_urls?.[0]}
               controls
               autoPlay
               playsInline
@@ -338,7 +338,11 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
                 const nextVal = !isSaved;
                 setIsSaved(nextVal);
                 try {
-                  await Api.post(`/posts/${currentPost.id}/save`, {});
+                  if (currentPost.item_type === "reel") {
+                    await Api.post(`/reels/${currentPost.id}/save`, {});
+                  } else {
+                    await Api.post(`/posts/${currentPost.id}/save`, {});
+                  }
                 } catch (e) {}
               }}
               className="text-base text-slate-400 hover:text-amber-400 transition"
@@ -346,6 +350,27 @@ export function PostModal({ post, currentUser, onClose, onPostUpdated, onPostDel
             >
               {isSaved ? "🔖" : "🏷️"}
             </button>
+
+            {Boolean(currentPost.video_url || isVideoMedia(currentPost.media_urls?.[0], currentPost.media_type)) && (
+              <button
+                onClick={() => {
+                  triggerHaptic("medium");
+                  const vUrl = currentPost.video_url || currentPost.media_urls?.[0];
+                  if (!vUrl) return;
+                  const link = document.createElement("a");
+                  link.href = vUrl;
+                  link.download = `video_${currentPost.id}.mp4`;
+                  link.target = "_blank";
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="text-base text-slate-400 hover:text-pink-400 transition"
+                title="Сохранить видео на устройство"
+              >
+                📥
+              </button>
+            )}
           </div>
         </div>
 

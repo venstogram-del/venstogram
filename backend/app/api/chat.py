@@ -261,11 +261,11 @@ async def start_call(
     if recipient.telegram_id:
         try:
             from app.bot.bot import send_bot_push_notification
-            call_icon = "📹 Видеозвонок" if call_type == "video" else "📞 Аудиозвонок"
+            call_icon = "📹 Видеозвонок"
             await send_bot_push_notification(
                 telegram_id=recipient.telegram_id,
-                text=f"📲 <b>Входящий {call_icon} от @{current_user.username}</b>!\n\nОткройте приложение Venstogram, чтобы ответить на звонок.",
-                button_text="Принять звонок в приложении",
+                text=f"📲 <b>Входящий {call_icon} от @{current_user.username}</b>!\n\nОткройте приложение Venstogram, чтобы ответить на видеозвонок.",
+                button_text="Принять видеозвонок в приложении",
                 start_param=f"chat_{current_user.id}"
             )
         except Exception as e:

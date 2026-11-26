@@ -176,27 +176,29 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         try { track.enabled = true; } catch (e) {}
       });
 
-      const audioTracks = stream.getAudioTracks();
-      const videoTracks = stream.getVideoTracks();
+      // 2. Remote Video Display with Unmuted Voice Audio
+      if (remoteVideoRef.current) {
+        if (remoteVideoRef.current.srcObject !== stream) {
+          remoteVideoRef.current.srcObject = stream;
+        }
+        remoteVideoRef.current.muted = false;
+        remoteVideoRef.current.volume = 1.0;
+        try {
+          const vp = remoteVideoRef.current.play();
+          if (vp !== undefined) vp.catch((e) => console.warn("[remoteVideo play note]", e));
+        } catch (e) {}
+      }
 
-      // 2. Audio Track playback: Dedicated unmuted HTML5 audio element receives ONLY audio tracks
-      if (audioTracks.length > 0 && remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = new MediaStream(audioTracks);
+      // 3. Dedicated Audio Element Playback
+      if (remoteAudioRef.current) {
+        if (remoteAudioRef.current.srcObject !== stream) {
+          remoteAudioRef.current.srcObject = stream;
+        }
         remoteAudioRef.current.volume = 1.0;
         remoteAudioRef.current.muted = false;
         try {
           const ap = remoteAudioRef.current.play();
           if (ap !== undefined) ap.catch((e) => console.warn("[remoteAudio play note]", e));
-        } catch (e) {}
-      }
-
-      // 3. Video Track display: Muted Video element receives ONLY video tracks (zero audio conflict)
-      if (videoTracks.length > 0 && remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = new MediaStream(videoTracks);
-        remoteVideoRef.current.muted = true;
-        try {
-          const vp = remoteVideoRef.current.play();
-          if (vp !== undefined) vp.catch((e) => console.warn("[remoteVideo play note]", e));
         } catch (e) {}
       }
     } else if (event.track) {
@@ -210,16 +212,22 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
           remoteStreamRef.current.addTrack(event.track);
         }
       }
-
-      if (event.track.kind === "audio" && remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = new MediaStream([event.track]);
+      const s = remoteStreamRef.current;
+      if (remoteVideoRef.current) {
+        if (remoteVideoRef.current.srcObject !== s) {
+          remoteVideoRef.current.srcObject = s;
+        }
+        remoteVideoRef.current.muted = false;
+        remoteVideoRef.current.volume = 1.0;
+        try { remoteVideoRef.current.play().catch(() => {}); } catch (e) {}
+      }
+      if (remoteAudioRef.current) {
+        if (remoteAudioRef.current.srcObject !== s) {
+          remoteAudioRef.current.srcObject = s;
+        }
         remoteAudioRef.current.volume = 1.0;
         remoteAudioRef.current.muted = false;
         try { remoteAudioRef.current.play().catch(() => {}); } catch (e) {}
-      } else if (event.track.kind === "video" && remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = new MediaStream([event.track]);
-        remoteVideoRef.current.muted = true;
-        try { remoteVideoRef.current.play().catch(() => {}); } catch (e) {}
       }
     }
 
@@ -455,32 +463,29 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
   useEffect(() => {
     if (activeCall?.isConnected && remoteStreamRef.current) {
       const stream = remoteStreamRef.current;
-      const audioTracks = stream.getAudioTracks();
-      const videoTracks = stream.getVideoTracks();
 
-      // 1. Audio playback: ALWAYS active and unmuted for both audio and video calls
-      if (audioTracks.length > 0 && remoteAudioRef.current) {
-        const curAudioTrack = remoteAudioRef.current.srcObject?.getAudioTracks()[0];
-        if (!curAudioTrack || curAudioTrack.id !== audioTracks[0].id) {
-          remoteAudioRef.current.srcObject = new MediaStream(audioTracks);
+      // 1. Remote Video Playback with Unmuted Voice
+      if (remoteVideoRef.current) {
+        if (remoteVideoRef.current.srcObject !== stream) {
+          remoteVideoRef.current.srcObject = stream;
+        }
+        remoteVideoRef.current.muted = false;
+        remoteVideoRef.current.volume = 1.0;
+        try {
+          const p = remoteVideoRef.current.play();
+          if (p !== undefined) p.catch(() => {});
+        } catch (e) {}
+      }
+
+      // 2. Audio Playback Element
+      if (remoteAudioRef.current) {
+        if (remoteAudioRef.current.srcObject !== stream) {
+          remoteAudioRef.current.srcObject = stream;
         }
         remoteAudioRef.current.volume = 1.0;
         remoteAudioRef.current.muted = false;
         try {
           const p = remoteAudioRef.current.play();
-          if (p !== undefined) p.catch(() => {});
-        } catch (e) {}
-      }
-
-      // 2. Video playback: Muted video element with ONLY video tracks (zero audio conflict)
-      if (videoTracks.length > 0 && remoteVideoRef.current && activeCall.isVideo) {
-        const curVideoTrack = remoteVideoRef.current.srcObject?.getVideoTracks()[0];
-        if (!curVideoTrack || curVideoTrack.id !== videoTracks[0].id) {
-          remoteVideoRef.current.srcObject = new MediaStream(videoTracks);
-        }
-        remoteVideoRef.current.muted = true;
-        try {
-          const p = remoteVideoRef.current.play();
           if (p !== undefined) p.catch(() => {});
         } catch (e) {}
       }
@@ -497,7 +502,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
         } catch (e) {}
       }
     }
-  }, [activeCall?.isConnected, activeCall?.isVideo, isCallMinimized]);
+  }, [activeCall?.isConnected, isCallMinimized]);
 
   const loadDialogs = async () => {
     try {
@@ -1265,21 +1270,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
               </div>
             </div>
 
-            {/* Call Buttons */}
+            {/* Video Call Button (Exclusive Video Communication) */}
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => startCall(false)}
-                className="p-2 text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-200 transition-colors shadow-sm"
-                title="Аудиозвонок HD"
-              >
-                📞
-              </button>
-              <button
                 onClick={() => startCall(true)}
-                className="p-2 text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-200 transition-colors shadow-sm"
+                className="px-3 py-2 text-slate-800 hover:text-pink-600 bg-slate-100 hover:bg-pink-50 rounded-xl border border-slate-200 hover:border-pink-300 transition-all shadow-sm flex items-center space-x-1.5 active:scale-95"
                 title="Видеозвонок HD"
               >
-                📹
+                <span className="text-base">📹</span>
+                <span className="text-xs font-bold">Видеозвонок</span>
               </button>
             </div>
           </div>
@@ -1679,17 +1678,11 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       <audio
         ref={(el) => {
           remoteAudioRef.current = el;
-          if (el && remoteStreamRef.current) {
-            const aTracks = remoteStreamRef.current.getAudioTracks();
-            if (aTracks.length > 0) {
-              const curAudioTrack = el.srcObject?.getAudioTracks()[0];
-              if (!curAudioTrack || curAudioTrack.id !== aTracks[0].id) {
-                el.srcObject = new MediaStream(aTracks);
-                el.volume = 1.0;
-                el.muted = false;
-                try { el.play().catch(() => {}); } catch(e) {}
-              }
-            }
+          if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) {
+            el.srcObject = remoteStreamRef.current;
+            el.volume = 1.0;
+            el.muted = false;
+            try { el.play().catch(() => {}); } catch(e) {}
           }
         }}
         autoPlay
@@ -1710,15 +1703,9 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
             {activeCall.isVideo && remoteStreamRef.current ? (
               <video
                 ref={(el) => {
-                  if (el && remoteStreamRef.current) {
-                    const vTracks = remoteStreamRef.current.getVideoTracks();
-                    if (vTracks.length > 0) {
-                      const curVideoTrack = el.srcObject?.getVideoTracks()[0];
-                      if (!curVideoTrack || curVideoTrack.id !== vTracks[0].id) {
-                        el.srcObject = new MediaStream(vTracks);
-                        try { el.play().catch(() => {}); } catch(e) {}
-                      }
-                    }
+                  if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) {
+                    el.srcObject = remoteStreamRef.current;
+                    try { el.play().catch(() => {}); } catch(e) {}
                   }
                 }}
                 autoPlay
@@ -1766,16 +1753,18 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
       {activeCall && !isCallMinimized && (
         <div
           onClick={() => {
-            // Screen tap: guarantees user activation for audio if browser blocked initial autoplay
+            // Screen tap: guarantees user activation for audio
+            if (remoteVideoRef.current) {
+              if (remoteStreamRef.current && remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
+                remoteVideoRef.current.srcObject = remoteStreamRef.current;
+              }
+              remoteVideoRef.current.muted = false;
+              remoteVideoRef.current.volume = 1.0;
+              try { remoteVideoRef.current.play().catch(() => {}); } catch(e) {}
+            }
             if (remoteAudioRef.current) {
-              if (remoteStreamRef.current) {
-                const aTracks = remoteStreamRef.current.getAudioTracks();
-                if (aTracks.length > 0) {
-                  const curAudioTrack = remoteAudioRef.current.srcObject?.getAudioTracks()[0];
-                  if (!curAudioTrack || curAudioTrack.id !== aTracks[0].id) {
-                    remoteAudioRef.current.srcObject = new MediaStream(aTracks);
-                  }
-                }
+              if (remoteStreamRef.current && remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
+                remoteAudioRef.current.srcObject = remoteStreamRef.current;
               }
               remoteAudioRef.current.volume = 1.0;
               remoteAudioRef.current.muted = false;
@@ -1819,20 +1808,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                 <video
                   ref={(el) => {
                     remoteVideoRef.current = el;
-                    if (el && remoteStreamRef.current) {
-                      const vTracks = remoteStreamRef.current.getVideoTracks();
-                      if (vTracks.length > 0) {
-                        const curVideoTrack = el.srcObject?.getVideoTracks()[0];
-                        if (!curVideoTrack || curVideoTrack.id !== vTracks[0].id) {
-                          el.srcObject = new MediaStream(vTracks);
-                          try { el.play().catch(() => {}); } catch(e) {}
-                        }
-                      }
+                    if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) {
+                      el.srcObject = remoteStreamRef.current;
+                      el.muted = false;
+                      el.volume = 1.0;
+                      try { el.play().catch(() => {}); } catch(e) {}
                     }
                   }}
                   autoPlay
                   playsInline
-                  muted
                   className="w-full h-full object-cover"
                 />
                 {!remoteStreamRef.current && (
@@ -1953,15 +1937,17 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile, pendingC
                   onClick={(e) => {
                     e.stopPropagation();
                     triggerHaptic("medium");
+                    if (remoteVideoRef.current) {
+                      if (remoteStreamRef.current && remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
+                        remoteVideoRef.current.srcObject = remoteStreamRef.current;
+                      }
+                      remoteVideoRef.current.muted = false;
+                      remoteVideoRef.current.volume = 1.0;
+                      try { remoteVideoRef.current.play().catch(() => {}); } catch (e) {}
+                    }
                     if (remoteAudioRef.current) {
-                      if (remoteStreamRef.current) {
-                        const aTracks = remoteStreamRef.current.getAudioTracks();
-                        if (aTracks.length > 0) {
-                          const curAudioTrack = remoteAudioRef.current.srcObject?.getAudioTracks()[0];
-                          if (!curAudioTrack || curAudioTrack.id !== aTracks[0].id) {
-                            remoteAudioRef.current.srcObject = new MediaStream(aTracks);
-                          }
-                        }
+                      if (remoteStreamRef.current && remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
+                        remoteAudioRef.current.srcObject = remoteStreamRef.current;
                       }
                       remoteAudioRef.current.volume = 1.0;
                       remoteAudioRef.current.muted = false;

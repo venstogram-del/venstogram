@@ -219,6 +219,24 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
     showToast("✓ Ссылка на Reels скопирована!");
   };
 
+  const handleDownloadReel = () => {
+    if (!currentReel?.video_url) return;
+    triggerHaptic("medium");
+    try {
+      showToast("⏳ Сохранение видео...");
+      const link = document.createElement("a");
+      link.href = currentReel.video_url;
+      link.download = `reel_${currentReel.id}.mp4`;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("✓ Видео скачивается на устройство!");
+    } catch (e) {
+      showToast("Ошибка скачивания видео");
+    }
+  };
+
   const handleShare = () => {
     if (!currentReel) return;
     triggerHaptic("light");
@@ -486,7 +504,17 @@ export function ReelsView({ reels = [], setReels, t, user, onOpenProfile }) {
           </button>
 
           {showReelOptionsMenu && (
-            <div className="absolute right-0 bottom-full mb-2 bg-slate-900/95 border border-slate-700/80 rounded-2xl p-1.5 shadow-2xl backdrop-blur-lg flex flex-col space-y-1 min-w-[140px] z-50 animate-in fade-in zoom-in-95">
+            <div className="absolute right-0 bottom-full mb-2 bg-slate-900/95 border border-slate-700/80 rounded-2xl p-1.5 shadow-2xl backdrop-blur-lg flex flex-col space-y-1 min-w-[160px] z-50 animate-in fade-in zoom-in-95">
+              <button
+                onClick={() => {
+                  setShowReelOptionsMenu(false);
+                  handleDownloadReel();
+                }}
+                className="flex items-center space-x-2 px-3 py-2 hover:bg-white/10 rounded-xl text-xs text-white transition text-left"
+              >
+                <span>📥</span>
+                <span>Сохранить видео</span>
+              </button>
               <button
                 onClick={() => {
                   setShowReelOptionsMenu(false);

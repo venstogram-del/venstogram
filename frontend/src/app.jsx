@@ -645,7 +645,7 @@ export function App() {
           {/* Top Info */}
           <div className="w-full flex flex-col items-center pt-8 space-y-2">
             <span className="text-xs uppercase tracking-widest text-pink-400 font-bold animate-pulse">
-              {globalIncomingCall.call_type === "video" ? "📹 Входящий видеозвонок" : "📞 Входящий аудиозвонок"}
+              📹 Входящий видеозвонок HD
             </span>
             <p className="text-xs text-slate-400">Venstogram WebRTC HD</p>
           </div>
@@ -703,7 +703,7 @@ export function App() {
                 onClick={handleAcceptGlobalCall}
                 className="w-18 h-18 rounded-full bg-emerald-500 hover:bg-emerald-400 active:scale-90 text-white flex items-center justify-center text-3xl shadow-2xl shadow-emerald-500/50 transition animate-bounce"
               >
-                {globalIncomingCall.call_type === "video" ? "📹" : "📞"}
+                📹
               </button>
               <span className="text-xs text-emerald-400 font-bold">Принять</span>
             </div>

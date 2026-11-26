@@ -139,6 +139,49 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
     } catch (e) {}
   };
 
+  const handleToggleSave = async (post) => {
+    if (!post) return;
+    triggerHaptic("medium");
+    const nextSaved = !post.is_saved;
+    setPosts((prev) =>
+      prev.map((p) => (p.id === post.id ? { ...p, is_saved: nextSaved } : p))
+    );
+    try {
+      if (post.item_type === "reel") {
+        await Api.post(`/reels/${post.id}/save`, {});
+      } else {
+        await Api.post(`/posts/${post.id}/save`, {});
+      }
+    } catch (e) {
+      console.warn("Save post error", e);
+    }
+  };
+
+  const handleDownloadVideo = (post) => {
+    if (!post) return;
+    triggerHaptic("medium");
+    const videoUrl =
+      post.video_url ||
+      (Array.isArray(post.media_urls) &&
+        post.media_urls.find(
+          (u) =>
+            typeof u === "string" &&
+            (u.includes(".mp4") || u.includes(".mov") || u.includes(".webm") || u.startsWith("data:video"))
+        ));
+    if (!videoUrl) return;
+    try {
+      const link = document.createElement("a");
+      link.href = videoUrl;
+      link.download = `venstogram_video_${post.id}.mp4`;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      console.warn("Download video error", e);
+    }
+  };
+
   const handleDeletePost = async (postId) => {
     const confirmed = await safeConfirm("Вы действительно хотите удалить эту публикацию?");
     if (!confirmed) return;
@@ -349,12 +392,49 @@ export function FeedView({ posts = [], setPosts, t, onOpenProfile, user }) {
               </button>
             </div>
 
-            {/* Bookmark */}
-            <button className="text-slate-400 hover:text-amber-500 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-              </svg>
-            </button>
+            <div className="flex items-center space-x-2">
+              {/* Save Video to Device / Download Button */}
+              {Boolean(
+                post.video_url ||
+                  post.media_type === "video" ||
+                  (Array.isArray(post.media_urls) &&
+                    post.media_urls.some(
+                      (u) =>
+                        typeof u === "string" &&
+                        (u.includes(".mp4") || u.includes(".mov") || u.includes(".webm") || u.startsWith("data:video"))
+                    ))
+              ) && (
+                <button
+                  onClick={() => handleDownloadVideo(post)}
+                  className="text-slate-500 hover:text-pink-600 p-1 rounded-full hover:bg-slate-100 transition-colors active:scale-125"
+                  title="Сохранить видео на устройство"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </button>
+              )}
+
+              {/* Bookmark / Save to Profile */}
+              <button
+                onClick={() => handleToggleSave(post)}
+                className="text-slate-400 hover:text-amber-500 transition-transform active:scale-125 p-1"
+                title={post.is_saved ? "Сохранено в закладки" : "Сохранить"}
+              >
+                <svg
+                  className={`w-6 h-6 transition-colors ${
+                    post.is_saved
+                      ? "text-amber-500 fill-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]"
+                      : "text-slate-400 fill-none"
+                  }`}
+                  viewBox="0 0 24 24"
+                  strokeWidth="2"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Likes & Views / Analytics Count */}
