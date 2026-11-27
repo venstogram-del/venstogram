@@ -525,7 +525,13 @@ export function App() {
         onOpenEmailAuth={() => setEmailAuthOpen(true)}
         onLanguageChange={handleLanguageChange}
         onOpenCreate={() => setCreatePostOpen(true)}
-        onOpenChat={() => setChatOpen(true)}
+        onOpenChat={(targetUser) => {
+          if (targetUser && targetUser.id) {
+            handleOpenUserChat(targetUser);
+          } else {
+            setChatOpen(true);
+          }
+        }}
         onOpenNotifications={() => setNotificationsOpen(true)}
         unreadNotificationsCount={unreadNotificationsCount}
       />

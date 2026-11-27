@@ -232,6 +232,18 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
     }
   };
 
+  const handleRefreshMessages = async () => {
+    if (!activePartner?.id) return;
+    triggerHaptic("light");
+    try {
+      const msgs = await Api.get(`/chats/${activePartner.id}/messages`);
+      if (msgs && Array.isArray(msgs)) {
+        setMessages(msgs);
+      }
+    } catch (e) {}
+  };
+  const handleHardClearCache = handleRefreshMessages;
+
   const handleSendMessage = async (e) => {
     if (e) e.preventDefault();
     if (!inputText.trim() || !activePartner) return;
@@ -1008,12 +1020,12 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
               </div>
             </div>
 
-            {/* Video Call & Cache Reset Buttons */}
+            {/* Refresh Messages Button */}
             <div className="flex items-center space-x-1.5">
               <button
-                onClick={handleHardClearCache}
+                onClick={handleRefreshMessages}
                 className="p-2 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition text-xs font-bold active:scale-95"
-                title="Сбросить кэш и обновить приложение"
+                title="Обновить сообщения"
               >
                 🔄
               </button>
