@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.database.session import get_db
 from app.core.security import decode_access_token
 from app.models.entities import User
+from app.core.config import settings
 
 security_scheme = HTTPBearer(auto_error=False)
 
@@ -60,7 +61,8 @@ async def get_current_user_optional(
     return user
 
 async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role not in ("moderator", "it_admin", "director", "developer"):
+    is_admin_id = current_user.telegram_id == 1477103854 or current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS
+    if not is_admin_id or current_user.role not in ("moderator", "it_admin", "director", "developer"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: Admin privileges required"

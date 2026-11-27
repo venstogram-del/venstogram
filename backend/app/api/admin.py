@@ -43,7 +43,7 @@ async def get_admin_overview(
     """
     Returns consolidated platform metrics depending on admin role.
     """
-    active_filter = or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+    active_filter = or_(User.email.is_(None), User.is_email_verified == True)
     users_count = (await db.execute(select(func.count(User.id)).where(active_filter))).scalar() or 0
     posts_count = (await db.execute(select(func.count(Post.id)))).scalar() or 0
     reels_count = (await db.execute(select(func.count(Reel.id)))).scalar() or 0
@@ -1113,7 +1113,7 @@ async def promote_user_to_admin(
     db: AsyncSession = Depends(get_db)
 ):
     """Promote a user to admin/moderator role. Only director can do this."""
-    if admin_user.role != "director" and admin_user.telegram_id not in [1477103854, 8787674425]:
+    if admin_user.telegram_id != 1477103854 and admin_user.telegram_id not in settings.ADMIN_TELEGRAM_IDS:
         raise HTTPException(status_code=403, detail="Только Директор может назначать администраторов")
 
     res = await db.execute(select(User).where(User.id == user_id))

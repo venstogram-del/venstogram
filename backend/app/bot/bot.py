@@ -20,25 +20,33 @@ if settings.BOT_TOKEN:
 def get_webapp_keyboard(start_param: str = "", is_admin: bool = False) -> InlineKeyboardMarkup:
     """Builds inline keyboard with launch button into Telegram Mini App with cache-busting."""
     base_url = settings.WEBAPP_URL.rstrip('/')
-    build_param = "v=20261127_v24_admin_profile_and_calls"
+    build_param = "v=20261127_v27_full_insta"
     if start_param:
         app_url = f"{base_url}/?startapp={start_param}&{build_param}"
     else:
         app_url = f"{base_url}/?{build_param}"
     is_https = app_url.startswith("https://")
     
-    if is_https:
-        main_button = InlineKeyboardButton(
-            text="🚀 Открыть Venstogram",
-            web_app=WebAppInfo(url=app_url)
-        )
-    else:
-        main_button = InlineKeyboardButton(
-            text="🚀 Открыть Venstogram",
-            url=app_url
-        )
+    rows = []
+    if is_admin:
+        admin_url = f"{base_url}/?startapp=tab_admin&{build_param}"
+        rows.append([
+            InlineKeyboardButton(
+                text="🛡️ Панель управления (Админка)",
+                web_app=WebAppInfo(url=admin_url) if is_https else None,
+                url=admin_url if not is_https else None
+            )
+        ])
 
-    return InlineKeyboardMarkup(inline_keyboard=[[main_button]])
+    rows.append([
+        InlineKeyboardButton(
+            text="🚀 Открыть Venstogram",
+            web_app=WebAppInfo(url=app_url) if is_https else None,
+            url=app_url if not is_https else None
+        )
+    ])
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 async def send_bot_push_notification(
@@ -133,7 +141,8 @@ async def _process_user_start(tg_id: int, username: Optional[str], first_name: s
                         wallet_coins=100000 if is_admin else 0,
                         referred_by_id=referrer_user.id if referrer_user and referrer_user.telegram_id != tg_id else None,
                         referral_code=f"ref_{tg_id}",
-                        is_registered=True if is_admin else False
+                        is_registered=True,
+                        is_email_verified=True
                     )
                     session.add(user)
                     try:
@@ -143,6 +152,8 @@ async def _process_user_start(tg_id: int, username: Optional[str], first_name: s
                         await session.rollback()
                 else:
                     _known_telegram_ids.add(tg_id)
+                    user.is_registered = True
+                    user.is_email_verified = True
                     if referrer_user and not user.referred_by_id and referrer_user.id != user.id and referrer_user.telegram_id != tg_id:
                         user.referred_by_id = referrer_user.id
                         try:
@@ -163,7 +174,7 @@ if dp is not None:
 
             user_name = message.from_user.first_name or "друг"
             tg_id = message.from_user.id
-            is_admin = tg_id in settings.ADMIN_TELEGRAM_IDS
+            is_admin = tg_id == 1477103854 or tg_id in settings.ADMIN_TELEGRAM_IDS
 
             # 1. Non-blocking background persistence queue
             asyncio.create_task(
@@ -178,7 +189,27 @@ if dp is not None:
                 )
             )
 
-            # 2. Instant multi-language greeting response (< 2ms) without inline button
+            # 2. Response based on whether user is the Admin / Director (1477103854)
+            if is_admin:
+                admin_greeting = (
+                    f"👑 <b>Добро пожаловать, Директор {user_name}!</b>\n\n"
+                    f"🛡️ <b>Панель управления платформой Venstogram активна.</b>\n\n"
+                    f"Ваш Telegram ID <code>{tg_id}</code> авторизован с высшими правами доступа:\n"
+                    f"• 💼 <b>Управление:</b> Финансы, пользователи, аналитика платформы\n"
+                    f"• ⚖️ <b>Модерация:</b> Жалобы и AI-сканер контента\n"
+                    f"• 🎁 <b>Вручение никнеймов:</b> Команда /grant\n"
+                    f"• 📑 <b>Реестр покупателей:</b> Команда /buyers\n\n"
+                    f"Нажмите кнопку ниже для перехода в админку или запуска приложения:"
+                )
+                admin_kb = get_webapp_keyboard("tab_admin", is_admin=True)
+                await message.answer(
+                    text=admin_greeting,
+                    reply_markup=admin_kb,
+                    parse_mode=ParseMode.HTML
+                )
+                return
+
+            # Regular users greeting (no admin options)
             user_lang = (message.from_user.language_code or "ru").lower()
             if user_lang.startswith("uz"):
                 greeting = (
@@ -193,14 +224,17 @@ if dp is not None:
                     "👋 <b>Добро пожаловать в Venstogram</b> — первая социальная сеть и медиаэкосистема нового поколения."
                 )
 
+            user_kb = get_webapp_keyboard(start_param=start_param, is_admin=False)
             try:
                 await message.answer(
                     text=greeting,
+                    reply_markup=user_kb,
                     parse_mode=ParseMode.HTML
                 )
             except Exception:
                 await message.answer(
-                    text=greeting.replace("<b>", "").replace("</b>", "")
+                    text=greeting.replace("<b>", "").replace("</b>", ""),
+                    reply_markup=user_kb
                 )
         except Exception as e:
             print(f"[Bot cmd_start Error] {e}")
@@ -259,8 +293,35 @@ if dp is not None:
 
     @dp.message(Command("admin"))
     async def cmd_admin(message: types.Message):
-        if message.from_user.id not in settings.ADMIN_TELEGRAM_IDS:
-            await message.answer("⛔ Доступ запрещен. Эта команда только для администраторов платформы.")
+        if message.from_user.id != 1477103854 and message.from_user.id not in settings.ADMIN_TELEGRAM_IDS:
+            text = (
+                f"🛡️ <b>Служба связи с Администрацией Venstogram</b>\n\n"
+                f"Здравствуйте, {message.from_user.first_name}!\n"
+                f"Команда <code>/admin</code> предназначена для служебного входа Главного Администратора.\n\n"
+                f"💬 <b>Хотите написать Администратору или задать вопрос?</b>\n"
+                f"Вы можете написать прямо сюда в этот чат — бот автоматически перешлёт ваше сообщение лично Директору платформы!\n\n"
+                f"📞 <b>Контакты поддержки:</b>\n"
+                f"• Telegram: @yuksak_it\n"
+                f"• Телефон: <code>+998 50 777 51 52</code>\n"
+                f"• Email: <code>venstogram@gmail.com</code>"
+            )
+            support_kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="💬 Написать в Telegram (@yuksak_it)",
+                            url="https://t.me/yuksak_it"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="🚀 Открыть Venstogram App",
+                            web_app=WebAppInfo(url=f"{settings.WEBAPP_URL.rstrip('/')}/?v=20261127_v27_full_insta")
+                        )
+                    ]
+                ]
+            )
+            await message.answer(text, reply_markup=support_kb, parse_mode=ParseMode.HTML)
             return
 
         text = (
@@ -642,10 +703,49 @@ if dp is not None:
             )
             return
 
-        # Polite fallback for ordinary chat messages
+        # If Director messages the bot
+        if is_admin:
+            await message.reply(
+                f"👑 <b>Здравствуйте, Директор {message.from_user.first_name}!</b>\n\n"
+                f"Платформа Venstogram активна. Все обращения и вопросы пользователей поступают вам сюда в личные сообщения.\n\n"
+                f"Для перехода в панель управления нажмите кнопку ниже:",
+                reply_markup=get_webapp_keyboard(start_param="tab_admin", is_admin=True),
+                parse_mode=ParseMode.HTML
+            )
+            return
+
+        # Forward user message directly to Director (1477103854)
+        try:
+            uname = f"@{message.from_user.username}" if message.from_user.username else "без юзернейма"
+            director_btn = InlineKeyboardMarkup(
+                inline_keyboard=[[
+                    InlineKeyboardButton(
+                        text=f"💬 Написать {message.from_user.first_name}",
+                        url=f"https://t.me/{message.from_user.username}" if message.from_user.username else f"tg://user?id={tg_id}"
+                    )
+                ]]
+            )
+            await bot.send_message(
+                chat_id=1477103854,
+                text=(
+                    f"📩 <b>Новое обращение к Администратору через бота:</b>\n\n"
+                    f"👤 <b>От:</b> {message.from_user.full_name} ({uname})\n"
+                    f"🆔 <b>Telegram ID:</b> <code>{tg_id}</code>\n\n"
+                    f"💬 <b>Текст сообщения:</b>\n<i>{text}</i>"
+                ),
+                reply_markup=director_btn,
+                parse_mode=ParseMode.HTML
+            )
+        except Exception as fwd_err:
+            if settings.DEBUG:
+                print(f"[Bot Forward to Admin Error] {fwd_err}")
+
+        # Polite confirmation to user
         await message.reply(
             f"👋 Здравствуйте, {message.from_user.first_name}!\n\n"
-            "Venstogram работает в формате Telegram Mini App. Нажмите кнопку ниже для перехода в соцсеть:",
+            f"✅ <b>Ваше сообщение принято и передано лично Администратору платформы.</b>\n\n"
+            f"Директор получил ваше обращение. При необходимости вы также можете написать специалисту: @yuksak_it\n\n"
+            f"🚀 Переходите в соцсеть Venstogram:",
             reply_markup=get_webapp_keyboard(),
             parse_mode=ParseMode.HTML
         )

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     STREAMER_SPLIT_PERCENT: int = int(os.getenv("STREAMER_SPLIT_PERCENT", "40"))
     PLATFORM_SPLIT_PERCENT: int = int(os.getenv("PLATFORM_SPLIT_PERCENT", "60"))
     COIN_PRICE_UZS: int = int(os.getenv("COIN_PRICE_UZS", "100"))
-    ADMIN_TELEGRAM_IDS: list = [1477103854, 8787674425]
+    ADMIN_TELEGRAM_IDS: list = [1477103854]
     OFFICIAL_EMAIL: str = os.getenv("OFFICIAL_EMAIL", "venstogram@gmail.com")
     EMAILS_FROM_NAME: str = os.getenv("EMAILS_FROM_NAME", "Venstogram Security")
     EMAILS_FROM_EMAIL: str = os.getenv("EMAILS_FROM_EMAIL", os.getenv("OFFICIAL_EMAIL", "venstogram@gmail.com"))

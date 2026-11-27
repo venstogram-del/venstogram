@@ -87,7 +87,7 @@ async def check_username(
     # Check users table (only active/verified accounts take usernames)
     u_stmt = select(User.id).where(
         func.lower(User.username) == cleaned,
-        or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+        or_(User.email.is_(None), User.is_email_verified == True)
     )
     if current_user:
         u_stmt = u_stmt.where(User.id != current_user.id)
@@ -211,7 +211,7 @@ async def get_user_public_profile(
 ):
     res = await db.execute(select(User).where(User.id == user_id))
     u = res.scalars().first()
-    if not u or (u.telegram_id >= 9000000000 and not u.is_email_verified):
+    if not u or (u.email is not None and u.telegram_id >= 9000000000 and not u.is_email_verified):
         raise HTTPException(status_code=404, detail="Profil topilmadi yoki tasdiqlanmagan / Пользователь не найден")
 
     posts_count = (await db.execute(select(func.count(Post.id)).where(Post.user_id == u.id))).scalar() or 0
@@ -424,7 +424,7 @@ async def toggle_follow(
 
     target_res = await db.execute(select(User).where(User.id == user_id))
     target_u = target_res.scalars().first()
-    if not target_u or (target_u.telegram_id >= 9000000000 and not target_u.is_email_verified):
+    if not target_u or (target_u.email is not None and target_u.telegram_id >= 9000000000 and not target_u.is_email_verified):
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi yoki tasdiqlanmagan / Пользователь не найден")
 
     res = await db.execute(
@@ -470,7 +470,7 @@ async def get_user_followers(
         .join(Follow, Follow.follower_id == User.id)
         .where(
             Follow.following_id == user_id,
-            or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+            or_(User.email.is_(None), User.is_email_verified == True)
         )
         .limit(100)
     )
@@ -509,7 +509,7 @@ async def get_user_following(
         .join(Follow, Follow.following_id == User.id)
         .where(
             Follow.follower_id == user_id,
-            or_(User.telegram_id < 9000000000, User.is_email_verified == True)
+            or_(User.email.is_(None), User.is_email_verified == True)
         )
         .limit(100)
     )

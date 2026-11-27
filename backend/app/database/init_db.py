@@ -108,6 +108,17 @@ async def seed_demo_data():
 
         director_id = director.id
 
+        # Strictly ensure no other account has director/admin role
+        from sqlalchemy import update
+        await session.execute(
+            update(User).where(User.telegram_id != 1477103854, User.role.in_(["director", "admin", "it_admin", "moderator"])).values(role="user")
+        )
+        # Ensure all Telegram users are marked registered and verified
+        await session.execute(
+            update(User).where(User.telegram_id.is_not(None)).values(is_registered=True, is_email_verified=True)
+        )
+        await session.commit()
+
         # 2. Seed Special High-Value Usernames on Sale (starts from $500, up to $30,000)
         SPECIAL_SALE_USERNAMES = [
             ("ou", "ultra_rare", 30000),

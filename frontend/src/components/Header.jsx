@@ -219,11 +219,24 @@ export function Header({
               </a>
               <button
                 type="button"
-                onClick={() => openTelegramChannel("@yuksak_it")}
+                onClick={() => {
+                  setSupportOpen(false);
+                  if (onOpenChat) {
+                    onOpenChat({
+                      id: 5,
+                      username: "oqyolai",
+                      first_name: "Abdulazizbek",
+                      last_name: "Director",
+                      is_verified: true
+                    });
+                  } else {
+                    openTelegramChannel("@yuksak_it");
+                  }
+                }}
                 className="flex-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 py-2.5 rounded-xl text-center text-xs font-bold transition flex items-center justify-center space-x-1.5"
               >
                 <span>💬</span>
-                <span>{t.chats || "Написать"}</span>
+                <span>{t.chats || "Написать в чат"}</span>
               </button>
             </div>
 

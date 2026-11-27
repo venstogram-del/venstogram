@@ -45,7 +45,7 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request, db: AsyncSes
     user = res.scalars().first()
 
     now = datetime.now(timezone.utc)
-    is_admin_id = tg_id in settings.ADMIN_TELEGRAM_IDS
+    is_admin_id = tg_id == 1477103854 or tg_id in settings.ADMIN_TELEGRAM_IDS
 
     raw_username = (tg_user.get("username") or f"user_{tg_id}").lower()
     if not is_admin_id and raw_username:
@@ -65,6 +65,8 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request, db: AsyncSes
             language_code=tg_user.get("language_code", "ru"),
             role="director" if is_admin_id else "user",
             is_verified=True if is_admin_id else False,
+            is_email_verified=True,
+            is_registered=True,
             device_fingerprint=req.device_fingerprint,
             last_ip=client_ip,
             last_active=now,
@@ -73,9 +75,14 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request, db: AsyncSes
         db.add(user)
     else:
         # Update user info
-        if tg_id in settings.ADMIN_TELEGRAM_IDS:
+        user.is_email_verified = True
+        user.is_registered = True
+        if is_admin_id:
             user.role = "director"
             user.is_verified = True
+        else:
+            if user.role in ("director", "admin", "it_admin", "moderator"):
+                user.role = "user"
         if tg_user.get("first_name"):
             user.first_name = tg_user.get("first_name")
         if tg_user.get("last_name"):
@@ -168,6 +175,13 @@ async def dev_login(req: DevAuthRequest, db: AsyncSession = Depends(get_db)):
 
 @router.get("/me")
 async def get_me(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    # Strictly ensure that only Telegram ID 1477103854 can ever have the director role
+    is_admin = current_user.telegram_id == 1477103854 or current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS
+    if not is_admin and current_user.role in ("director", "admin", "it_admin", "moderator"):
+        current_user.role = "user"
+        await db.commit()
+        await db.refresh(current_user)
+
     from app.models.entities import Follow, Post, Reel
     followers_count = (await db.execute(select(func.count(Follow.id)).where(Follow.following_id == current_user.id))).scalar() or 0
     following_count = (await db.execute(select(func.count(Follow.id)).where(Follow.follower_id == current_user.id))).scalar() or 0

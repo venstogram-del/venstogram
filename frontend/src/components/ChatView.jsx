@@ -38,6 +38,15 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
   const photoInputRef = useRef(null);
   const videoInputRef = useRef(null);
 
+  const getCurrentUserId = () => {
+    if (user?.id) return user.id;
+    try {
+      const cached = JSON.parse(localStorage.getItem("vensto_cached_user") || "{}");
+      if (cached.id) return cached.id;
+    } catch (e) {}
+    return 0;
+  };
+
   useEffect(() => {
     loadDialogs();
     if (activeUser) {
@@ -232,7 +241,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
     setInputText("");
     setShowEmojiPicker(false);
 
-    const currentUserId = user?.id || 5;
+    const currentUserId = getCurrentUserId();
 
     const tempMsg = {
       id: Date.now(),
@@ -364,7 +373,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
     triggerHaptic("medium");
     setIsRecordingVoice(false);
 
-    const currentUserId = user?.id || 5;
+    const currentUserId = getCurrentUserId();
     const duration = voiceSeconds > 0 ? voiceSeconds : 3;
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
@@ -445,7 +454,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
     if (!file || !activePartner) return;
 
     triggerHaptic("medium");
-    const currentUserId = user?.id || 5;
+    const currentUserId = getCurrentUserId();
 
     try {
       const formData = new FormData();
@@ -487,7 +496,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
     if (!file || !activePartner) return;
 
     triggerHaptic("medium");
-    const currentUserId = user?.id || 5;
+    const currentUserId = getCurrentUserId();
 
     try {
       const formData = new FormData();
@@ -1014,7 +1023,7 @@ export function ChatView({ user, activeUser, t, onClose, onOpenProfile }) {
           {/* Messages Stream */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/70">
             {messages.map((m) => {
-              const isMine = m.sender_id === (user?.id || 5);
+              const isMine = m.sender_id === getCurrentUserId();
               const isVoicePlaying = playingVoiceId === m.id;
 
               return (

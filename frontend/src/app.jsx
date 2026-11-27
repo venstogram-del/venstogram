@@ -193,8 +193,11 @@ export function App() {
   const authenticateUser = async () => {
     try {
       let activeSessionUser = null;
+      const currentTgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+      const currentTgId = currentTgUser?.id ? Number(currentTgUser.id) : null;
+      const initData = window.Telegram?.WebApp?.initData;
 
-      // 0. Instant offline/cached user restoration
+      // 0. Instant offline/cached user restoration with account-switch check
       const cachedUserStr = safeGetItem("vensto_cached_user");
       let cachedUser = null;
       if (cachedUserStr) {
@@ -202,30 +205,56 @@ export function App() {
           cachedUser = JSON.parse(cachedUserStr);
         } catch (e) {}
       }
+
+      // If user switched accounts in Telegram, wipe credentials of the other account!
+      const cachedTgId = cachedUser?.telegram_id ? Number(cachedUser.telegram_id) : null;
+      if (currentTgId && cachedTgId && cachedTgId !== currentTgId) {
+        console.log(`[Vensto Auth] Account switch: current TG ${currentTgId} != cached TG ${cachedTgId}. Resetting storage.`);
+        safeRemoveItem("vensto_token");
+        safeRemoveItem("vensto_cached_user");
+        Api.setToken("");
+        cachedUser = null;
+      }
+
       if (cachedUser && cachedUser.id) {
+        if (Number(cachedUser.telegram_id) !== 1477103854 && cachedUser.role === "director") {
+          cachedUser.role = "user";
+        }
         activeSessionUser = cachedUser;
         setUser(cachedUser);
         const resolvedUserId = cachedUser.id || 1;
         const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`) === "true";
-        const isDirector = cachedUser.role === "director" || cachedUser.telegram_id === 1477103854;
+        const isDirector = Number(cachedUser.telegram_id) === 1477103854;
         setIsRegistered(isDirector || hasCreated || Boolean(cachedUser.is_registered));
       }
 
-      // 1. Prioritize saved session JWT token from localStorage
+      // 1. Check saved session JWT token from localStorage
       const savedToken = safeGetItem("vensto_token");
-      if (savedToken) {
+      if (savedToken && !activeSessionUser) {
         try {
           Api.setToken(savedToken);
           const me = await Api.get("/auth/me");
           if (me && me.id) {
-            activeSessionUser = me;
-            safeSetItem("vensto_cached_user", JSON.stringify(me));
-            setUser(me);
-            try {
-              if (!window.__vensto_socket) {
-                new RealtimeSocket(savedToken);
+            const meTgId = me.telegram_id ? Number(me.telegram_id) : null;
+            if (currentTgId && meTgId && meTgId !== currentTgId) {
+              console.warn(`[Vensto Auth] Token mismatch: belongs to ${meTgId}, but current TG is ${currentTgId}. Resetting.`);
+              safeRemoveItem("vensto_token");
+              safeRemoveItem("vensto_cached_user");
+              Api.setToken("");
+              activeSessionUser = null;
+            } else {
+              if (meTgId !== 1477103854 && me.role === "director") {
+                me.role = "user";
               }
-            } catch (wsErr) {}
+              activeSessionUser = me;
+              safeSetItem("vensto_cached_user", JSON.stringify(me));
+              setUser(me);
+              try {
+                if (!window.__vensto_socket) {
+                  new RealtimeSocket(savedToken);
+                }
+              } catch (wsErr) {}
+            }
           }
         } catch (meErr) {
           const status = meErr?.status;
@@ -237,24 +266,26 @@ export function App() {
             activeSessionUser = null;
           } else {
             console.warn("[Server network error or cold start, preserving existing session]", meErr);
-            // DO NOT wipe token on network timeouts, 502/503, or offline!
           }
         }
       }
 
       // 2. Try Telegram WebApp initData HMAC authentication if no active user session
       if (!activeSessionUser) {
-        const initData = window.Telegram?.WebApp?.initData;
         if (initData) {
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
               const authResult = await Api.post("/auth/telegram", { init_data: initData });
               if (authResult && authResult.user) {
+                const authedUser = authResult.user;
+                if (Number(authedUser.telegram_id) !== 1477103854 && authedUser.role === "director") {
+                  authedUser.role = "user";
+                }
                 Api.setToken(authResult.access_token);
                 safeSetItem("vensto_token", authResult.access_token);
-                safeSetItem("vensto_cached_user", JSON.stringify(authResult.user));
-                activeSessionUser = authResult.user;
-                setUser(authResult.user);
+                safeSetItem("vensto_cached_user", JSON.stringify(authedUser));
+                activeSessionUser = authedUser;
+                setUser(authedUser);
                 try {
                   if (!window.__vensto_socket) {
                     new RealtimeSocket(authResult.access_token);
@@ -274,9 +305,12 @@ export function App() {
 
       // 3. Handle registration resolution
       if (activeSessionUser) {
+        if (Number(activeSessionUser.telegram_id) !== 1477103854 && activeSessionUser.role === "director") {
+          activeSessionUser.role = "user";
+        }
         setUser(activeSessionUser);
         safeSetItem("vensto_cached_user", JSON.stringify(activeSessionUser));
-        const isDirector = activeSessionUser.role === "director" || activeSessionUser.telegram_id === 1477103854;
+        const isDirector = Number(activeSessionUser.telegram_id) === 1477103854;
         const resolvedUserId = activeSessionUser.id || 1;
         const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`) === "true";
         const hasProfile = Boolean(
@@ -308,12 +342,19 @@ export function App() {
 
       if (tabParam) {
         if (tabParam === "quest" || tabParam === "tab_quest") setFounderQuestOpen(true);
+        else if (tabParam === "admin") {
+          if (Number(activeSessionUser?.telegram_id) === 1477103854) setActiveTab("admin");
+          else setActiveTab("feed");
+        }
         else setActiveTab(tabParam);
       }
       if (startAppParam) {
         if (startAppParam.startsWith("chat")) setChatOpen(true);
         else if (startAppParam.startsWith("reels")) setActiveTab("reels");
-        else if (startAppParam.includes("admin")) setActiveTab("admin");
+        else if (startAppParam.includes("admin")) {
+          if (Number(activeSessionUser?.telegram_id) === 1477103854) setActiveTab("admin");
+          else setActiveTab("feed");
+        }
         else if (startAppParam.startsWith("search")) setActiveTab("search");
         else if (startAppParam.includes("quest")) setFounderQuestOpen(true);
       }
@@ -555,7 +596,15 @@ export function App() {
         )}
 
         {activeTab === "admin" && (
-          <AdminView user={user} t={t} />
+          Number(user?.telegram_id) === 1477103854 ? (
+            <AdminView user={user} t={t} />
+          ) : (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
+              <span className="text-4xl mb-3">⛔</span>
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white">Доступ ограничен</h2>
+              <p className="text-sm text-slate-500 mt-2">Панель управления доступна только Главному Администратору.</p>
+            </div>
+          )
         )}
       </main>
 
@@ -565,6 +614,7 @@ export function App() {
         onTabChange={(tab) => setActiveTab(tab)}
         t={t}
         userRole={user?.role}
+        telegramId={user?.telegram_id ? Number(user.telegram_id) : null}
       />
 
       {/* Modals */}

@@ -1,8 +1,8 @@
 import React from "react";
 import { triggerHaptic } from "../telegram.js";
 
-export function BottomNav({ activeTab, onTabChange, t, userRole }) {
-  const isAdmin = ["director", "it_admin", "moderator", "developer"].includes(userRole);
+export function BottomNav({ activeTab, onTabChange, t, userRole, telegramId }) {
+  const isAdmin = Number(telegramId) === 1477103854 && ["director", "it_admin", "moderator", "developer"].includes(userRole);
 
   const tabs = [
     {
