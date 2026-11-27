@@ -349,7 +349,16 @@ export function App() {
         else setActiveTab(tabParam);
       }
       if (startAppParam) {
-        if (startAppParam.startsWith("chat")) setChatOpen(true);
+        if (startAppParam.startsWith("chat")) {
+          setChatOpen(true);
+          const pMatch = startAppParam.match(/^chat_(\d+)$/);
+          if (pMatch) {
+            const partnerId = Number(pMatch[1]);
+            Api.get(`/users/${partnerId}`).then((u) => {
+              if (u && u.id) setActiveChatUser(u);
+            }).catch(() => {});
+          }
+        }
         else if (startAppParam.startsWith("reels")) setActiveTab("reels");
         else if (startAppParam.includes("admin")) {
           if (Number(activeSessionUser?.telegram_id) === 1477103854) setActiveTab("admin");
