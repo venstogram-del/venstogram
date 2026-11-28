@@ -623,9 +623,9 @@ if dp is not None:
                 caption=caption,
                 media_urls=[media_url],
                 media_type=media_type,
-                is_flagged=not is_safe,
+                is_flagged=False,
                 threat_score=threat_score,
-                moderation_status="approved" if is_safe else "pending",
+                moderation_status="approved",
                 moderation_reason=", ".join(flags) if flags else None
             )
             session.add(post)
@@ -633,9 +633,9 @@ if dp is not None:
             post_id = post.id
 
         await message.reply(
-            f"🎉 <b>Ваша публикация успешно создана в Venstogram!</b>\n\n"
+            f"🎉 <b>Ваша публикация успешно опубликована в Venstogram!</b>\n\n"
             f"📝 <i>{caption or 'Без подписи'}</i>\n"
-            f"📊 Статус модерации: {'✅ Одобрено' if is_safe else '⏳ На проверке'}\n\n"
+            f"📊 Статус: ✅ Опубликовано\n\n"
             f"Посмотреть в Mini App 👇",
             reply_markup=get_webapp_keyboard(f"post_{post_id}"),
             parse_mode=ParseMode.HTML

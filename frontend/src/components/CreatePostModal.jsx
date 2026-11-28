@@ -118,38 +118,47 @@ export function CreatePostModal({ t, onClose, onPostCreated, dataSaver }) {
       // 2. Extract hashtags
       const hashtags = (caption.match(/#[a-zа-яё0-9_]+/gi) || []).map((h) => h.slice(1));
 
-      // 3. Create post
+      // 3. Create single publication: if video -> Reel; if photo -> Post (strictly no duplicate creation!)
       const isVideo = selectedFile.type.startsWith("video");
-      const postRes = await Api.post("/posts", {
-        caption,
-        media_urls: [uploadRes.url],
-        media_type: isVideo ? "video" : "image",
-        location: location.trim(),
-        hashtags
-      });
-
-      // 4. If video, automatically publish to Reels too for algorithmic discovery
+      let createdPost = null;
       let createdReel = null;
+
       if (isVideo) {
-        try {
-          const reelRes = await Api.post("/reels", {
+        const reelRes = await Api.post("/reels", {
+          video_url: uploadRes.url,
+          caption: caption,
+          audio_title: "Original Sound",
+          thumbnail_url: ""
+        });
+        if (reelRes && reelRes.reel) {
+          createdReel = reelRes.reel;
+        } else {
+          createdReel = {
+            id: reelRes?.reel_id || Date.now(),
             video_url: uploadRes.url,
             caption: caption,
-            audio_title: "Original Sound",
-            thumbnail_url: ""
-          });
-          if (reelRes && reelRes.reel) {
-            createdReel = reelRes.reel;
-          }
-        } catch (e) {
-          console.warn("Reel sync error", e);
+            likes_count: 0,
+            comments_count: 0
+          };
+        }
+      } else {
+        const postRes = await Api.post("/posts", {
+          caption,
+          media_urls: [uploadRes.url],
+          media_type: "image",
+          location: location.trim(),
+          hashtags
+        });
+        if (postRes && postRes.post) {
+          createdPost = postRes.post;
         }
       }
 
       SoundEngine.playFanfare();
-      alert(postRes.message || "Muvaffaqiyatli chop etildi! / Опубликовано!");
+      triggerHaptic("success");
+      alert("✓ Muvaffaqiyatli chop etildi! / Публикация успешно размещена!");
       if (onPostCreated) {
-        onPostCreated(postRes.post, createdReel);
+        onPostCreated(createdPost, createdReel);
       }
       onClose();
     } catch (err) {

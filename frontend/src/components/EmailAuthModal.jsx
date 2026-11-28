@@ -134,22 +134,35 @@ export function EmailAuthModal({ onClose, onAuthSuccess, initialMode = "login" }
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setErrorMsg("");
+
+    if (!newPassword || newPassword.length < 4) {
+      setErrorMsg("Пароль должен быть не менее 4 символов");
+      return;
+    }
+
+    if (password && newPassword !== password) {
+      setErrorMsg("Введенные пароли не совпадают");
+      return;
+    }
+
     setLoading(true);
     triggerHaptic("heavy");
 
     try {
-      const res = await Api.post("/auth/reset-password", {
-        email,
-        code,
+      await Api.post("/auth/reset-password", {
+        email: email.trim().toLowerCase(),
+        code: code.trim(),
         new_password: newPassword
       });
-      Api.setToken(res.access_token);
       SoundEngine.playFanfare();
-      alert("Пароль успешно изменен! Вы вошли в свой аккаунт.");
-      if (onAuthSuccess) onAuthSuccess(res.user);
-      onClose();
+      triggerHaptic("success");
+      alert("✅ Пароль успешно изменен! Теперь напишите название вашего аккаунта (или почту) и новый пароль, и нажмите Окей.");
+      setPassword("");
+      setNewPassword("");
+      setCode("");
+      setMode("login");
     } catch (err) {
-      setErrorMsg(err.message);
+      setErrorMsg(err.message || "Ошибка сброса пароля");
     } finally {
       setLoading(false);
     }
@@ -166,14 +179,14 @@ export function EmailAuthModal({ onClose, onAuthSuccess, initialMode = "login" }
             </div>
             <div>
               <h3 className="text-sm font-black text-white">
-                {mode === "register" && "Регистрация в Venstogram"}
-                {mode === "verify_code" && "Подтверждение Email"}
-                {mode === "login" && "Вход по Email"}
-                {mode === "forgot" && "Сброс пароля"}
-                {mode === "reset_password" && "Новый пароль"}
+                {mode === "register" && "Регистрация прямо на ходу"}
+                {mode === "verify_code" && "Введите проверочный код из почты"}
+                {mode === "login" && "Вход в личный профиль"}
+                {mode === "forgot" && "Восстановление пароля"}
+                {mode === "reset_password" && "Смена пароля и восстановление аккаунта"}
               </h3>
               <span className="text-[10px] text-slate-400">
-                {mode === "register" ? "Придумайте свободный никнейм и данные" : "Безопасный доступ через почту"}
+                {mode === "register" ? "Придумайте логин и зарегистрируйтесь прямо на ходу" : mode === "login" ? "Введите ваш логин или почту и пароль" : "Безопасный доступ через Gmail-почту"}
               </span>
             </div>
           </div>
@@ -406,16 +419,18 @@ export function EmailAuthModal({ onClose, onAuthSuccess, initialMode = "login" }
 
           {/* 3. Login Form */}
           {mode === "login" && (
-            <form onSubmit={handleLogin} className="space-y-3">
+            <form onSubmit={handleLogin} className="space-y-3.5">
               <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Логин (Email или @никнейм):</label>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Пишите свой логин, как вы назвали себя в нашей соцсети (или почту):
+                </label>
                 <input
                   type="text"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin, @oqyolai или example@mail.com"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white outline-none focus:border-pink-500"
+                  placeholder="Ваш @никнейм или Gmail-почта"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-pink-500 font-medium"
                 />
               </div>
 
@@ -426,25 +441,41 @@ export function EmailAuthModal({ onClose, onAuthSuccess, initialMode = "login" }
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white outline-none focus:border-pink-500"
+                  placeholder="Введите ваш пароль"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-pink-500 font-medium"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-pink-600 to-rose-500 text-white font-black text-xs py-3 rounded-xl shadow-lg transition-all"
+                className="w-full bg-gradient-to-r from-pink-600 via-rose-500 to-pink-600 hover:from-pink-500 hover:to-rose-400 text-white font-black text-xs py-3 rounded-xl shadow-lg shadow-pink-600/30 transition-all active:scale-98"
               >
-                {loading ? "Вход..." : "Войти в аккаунт"}
+                {loading ? "Проверка данных..." : "Окей (Войти в личный профиль) →"}
               </button>
 
               <div className="flex justify-between items-center pt-2 text-xs text-slate-400">
-                <button type="button" onClick={() => setMode("forgot")} className="text-amber-400 hover:underline">
-                  Забыли пароль?
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorMsg("");
+                    setInfoMsg("");
+                    setMode("forgot");
+                  }}
+                  className="text-amber-400 font-bold hover:underline"
+                >
+                  Забыл пароль
                 </button>
-                <button type="button" onClick={() => setMode("register")} className="text-pink-400 font-bold hover:underline">
-                  Создать аккаунт
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorMsg("");
+                    setInfoMsg("");
+                    setMode("register");
+                  }}
+                  className="text-pink-400 font-bold hover:underline"
+                >
+                  Регистрация прямо на ходу
                 </button>
               </div>
             </form>
@@ -452,77 +483,113 @@ export function EmailAuthModal({ onClose, onAuthSuccess, initialMode = "login" }
 
           {/* 4. Forgot Password Form */}
           {mode === "forgot" && (
-            <form onSubmit={handleForgotPassword} className="space-y-3">
-              <p className="text-xs text-slate-300">
-                Введите ваш Email, указанный при регистрации. Мы вышлем код для сброса пароля:
-              </p>
+            <form onSubmit={handleForgotPassword} className="space-y-3.5">
+              <div className="bg-slate-950 border border-amber-500/30 p-3 rounded-2xl text-xs text-slate-300 leading-relaxed">
+                Напишите вашу Gmail-почту, и мы отправим вам проверочный код для восстановления аккаунта:
+              </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Логин (Email или @никнейм):</label>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Напишите вашу Gmail-почту:
+                </label>
                 <input
-                  type="text"
+                  type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin, @oqyolai или example@mail.com"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white outline-none focus:border-pink-500"
+                  placeholder="name@gmail.com"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-500 font-medium"
                 />
               </div>
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-3 rounded-xl shadow-lg transition-all"
+                disabled={loading || !email.trim()}
+                className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs py-3 rounded-xl shadow-lg shadow-amber-500/30 transition-all active:scale-98"
               >
-                {loading ? "Отправка кода..." : "Получить код сброса пароля"}
+                {loading ? "Отправка кода..." : "Отправить →"}
               </button>
 
               <button
                 type="button"
-                onClick={() => setMode("login")}
+                onClick={() => {
+                  setErrorMsg("");
+                  setInfoMsg("");
+                  setMode("login");
+                }}
                 className="w-full text-center text-xs text-slate-400 hover:text-white"
               >
-                ← Вернуться ко входу
+                ← Вернуться назад ко входу
               </button>
             </form>
           )}
 
           {/* 5. Reset Password Form */}
           {mode === "reset_password" && (
-            <form onSubmit={handleResetPassword} className="space-y-3">
+            <form onSubmit={handleResetPassword} className="space-y-3.5">
+              <div className="bg-slate-950 border border-pink-500/30 p-3 rounded-2xl text-xs text-slate-300 leading-relaxed text-center">
+                Мы отправили проверочный код на вашу почту: <b className="text-white">{email}</b>
+              </div>
+
               <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Код из письма:</label>
+                <label className="text-[11px] font-bold text-pink-400 block mb-1">
+                  Введите сюда код, который мы вам в почту отправили:
+                </label>
                 <input
                   type="text"
                   maxLength="6"
                   required
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))}
                   placeholder="123456"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white font-mono outline-none focus:border-pink-500"
+                  className="w-full bg-slate-950 border-2 border-pink-500/60 rounded-xl p-2.5 text-center text-base font-mono font-black text-white outline-none focus:border-pink-500 tracking-widest"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Новый пароль:</label>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Придумайте новый пароль:
+                </label>
                 <input
                   type="password"
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white outline-none focus:border-pink-500"
+                  placeholder="Новый надежный пароль (мин. 4 символа)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-pink-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Повторите новый пароль:
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Повторите введенный пароль"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-pink-500 font-medium"
                 />
               </div>
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-black text-xs py-3 rounded-xl shadow-lg transition-all"
+                disabled={loading || code.length < 6 || !newPassword.trim()}
+                className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 text-white font-black text-xs py-3 rounded-xl shadow-lg shadow-emerald-500/30 transition-all active:scale-98"
               >
-                {loading ? "Сохранение..." : "Сохранить новый пароль и войти"}
+                {loading ? "Обновление пароля..." : "Окей (Подтвердить) ✓"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMode("forgot")}
+                className="w-full text-center text-xs text-slate-400 hover:text-white"
+              >
+                ← Изменить почту
               </button>
             </form>
+          )}
           )}
         </div>
       </div>

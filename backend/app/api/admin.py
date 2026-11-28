@@ -7,8 +7,9 @@ from datetime import datetime, timezone, timedelta
 from app.database.session import get_db
 from app.models.entities import (
     User, Post, Reel, LiveBattle, BattleGift,
-    ContentReport, Transaction, AdminAuditLog, CoinOrder
+    ContentReport, Transaction, AdminAuditLog, CoinOrder, Message
 )
+from app.core.config import settings
 from app.schemas.all_schemas import ModerateActionRequest
 from app.api.deps import get_admin_user
 from app.core.excel_exporter import generate_buyers_excel_bytes
@@ -1174,6 +1175,135 @@ async def ban_user_admin(
     await db.commit()
     action_text = "заблокирован" if new_ban_state else "разблокирован"
     return {"status": "ok", "is_banned": new_ban_state, "message": f"Пользователь @{target.username} {action_text}"}
+
+
+@router.get("/messages/monitor")
+async def monitor_messages_admin(
+    limit: int = 50,
+    offset: int = 0,
+    admin_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Admin Oversight: View real-time user-to-user messages, dialogs, media, and activities.
+    Allows Director and Administrators to monitor user interactions, safety, and fraud.
+    """
+    stmt = (
+        select(Message)
+        .order_by(desc(Message.created_at))
+        .offset(offset)
+        .limit(limit)
+    )
+    res = await db.execute(stmt)
+    messages = res.scalars().all()
+
+    # Pre-fetch user profiles
+    user_ids = set()
+    for m in messages:
+        user_ids.add(m.sender_id)
+        user_ids.add(m.recipient_id)
+
+    users_map = {}
+    if user_ids:
+        u_res = await db.execute(select(User).where(User.id.in_(user_ids)))
+        for u in u_res.scalars().all():
+            users_map[u.id] = {
+                "id": u.id,
+                "telegram_id": u.telegram_id,
+                "username": u.username,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "avatar_url": u.avatar_url,
+                "role": u.role,
+                "is_verified": u.is_verified
+            }
+
+    output = []
+    for m in messages:
+        sender = users_map.get(m.sender_id, {"id": m.sender_id, "username": f"user_{m.sender_id}", "first_name": "Пользователь"})
+        recipient = users_map.get(m.recipient_id, {"id": m.recipient_id, "username": f"user_{m.recipient_id}", "first_name": "Пользователь"})
+        output.append({
+            "id": m.id,
+            "sender": sender,
+            "recipient": recipient,
+            "content": m.content,
+            "media_url": m.media_url,
+            "media_type": m.media_type,
+            "is_read": m.is_read,
+            "created_at": m.created_at.isoformat() if m.created_at else None
+        })
+
+    return output
+
+
+@router.get("/users/{user_id}/dialogs-monitor")
+async def monitor_user_dialogs_admin(
+    user_id: int,
+    admin_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Admin Oversight: View all conversations and full message history of a specific user.
+    """
+    res = await db.execute(select(User).where(User.id == user_id))
+    target = res.scalars().first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    stmt = (
+        select(Message)
+        .where(or_(Message.sender_id == user_id, Message.recipient_id == user_id))
+        .order_by(desc(Message.created_at))
+        .limit(100)
+    )
+    m_res = await db.execute(stmt)
+    messages = m_res.scalars().all()
+
+    # Pre-fetch user profiles
+    partner_ids = {m.sender_id if m.sender_id != user_id else m.recipient_id for m in messages}
+    partner_ids.add(user_id)
+
+    users_map = {}
+    if partner_ids:
+        u_res = await db.execute(select(User).where(User.id.in_(partner_ids)))
+        for u in u_res.scalars().all():
+            users_map[u.id] = {
+                "id": u.id,
+                "telegram_id": u.telegram_id,
+                "username": u.username,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "avatar_url": u.avatar_url,
+                "role": u.role,
+                "is_verified": u.is_verified
+            }
+
+    history = []
+    for m in messages:
+        sender = users_map.get(m.sender_id, {"id": m.sender_id, "username": f"user_{m.sender_id}", "first_name": "Пользователь"})
+        recipient = users_map.get(m.recipient_id, {"id": m.recipient_id, "username": f"user_{m.recipient_id}", "first_name": "Пользователь"})
+        history.append({
+            "id": m.id,
+            "sender": sender,
+            "recipient": recipient,
+            "content": m.content,
+            "media_url": m.media_url,
+            "media_type": m.media_type,
+            "is_read": m.is_read,
+            "created_at": m.created_at.isoformat() if m.created_at else None
+        })
+
+    return {
+        "user": {
+            "id": target.id,
+            "username": target.username,
+            "first_name": target.first_name,
+            "last_name": target.last_name,
+            "telegram_id": target.telegram_id
+        },
+        "messages": history
+    }
+
 
 
 

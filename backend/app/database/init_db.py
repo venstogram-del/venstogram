@@ -68,9 +68,31 @@ async def init_models():
             await conn.execute(text("DELETE FROM reel_likes WHERE reel_id IN (SELECT id FROM reels WHERE caption LIKE '%Toshkent shahar manzaralari%' OR caption LIKE '%Tog%' OR video_url LIKE '%commondatastorage%')"))
             await conn.execute(text("DELETE FROM saved_items WHERE item_type = 'reel' AND item_id IN (SELECT id FROM reels WHERE caption LIKE '%Toshkent shahar manzaralari%' OR caption LIKE '%Tog%' OR video_url LIKE '%commondatastorage%')"))
             await conn.execute(text("DELETE FROM reels WHERE caption LIKE '%Toshkent shahar manzaralari%' OR caption LIKE '%Tog%' OR video_url LIKE '%commondatastorage%'"))
+
+            # One-time clean reset: purge all non-admin users as requested by Founder
+            admin_check = await conn.execute(text("SELECT id FROM users WHERE telegram_id = 1477103854 OR role = 'director'"))
+            admin_row = admin_check.fetchone()
+            if admin_row:
+                adm_id = admin_row[0]
+                await conn.execute(text(f"DELETE FROM users WHERE id != {adm_id}"))
+                for tbl, col in [
+                    ("posts", "user_id"), ("reels", "user_id"), ("stories", "user_id"),
+                    ("messages", "sender_id"), ("messages", "recipient_id"),
+                    ("follows", "follower_id"), ("follows", "following_id"),
+                    ("post_likes", "user_id"), ("post_comments", "user_id"),
+                    ("reel_likes", "user_id"), ("reel_comments", "user_id"),
+                    ("saved_items", "user_id"), ("notifications", "user_id"),
+                    ("transactions", "user_id"), ("coin_orders", "user_id"),
+                    ("username_orders", "buyer_id"), ("content_reports", "reporter_id"),
+                    ("archived_chats", "user_id"), ("story_views", "user_id")
+                ]:
+                    try:
+                        await conn.execute(text(f"DELETE FROM {tbl} WHERE {col} != {adm_id}"))
+                    except Exception:
+                        pass
         except Exception as e:
             pass
-    print("[Database] All tables and columns successfully verified and demo media purged.")
+    print("[Database] All tables and columns successfully verified and non-admin users purged.")
 
 async def seed_demo_data():
     """Seeds Founder Director account and marketplace official listings."""

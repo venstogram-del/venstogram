@@ -112,9 +112,9 @@ async def create_post(
         media_type=req.media_type,
         location=req.location or "",
         hashtags=req.hashtags or [],
-        is_flagged=not is_safe,
+        is_flagged=False,
         threat_score=threat_score,
-        moderation_status="approved" if is_safe else "pending",
+        moderation_status="approved",
         moderation_reason=", ".join(flags) if flags else None
     )
     db.add(post)
@@ -124,8 +124,8 @@ async def create_post(
     return {
         "status": "ok",
         "post_id": post.id,
-        "moderation_status": post.moderation_status,
-        "message": "Post created successfully" if is_safe else "Post queued for moderator review"
+        "moderation_status": "approved",
+        "message": "Post created successfully"
     }
 
 

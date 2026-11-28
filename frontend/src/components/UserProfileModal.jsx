@@ -98,9 +98,16 @@ export function UserProfileModal({
 
   const isMe = currentUser?.id === userId;
 
+  // Deduplicate posts that have the same video URL as a reel (legacy bug fix)
+  const uniqueReelsUrls = new Set((reels || []).map((r) => r.video_url).filter(Boolean));
+  const uniquePosts = (posts || []).filter((p) => {
+    const url = (p.media_urls && p.media_urls[0]) || p.media_url;
+    return !url || !uniqueReelsUrls.has(url);
+  });
+
   // Compute total likes across posts and reels
   const totalLikes =
-    (posts.reduce((acc, p) => acc + (p.likes_count || 0), 0)) +
+    (uniquePosts.reduce((acc, p) => acc + (p.likes_count || 0), 0)) +
     (reels.reduce((acc, r) => acc + (r.likes_count || 0), 0));
 
   if (!loading && !profile) {
@@ -233,7 +240,7 @@ export function UserProfileModal({
           {/* Stats Bar */}
           <div className="grid grid-cols-4 gap-2 bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3 text-center">
             <div>
-              <span className="block text-sm font-black text-white">{posts.length}</span>
+              <span className="block text-sm font-black text-white">{uniquePosts.length}</span>
               <span className="text-[10px] text-slate-400 font-medium">Посты</span>
             </div>
             <div
@@ -329,7 +336,7 @@ export function UserProfileModal({
             >
               <span>📸 Публикации</span>
               <span className="text-[10px] bg-slate-800 px-1.5 py-0.2 rounded-full">
-                {posts.length}
+                {uniquePosts.length}
               </span>
             </button>
             <button
@@ -353,7 +360,7 @@ export function UserProfileModal({
           {/* Content Grids */}
           {activeTab === "posts" && (
             <div>
-              {posts.length === 0 ? (
+              {uniquePosts.length === 0 ? (
                 <div className="text-center py-12 space-y-2">
                   <span className="text-3xl block">📷</span>
                   <p className="text-xs font-bold text-slate-400">Нет публикаций</p>
@@ -363,7 +370,7 @@ export function UserProfileModal({
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-1">
-                  {posts.map((post) => {
+                  {uniquePosts.map((post) => {
                     const thumb =
                       (post.media_urls && post.media_urls[0]) || post.media_url || "";
                     const isVideo = post.media_type === "video";

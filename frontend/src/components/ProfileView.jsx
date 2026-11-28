@@ -358,12 +358,20 @@ export function ProfileView({
     }
   };
 
+  // Deduplicate posts that have the same video URL as a reel (legacy bug fix)
+  const uniqueReelsUrls = new Set((userReels || []).map((r) => r.video_url).filter(Boolean));
+  const uniqueUserPosts = (userPosts || []).filter((p) => {
+    const url = p.media_urls?.[0];
+    return !url || !uniqueReelsUrls.has(url);
+  });
+  const totalPublicationsCount = uniqueUserPosts.length + (userReels || []).length;
+
   const displayList =
     activeTab === "reels"
       ? userReels
       : activeTab === "saved"
       ? savedItems
-      : userPosts;
+      : uniqueUserPosts;
 
   const userTheme = user?.profile_theme || (user?.role === "director" ? "gold_founder" : "default");
   const isDirector = user?.role === "director";
@@ -534,7 +542,7 @@ export function ProfileView({
         {/* Stats */}
         <div className="flex-1 flex justify-around text-center">
           <div>
-            <span className="text-base font-black text-slate-900 block">{userPosts.length + userReels.length}</span>
+            <span className="text-base font-black text-slate-900 block">{totalPublicationsCount}</span>
             <span className="text-[11px] text-slate-500 font-medium">{t?.postsCount || "Публикаций"}</span>
           </div>
           <div

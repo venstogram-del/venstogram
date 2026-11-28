@@ -65,8 +65,8 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request, db: AsyncSes
             language_code=tg_user.get("language_code", "ru"),
             role="director" if is_admin_id else "user",
             is_verified=True if is_admin_id else False,
-            is_email_verified=True,
-            is_registered=True,
+            is_email_verified=False,
+            is_registered=True if is_admin_id else False,
             device_fingerprint=req.device_fingerprint,
             last_ip=client_ip,
             last_active=now,
@@ -75,11 +75,10 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request, db: AsyncSes
         db.add(user)
     else:
         # Update user info
-        user.is_email_verified = True
-        user.is_registered = True
         if is_admin_id:
             user.role = "director"
             user.is_verified = True
+            user.is_registered = True
         else:
             if user.role in ("director", "admin", "it_admin", "moderator"):
                 user.role = "user"
@@ -115,7 +114,8 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request, db: AsyncSes
             "is_verified": user.is_verified,
             "birth_year": user.birth_year,
             "birth_date": user.birth_date,
-            "is_registered": bool(user.is_registered or user.role == "director" or (user.birth_year and user.username and not user.username.startswith("user_"))),
+            "is_registered": bool((user.is_registered and user.password_hash) or user.role == "director" or is_admin_id),
+            "has_password": bool(user.password_hash),
             "wallet_coins": user.wallet_coins,
             "wallet_uzs": user.wallet_uzs,
             "language_code": user.language_code
@@ -165,7 +165,8 @@ async def dev_login(req: DevAuthRequest, db: AsyncSession = Depends(get_db)):
             "is_verified": user.is_verified,
             "birth_year": user.birth_year,
             "birth_date": user.birth_date,
-            "is_registered": bool(user.is_registered or user.role == "director" or (user.birth_year and user.username and not user.username.startswith("user_"))),
+            "is_registered": bool((user.is_registered and user.password_hash) or user.role == "director" or is_admin_id),
+            "has_password": bool(user.password_hash),
             "wallet_coins": user.wallet_coins,
             "wallet_uzs": user.wallet_uzs,
             "language_code": user.language_code
@@ -207,7 +208,8 @@ async def get_me(current_user: User = Depends(get_current_user), db: AsyncSessio
         "wallet_uzs": current_user.wallet_uzs,
         "birth_year": current_user.birth_year,
         "birth_date": current_user.birth_date,
-        "is_registered": bool(current_user.is_registered or current_user.role == "director" or (current_user.birth_year and current_user.username and not current_user.username.startswith("user_"))),
+        "is_registered": bool((current_user.is_registered and current_user.password_hash) or current_user.role == "director" or current_user.telegram_id in settings.ADMIN_TELEGRAM_IDS),
+        "has_password": bool(current_user.password_hash),
         "language_code": current_user.language_code,
         "biometric_enabled": current_user.biometric_enabled,
         "has_pin": bool(current_user.wallet_pin),
@@ -712,7 +714,8 @@ async def login_email(req: EmailLoginRequest, db: AsyncSession = Depends(get_db)
             "is_verified": user.is_verified,
             "birth_year": user.birth_year,
             "birth_date": user.birth_date,
-            "is_registered": bool(user.is_registered or user.role == "director" or (user.birth_year and user.username and not user.username.startswith("user_"))),
+            "is_registered": bool((user.is_registered and user.password_hash) or user.role == "director" or is_admin_id),
+            "has_password": bool(user.password_hash),
             "wallet_coins": user.wallet_coins,
             "wallet_uzs": user.wallet_uzs,
             "language_code": user.language_code

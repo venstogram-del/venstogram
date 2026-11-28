@@ -30,6 +30,13 @@ export function AdminView({ user, t }) {
   const [adminPasswordInput, setAdminPasswordInput] = useState("");
   const [adminAuthError, setAdminAuthError] = useState("");
 
+  // Chats & Messages Monitor state (Admin Oversight)
+  const [monitoredMessages, setMonitoredMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [messageSearchQuery, setMessageSearchQuery] = useState("");
+  const [inspectingUserDialogs, setInspectingUserDialogs] = useState(null);
+  const [loadingDialogs, setLoadingDialogs] = useState(false);
+
   // Policies and Management Authority state
   const [policies, setPolicies] = useState([]);
   const [selectedPolicyKey, setSelectedPolicyKey] = useState("username_terms");
@@ -83,6 +90,31 @@ export function AdminView({ user, t }) {
     } else {
       triggerHaptic("heavy");
       setAdminAuthError("Неверный пароль администратора!");
+    }
+  };
+
+  const loadMonitoredMessages = async () => {
+    setLoadingMessages(true);
+    try {
+      const res = await Api.get("/admin/messages/monitor?limit=150");
+      setMonitoredMessages(Array.isArray(res) ? res : []);
+    } catch (e) {
+      console.warn("Error loading messages monitor", e);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
+  const loadUserDialogHistory = async (targetUserId) => {
+    setLoadingDialogs(true);
+    try {
+      const res = await Api.get(`/admin/users/${targetUserId}/dialogs-monitor`);
+      setInspectingUserDialogs(res);
+      triggerHaptic("medium");
+    } catch (e) {
+      alert("Не удалось загрузить историю переписки: " + e.message);
+    } finally {
+      setLoadingDialogs(false);
     }
   };
 
@@ -637,6 +669,19 @@ export function AdminView({ user, t }) {
         <button
           onClick={() => {
             triggerHaptic("light");
+            setActiveSubTab("chats_monitor");
+            loadMonitoredMessages();
+          }}
+          className={`py-2 px-3 rounded-xl whitespace-nowrap transition-all flex items-center space-x-1 ${
+            activeSubTab === "chats_monitor" ? "bg-teal-500 text-slate-950 font-black shadow-md" : "text-slate-400"
+          }`}
+        >
+          <span>💬 Мониторинг переписок</span>
+        </button>
+
+        <button
+          onClick={() => {
+            triggerHaptic("light");
             setActiveSubTab("users");
           }}
           className={`py-2 px-3 rounded-xl whitespace-nowrap transition-all ${
@@ -731,6 +776,152 @@ export function AdminView({ user, t }) {
           )}
         </button>
       </div>
+
+      {/* Chats & Messages Monitor Sub-Tab (Admin Oversight) */}
+      {activeSubTab === "chats_monitor" && (
+        <div className="space-y-3">
+
+          {/* Dialogs Inspection Modal if a specific user conversation is selected */}
+          {inspectingUserDialogs && (
+            <div className="bg-slate-900 border border-sky-500/40 p-4 rounded-2xl space-y-3 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-base">💬</span>
+                  <h4 className="text-xs font-black text-white">
+                    Диалоги пользователя: <span className="text-sky-400">@{inspectingUserDialogs.user?.username}</span> ({inspectingUserDialogs.user?.first_name})
+                  </h4>
+                </div>
+                <button
+                  onClick={() => setInspectingUserDialogs(null)}
+                  className="text-xs text-slate-400 hover:text-white bg-slate-800 px-2 py-1 rounded-lg"
+                >
+                  ✕ Закрыть
+                </button>
+              </div>
+
+              {inspectingUserDialogs.messages?.length === 0 ? (
+                <div className="text-center py-6 text-xs text-slate-500">У данного пользователя пока нет сообщений</div>
+              ) : (
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                  {inspectingUserDialogs.messages.map((m) => (
+                    <div key={m.id} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs space-y-1">
+                      <div className="flex items-center justify-between text-[10px] text-slate-400">
+                        <span className="font-bold text-sky-300">
+                          @{m.sender?.username} ➔ @{m.recipient?.username}
+                        </span>
+                        <span>{m.created_at ? new Date(m.created_at).toLocaleTimeString() : ""}</span>
+                      </div>
+                      <p className="text-slate-200">{m.content || "(Медиафайл)"}</p>
+                      {m.media_url && (
+                        <div className="pt-1">
+                          <a href={m.media_url} target="_blank" rel="noreferrer" className="text-[10px] text-pink-400 hover:underline">
+                            📎 Просмотреть прикрепленный медиафайл
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Live Messages List */}
+          <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl space-y-3 shadow-md">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-white flex items-center space-x-1.5">
+                  <span>📨</span>
+                  <span>Лента всех сообщений и диалогов ({monitoredMessages.length})</span>
+                </h4>
+                <span className="text-[10px] text-slate-400">Контроль безопасности переписок и предупреждение мошенничества</span>
+              </div>
+              <button
+                onClick={() => {
+                  triggerHaptic("light");
+                  loadMonitoredMessages();
+                }}
+                className="text-[11px] text-teal-400 font-bold hover:underline"
+              >
+                🔄 Обновить
+              </button>
+            </div>
+
+            <div className="relative">
+              <input
+                type="text"
+                value={messageSearchQuery}
+                onChange={(e) => setMessageSearchQuery(e.target.value)}
+                placeholder="Поиск по никнейму или тексту сообщения..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-teal-500"
+              />
+            </div>
+
+            {loadingMessages ? (
+              <div className="text-center py-8 text-xs text-slate-500">Загрузка сообщений платформы...</div>
+            ) : monitoredMessages.length === 0 ? (
+              <div className="text-center py-8 text-xs text-slate-500">Сообщений в базе пока нет</div>
+            ) : (
+              <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+                {monitoredMessages
+                  .filter((m) => {
+                    if (!messageSearchQuery.trim()) return true;
+                    const q = messageSearchQuery.toLowerCase();
+                    return (
+                      (m.content || "").toLowerCase().includes(q) ||
+                      (m.sender?.username || "").toLowerCase().includes(q) ||
+                      (m.recipient?.username || "").toLowerCase().includes(q) ||
+                      (m.sender?.first_name || "").toLowerCase().includes(q)
+                    );
+                  })
+                  .map((m) => (
+                    <div
+                      key={m.id}
+                      className="bg-slate-950 border border-slate-800/80 hover:border-slate-700 p-3 rounded-2xl space-y-2 transition shadow-sm"
+                    >
+                      <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center space-x-1.5 flex-wrap">
+                          <span className="font-bold text-white">@{m.sender?.username}</span>
+                          <span className="text-slate-500">➔</span>
+                          <span className="font-bold text-sky-400">@{m.recipient?.username}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500">
+                          {m.created_at ? new Date(m.created_at).toLocaleString() : ""}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-900/90 rounded-xl p-2.5 text-xs text-slate-200 leading-relaxed border border-slate-800/50">
+                        {m.content || <i className="text-slate-500">Медиасообщение без текста</i>}
+                        {m.media_url && (
+                          <div className="mt-1.5 pt-1.5 border-t border-slate-800 flex items-center space-x-2">
+                            <span className="text-xs">📎</span>
+                            <a
+                              href={m.media_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] text-pink-400 font-bold hover:underline truncate"
+                            >
+                              Открыть медиа ({m.media_type || "файл"})
+                            </a>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-end space-x-2 pt-1">
+                        <button
+                          onClick={() => loadUserDialogHistory(m.sender.id)}
+                          className="text-[10px] bg-slate-900 border border-slate-700 hover:border-sky-500 text-sky-300 font-bold px-2.5 py-1 rounded-lg transition"
+                        >
+                          🔍 Все диалоги @{m.sender?.username}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Orders Tab: Username Purchase Receipts Queue */}
       {activeSubTab === "orders" && (

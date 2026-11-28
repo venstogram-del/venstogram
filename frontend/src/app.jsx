@@ -63,7 +63,7 @@ export function App() {
   const [chatOpen, setChatOpen] = useState(false);
   const [activeChatUser, setActiveChatUser] = useState(null);
   const [founderQuestOpen, setFounderQuestOpen] = useState(false);
-  const [isRegistered, setIsRegistered] = useState(true);
+  const [isRegistered, setIsRegistered] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState(null);
   const [selectedPostModal, setSelectedPostModal] = useState(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -75,14 +75,17 @@ export function App() {
     if (!confirm("Вы уверены, что хотите выйти из профиля?")) return;
     triggerHaptic("heavy");
     try {
-      localStorage.removeItem("vensto_token");
+      safeRemoveItem("vensto_token");
+      safeRemoveItem("vensto_cached_user");
+      safeSetItem("vensto_logged_out", "true");
       if (user?.id) {
-        localStorage.removeItem(`vensto_account_created_${user.id}`);
+        safeRemoveItem(`vensto_account_created_${user.id}`);
       }
     } catch (e) {}
     Api.setToken("");
     setUser(null);
     setIsRegistered(false);
+    setEmailAuthMode("login");
     setEmailAuthOpen(true);
   };
 
@@ -197,7 +200,17 @@ export function App() {
       const currentTgId = currentTgUser?.id ? Number(currentTgUser.id) : null;
       const initData = window.Telegram?.WebApp?.initData;
 
-      // 0. Instant offline/cached user restoration with account-switch check
+      // 0. Check if user manually logged out - never auto-login!
+      const isLoggedOut = safeGetItem("vensto_logged_out") === "true";
+      if (isLoggedOut) {
+        setUser(null);
+        setIsRegistered(false);
+        setEmailAuthMode("login");
+        setEmailAuthOpen(true);
+        return;
+      }
+
+      // 0.1 Instant offline/cached user restoration with account-switch check
       const cachedUserStr = safeGetItem("vensto_cached_user");
       let cachedUser = null;
       if (cachedUserStr) {
@@ -222,10 +235,6 @@ export function App() {
         }
         activeSessionUser = cachedUser;
         setUser(cachedUser);
-        const resolvedUserId = cachedUser.id || 1;
-        const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`) === "true";
-        const isDirector = Number(cachedUser.telegram_id) === 1477103854;
-        setIsRegistered(isDirector || hasCreated || Boolean(cachedUser.is_registered));
       }
 
       // 1. Check saved session JWT token from localStorage
@@ -309,30 +318,26 @@ export function App() {
           activeSessionUser.role = "user";
         }
         setUser(activeSessionUser);
-        safeSetItem("vensto_cached_user", JSON.stringify(activeSessionUser));
         const isDirector = Number(activeSessionUser.telegram_id) === 1477103854;
         const resolvedUserId = activeSessionUser.id || 1;
         const hasCreated = safeGetItem(`vensto_account_created_${resolvedUserId}`) === "true";
-        const hasProfile = Boolean(
-          activeSessionUser.birth_year &&
-          activeSessionUser.first_name &&
-          activeSessionUser.username &&
-          typeof activeSessionUser.username === "string" &&
-          !activeSessionUser.username.startsWith("user_")
-        );
-        const registered = isDirector || hasCreated || Boolean(activeSessionUser.is_registered) || hasProfile;
+        const hasPass = Boolean(activeSessionUser.has_password || safeGetItem(`vensto_has_pass_${resolvedUserId}`) === "true");
+        const registered = isDirector || (hasCreated && hasPass) || (Boolean(activeSessionUser.is_registered) && hasPass);
+
         if (registered) {
+          safeSetItem("vensto_cached_user", JSON.stringify(activeSessionUser));
           safeSetItem(`vensto_account_created_${resolvedUserId}`, "true");
-        }
-        setIsRegistered(registered);
-      } else {
-        // If inside Telegram WebApp and network timed out, don't force email modal or false registration
-        const isTelegram = Boolean(window.Telegram?.WebApp?.initData);
-        if (!isTelegram) {
-          setUser(null);
+          setIsRegistered(true);
+        } else {
           setIsRegistered(false);
+          setEmailAuthMode("register");
           setEmailAuthOpen(true);
         }
+      } else {
+        setUser(null);
+        setIsRegistered(false);
+        setEmailAuthMode("register");
+        setEmailAuthOpen(true);
       }
 
       // Check deep link parameters
@@ -481,35 +486,21 @@ export function App() {
   // Mandatory initial registration and account creation view
   if (!isRegistered) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900">
-        <RegistrationModal
-          user={user}
-          lang={lang}
-          onLanguageChange={handleLanguageChange}
-          onOpenEmailAuth={(mode = "login") => {
-            setEmailAuthMode(mode);
-            setEmailAuthOpen(true);
-          }}
-          onComplete={(updatedUser) => {
-            setUser(updatedUser);
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center">
+        <EmailAuthModal
+          initialMode={emailAuthMode || "register"}
+          onClose={() => {}}
+          onAuthSuccess={(u) => {
+            setUser(u);
             setIsRegistered(true);
-            safeSetItem(`vensto_account_created_${updatedUser?.id || user?.id || 1}`, "true");
+            safeRemoveItem("vensto_logged_out");
+            safeSetItem(`vensto_account_created_${u?.id || 1}`, "true");
+            safeSetItem(`vensto_has_pass_${u?.id || 1}`, "true");
+            safeSetItem("vensto_cached_user", JSON.stringify(u));
+            setEmailAuthOpen(false);
             loadAllContent();
           }}
         />
-        {emailAuthOpen && (
-          <EmailAuthModal
-            initialMode={emailAuthMode}
-            onClose={() => setEmailAuthOpen(false)}
-            onAuthSuccess={(u) => {
-              setUser(u);
-              setIsRegistered(true);
-              safeSetItem(`vensto_account_created_${u?.id || 1}`, "true");
-              setEmailAuthOpen(false);
-              loadAllContent();
-            }}
-          />
-        )}
       </div>
     );
   }
